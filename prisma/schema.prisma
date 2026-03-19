@@ -1,0 +1,231 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum PlanCode {
+  FREE
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+  TRIALING
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String?
+  email        String   @unique
+  passwordHash String?
+  role         UserRole @default(USER)
+  plan         PlanCode @default(FREE)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  reports            Report[]
+  subscription       Subscription?
+  userUsageRecords   UserUsageRecord[]
+}
+
+model Plan {
+  id                   String   @id @default(cuid())
+  code                 PlanCode @unique
+  name                 String
+  description          String?
+  monthlyAnalysisLimit Int
+  reportsHistoryLimit  Int?
+  canExportReports     Boolean  @default(false)
+  canUseAdvancedAi     Boolean  @default(false)
+  canReanalyze         Boolean  @default(false)
+  priceMonthly         Float    @default(0)
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                String             @id @default(cuid())
+  userId            String             @unique
+  planId            String
+  status            SubscriptionStatus @default(ACTIVE)
+  startDate         DateTime           @default(now())
+  endDate           DateTime?
+  cancelAtPeriodEnd Boolean            @default(false)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+}
+
+model Report {
+  id                   String   @id @default(cuid())
+  userId               String?
+  guestId              String?
+  url                  String
+  platform             String?
+  category             String?
+  seoScore             Int?
+  dataCompletenessScore Int?
+  conversionScore      Int?
+  overallScore         Int?
+  priceCompetitiveness String?
+  summary              String?
+  dataSource           String?
+  extractedData        Json?
+  derivedMetrics       Json?
+  coverage             Json?
+  accessState          Json?
+  suggestions          Json?
+  priorityActions      Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  learningMemory LearningMemory?
+
+  @@index([userId, createdAt])
+  @@index([guestId, createdAt])
+  @@map("reports")
+}
+
+model LearningMemory {
+  id                String   @id @default(cuid())
+  reportId          String?  @unique
+  platform          String
+  category          String
+  sourceType        String   @default("real")
+  learningEligible  Boolean  @default(true)
+  excludedReason    String?
+  coverageConfidence String?
+  missingCriticalCount Int   @default(0)
+  brand             String?
+  sellerName        String?
+  productName       String?
+  priceBand         String?
+  outcomeLabel      String?
+  confidenceLabel   String?
+  isBestSeller      Boolean  @default(false)
+  bestSellerRank    Int?
+  normalizedPrice   Float?
+  shippingDays      Int?
+  imageCount        Int?
+  descriptionLength Int?
+  ratingValue       Float?
+  reviewCount       Int?
+  sellerScore       Float?
+  favoriteCount     Int?
+  otherSellersCount Int?
+  hasVideo          Boolean  @default(false)
+  hasFreeShipping   Boolean  @default(false)
+  officialSeller    Boolean  @default(false)
+  hasCampaign       Boolean  @default(false)
+  criticalDiagnosis String?
+  systemLearning    String?
+  summarySnippet    String?
+  signalSnapshot    Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  report Report? @relation(fields: [reportId], references: [id], onDelete: SetNull)
+
+  @@index([platform, category, createdAt])
+  @@index([platform, category, brand, createdAt])
+  @@index([platform, category, sourceType, learningEligible, createdAt])
+}
+
+model CategoryBenchmark {
+  id                           String   @id @default(cuid())
+  platform                     String
+  category                     String
+  sampleSize                   Int      @default(0)
+  successfulSampleSize         Int      @default(0)
+  avgShippingDays              Float?
+  avgImageCount                Float?
+  avgDescriptionLength         Float?
+  avgRatingValue               Float?
+  avgSellerScore               Float?
+  avgPrice                     Float?
+  avgReviewCount               Float?
+  avgFavoriteCount             Float?
+  avgOtherSellersCount         Float?
+  fastDeliveryRate             Float?
+  freeShippingRate             Float?
+  hasVideoRate                 Float?
+  officialSellerRate           Float?
+  campaignRate                 Float?
+  bestSellerRate               Float?
+  successfulAvgShippingDays    Float?
+  successfulAvgImageCount      Float?
+  successfulAvgRatingValue     Float?
+  successfulAvgSellerScore     Float?
+  successfulAvgPrice           Float?
+  successfulFastDeliveryRate   Float?
+  successfulVideoRate          Float?
+  successfulOfficialSellerRate Float?
+  notes                        Json?
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+
+  @@unique([platform, category])
+  @@index([platform, category])
+}
+
+model LearnedRule {
+  id         String   @id @default(cuid())
+  platform   String
+  category   String
+  ruleKey    String
+  title      String
+  insight    String
+  confidence Float    @default(0)
+  supportCount Int    @default(0)
+  metadata   Json?
+  lastSeenAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([platform, category, ruleKey])
+  @@index([platform, category, confidence])
+}
+
+model UserUsageRecord {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  count      Int      @default(0)
+  periodKey  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, action, periodKey])
+  @@index([userId, periodKey])
+}
+
+model GuestUsageRecord {
+  id         String   @id @default(cuid())
+  guestId    String
+  action     String
+  count      Int      @default(0)
+  periodKey  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([guestId, action, periodKey])
+  @@index([guestId, periodKey])
+}

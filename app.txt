@@ -1,0 +1,64 @@
+﻿Folder PATH listing for volume Yeni Birim
+Volume serial number is 4C45-9179
+D:\SELLBOOST\APP
+-   .env
+-   .gitignore
+-   dev.db
+-   favicon.ico
+-   globals.css
+-   layout.tsx
+-   page.tsx
+-   prisma.config.ts
+-   providers.tsx
+-   
++ĞĞĞanalyze
+-       page.tsx
+-       
++ĞĞĞapi
+-   +ĞĞĞanalyze
+-   -       route.ts
+-   -       
+-   +ĞĞĞauth
+-   -   LĞĞĞ[...nextauth]
+-   -           route.ts
+-   -           
+-   +ĞĞĞregister
+-   -       route.ts
+-   -       
+-   +ĞĞĞreports
+-   -   -   route.ts
+-   -   -   
+-   -   +ĞĞĞlist
+-   -   -       route.ts
+-   -   -       
+-   -   +ĞĞĞsave
+-   -   -       route.ts
+-   -   -       
+-   -   LĞĞĞ[id]
+-   -           route.ts
+-   -           
+-   LĞĞĞusage
+-       -   route.ts
+-       -   
+-       LĞĞĞanalyze
+-               route.ts
+-               
++ĞĞĞcomponents
+-       LogoutButton.tsx
+-       
++ĞĞĞdashboard
+-       page.tsx
+-       
++ĞĞĞlogin
+-       page.tsx
+-       
++ĞĞĞregister
+-       page.tsx
+-       
+LĞĞĞreports
+    LĞĞĞ[id]
+        -   page.tsx
+        -   
+        LĞĞĞexport
+                page.tsx
+                

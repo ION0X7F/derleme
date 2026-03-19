@@ -1,0 +1,30 @@
+﻿Folder PATH listing for volume Yeni Birim
+Volume serial number is 4C45-9179
+D:\SELLBOOST\LIB
+-   api.ts
+-   build-analysis.ts
+-   check-analyze-limit.ts
+-   detect-category.ts
+-   detect-platform.ts
+-   extract-basic-fields.ts
+-   extract-page-data.ts
+-   fetch-html.ts
+-   fetch-page-html.ts
+-   guest.ts
+-   increment-analyze-usage.ts
+-   is-unlimited-user.ts
+-   limits.ts
+-   prisma.ts
+-   usage.ts
+-   
+LĞĞĞextractors
+    -   index.ts
+    -   merge-extracted-fields.ts
+    -   types.ts
+    -   
+    LĞĞĞplatforms
+            amazon.ts
+            hepsiburada.ts
+            n11.ts
+            trendyol.ts
+            

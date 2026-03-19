@@ -1,0 +1,15 @@
+﻿Folder PATH listing for volume Yeni Birim
+Volume serial number is 4C45-9179
+D:\SELLBOOST\COMPONENTS
+-   AnalysisResult.tsx
+-   AnalyzeForm.tsx
+-   ReportHistory.tsx
+-   
+LĞĞĞui
+        BackButton.tsx
+        Badge.tsx
+        Card.tsx
+        InfoRow.tsx
+        SectionTitle.tsx
+        StateViews.tsx
+        

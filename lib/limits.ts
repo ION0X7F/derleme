@@ -1,0 +1,1 @@
+export const GUEST_ANALYZE_MONTHLY_LIMIT = 2;
