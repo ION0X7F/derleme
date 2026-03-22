@@ -5,9 +5,9 @@ import { useState } from "react";
 import SiteHeader from "@/components/layout/SiteHeader";
 
 const benefits = [
-  "Kayitli dashboard ve rapor gecmisi",
-  "Daha fazla analiz hakki",
-  "Trendyol odakli premium UI deneyimi",
+  "Kayıtlı dashboard ve rapor geçmişi",
+  "Daha fazla analiz hakkı",
+  "Trendyol odaklı premium UI deneyimi",
 ];
 
 export default function RegisterPage() {
@@ -20,14 +20,14 @@ export default function RegisterPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setLoading(true);
     setMessage("");
     setError("");
 
     try {
-      const res = await fetch("/api/register", {
+      const response = await fetch("/api/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -35,21 +35,21 @@ export default function RegisterPage() {
         body: JSON.stringify(form),
       });
 
-      const data = await res.json();
+      const data = await response.json();
 
-      if (!res.ok) {
-        setError(data.error || "Bir hata olustu.");
+      if (!response.ok) {
+        setError(data.error || "Bir hata oluştu.");
         return;
       }
 
-      setMessage("Kayit basarili. Simdi giris yapabilirsin.");
+      setMessage("Kayıt başarılı. Şimdi giriş yapabilirsin.");
       setForm({
         name: "",
         email: "",
         password: "",
       });
     } catch {
-      setError("Sunucu hatasi olustu.");
+      setError("Sunucu hatası oluştu.");
     } finally {
       setLoading(false);
     }
@@ -62,30 +62,31 @@ export default function RegisterPage() {
       <main className="auth-shell">
         <div className="sb-container auth-grid">
           <section className="surface auth-panel sb-stack-20">
-            <div className="eyebrow">Onboarding baslangici</div>
+            <div className="eyebrow">Onboarding başlangıcı</div>
             <div className="sb-stack-16">
-              <h1 className="section-title">SellBoost AI ile urun kararlarini merkezilestir.</h1>
+              <h1 className="section-title">SellBoost AI ile ürün kararlarını merkezileştir.</h1>
               <p className="section-text">
-                Kayit oldugunda dashboard, rapor kutuphanesi ve plan bazli analiz akisi ayni premium arayuzde acilir.
+                Kayıt olduğunda dashboard, rapor kütüphanesi ve plan bazlı analiz akışı
+                aynı premium arayüzde açılır.
               </p>
             </div>
 
             <div className="auth-panel__hero sb-stack-12">
-              <div className="stat-card__label">Hizli baslangic</div>
+              <div className="stat-card__label">Hızlı başlangıç</div>
               <div className="card-heading" style={{ fontSize: 20, marginBottom: 0 }}>
-                Ilk kayitla birlikte daha ciddi, daha guven veren bir analiz paneline girersin.
+                İlk kayıtla birlikte daha ciddi, daha güven veren bir analiz paneline girersin.
               </div>
               <p className="card-copy">
-                Bu ekran onboarding baslangici gibi davranir; form kadar urun degerini de hissettirir.
+                Bu ekran onboarding başlangıcı gibi davranır; form kadar ürün değerini de hissettirir.
               </p>
             </div>
 
             <div className="surface-soft" style={{ padding: 18 }}>
               <div className="card-heading" style={{ fontSize: 18, marginBottom: 8 }}>
-                Ucretsiz baslangic
+                Ücretsiz başlangıç
               </div>
               <p className="card-copy" style={{ marginBottom: 14 }}>
-                Ilk asamada temel kullanimla basla; ihtiyac buyudukce daha derin premium analiz katmanina gec.
+                İlk aşamada temel kullanım ile başla; ihtiyaç büyüdükçe daha derin premium analiz katmanına geç.
               </p>
               <div className="sb-stack-12">
                 {benefits.map((benefit) => (
@@ -99,13 +100,13 @@ export default function RegisterPage() {
 
           <section className="surface auth-form-card sb-stack-20">
             <div className="sb-stack-12">
-              <div className="eyebrow">Kayit Ol</div>
+              <div className="eyebrow">Kayıt Ol</div>
               <div>
                 <h2 className="card-heading" style={{ fontSize: 30, marginBottom: 10 }}>
-                  Hesabini olustur
+                  Hesabını oluştur
                 </h2>
                 <p className="card-copy">
-                  Birkac alan doldur, sonra Trendyol linklerini kayitli ve daha guvenli bir akista analiz etmeye basla.
+                  Birkaç alan doldur, sonra Trendyol linklerini kayıtlı ve daha güvenli bir akışta analiz etmeye başla.
                 </p>
               </div>
             </div>
@@ -115,44 +116,46 @@ export default function RegisterPage() {
                 <span>Ad Soyad</span>
                 <input
                   type="text"
-                  placeholder="Adin ve soyadin"
+                  placeholder="Adın ve soyadın"
                   value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  onChange={(event) => setForm({ ...form, name: event.target.value })}
                   className="input"
                   autoComplete="name"
                 />
               </label>
 
               <label className="form-label">
-                <span>Email</span>
+                <span>E-posta</span>
                 <input
                   type="email"
                   placeholder="ornek@markan.com"
                   value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  onChange={(event) => setForm({ ...form, email: event.target.value })}
                   className="input"
                   autoComplete="email"
                 />
               </label>
 
               <label className="form-label">
-                <span>Sifre</span>
+                <span>Şifre</span>
                 <input
                   type="password"
-                  placeholder="En az guclu bir sifre belirle"
+                  placeholder="En az 6 karakterlik bir şifre belirle"
                   value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  onChange={(event) => setForm({ ...form, password: event.target.value })}
                   className="input"
                   autoComplete="new-password"
                 />
                 <span className="field-hint">
-                  Guclu bir sifre icin harf, rakam ve ayirt edici bir karakter kombinasyonu kullan.
+                  Güçlü bir şifre için harf, rakam ve ayırt edici karakter kombinasyonu kullan.
                 </span>
               </label>
 
               <div className="auth-benefit-list">
-                <div className="auth-benefit">Kayitli dashboard ve rapor kutuphanesi</div>
-                <div className="auth-benefit">Plan seviyesi buyudukce ayni arayuzde daha derin karar katmani</div>
+                <div className="auth-benefit">Kayıtlı dashboard ve rapor kütüphanesi</div>
+                <div className="auth-benefit">
+                  Plan seviyesi büyüdükçe aynı arayüzde daha derin karar katmanı
+                </div>
               </div>
 
               {message && <div className="alert alert-success">{message}</div>}
@@ -160,7 +163,7 @@ export default function RegisterPage() {
 
               <div className="form-actions">
                 <Link href="/login" className="text-link">
-                  Zaten hesabim var
+                  Zaten hesabım var
                 </Link>
                 <button type="submit" className="btn btn-primary" disabled={loading}>
                   {loading ? (
@@ -169,7 +172,7 @@ export default function RegisterPage() {
                       <span>Kaydediliyor</span>
                     </>
                   ) : (
-                    "Kayit Ol"
+                    "Kayıt Ol"
                   )}
                 </button>
               </div>

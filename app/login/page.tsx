@@ -8,18 +8,18 @@ import SiteHeader from "@/components/layout/SiteHeader";
 const highlights = [
   {
     value: "AI",
-    label: "Stratejik teshis",
-    text: "Veriyi sade degil, karar verdiren bir akista yorumlar.",
+    label: "Stratejik teşhis",
+    text: "Veriyi sade değil, karar verdiren bir akışta yorumlar.",
   },
   {
     value: "Pro",
     label: "Premium rapor hissi",
-    text: "Rapor gecmisi, karar paneli ve premium ekran dili ile gelir.",
+    text: "Rapor geçmişi, karar paneli ve premium ekran dili ile gelir.",
   },
   {
     value: "TR",
-    label: "Trendyol odagi",
-    text: "Pazar yeri davranisini urun, teklif ve guven sinyallerinden okur.",
+    label: "Trendyol odağı",
+    text: "Pazar yeri davranışını ürün, teklif ve güven sinyallerinden okur.",
   },
 ];
 
@@ -29,10 +29,11 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function onSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setError("");
     setLoading(true);
+
     const callbackUrl =
       typeof window !== "undefined"
         ? `${window.location.origin}/dashboard`
@@ -48,7 +49,7 @@ export default function LoginPage() {
     setLoading(false);
 
     if (result?.error || result?.ok === false) {
-      setError("Email veya sifre hatali.");
+      setError("E-posta veya şifre hatalı.");
       return;
     }
 
@@ -62,23 +63,23 @@ export default function LoginPage() {
       <main className="auth-shell">
         <div className="sb-container auth-grid">
           <section className="surface auth-panel sb-stack-20">
-            <div className="eyebrow">Tekrar hos geldin</div>
+            <div className="eyebrow">Tekrar hoş geldin</div>
             <div className="sb-stack-16">
-              <h1 className="section-title">SellBoost AI paneline guvenli giris yap.</h1>
+              <h1 className="section-title">SellBoost AI paneline güvenli giriş yap.</h1>
               <p className="section-text">
-                Kayitli raporlarina, analiz kutuphanene ve premium karar paneline
-                kaldigin yerden devam et.
+                Kayıtlı raporlarına, analiz kütüphanene ve premium karar paneline
+                kaldığın yerden devam et.
               </p>
             </div>
 
             <div className="auth-panel__hero sb-stack-12">
-              <div className="stat-card__label">Canli yuzey</div>
+              <div className="stat-card__label">Canlı yüzey</div>
               <div className="card-heading" style={{ fontSize: 20, marginBottom: 0 }}>
-                Kayitli analizler, premium karar dili ve rapor merkezi tek giriste acilir.
+                Kayıtlı analizler, premium karar dili ve rapor merkezi tek girişte açılır.
               </div>
               <p className="card-copy">
-                Auth ekrani sadece form degil; urune donus hissi veren ilk temas noktasi
-                olarak kurgulandi.
+                Giriş ekranı yalnızca form değil; ürüne dönüş hissi veren ilk temas
+                noktası olarak kurgulandı.
               </p>
             </div>
 
@@ -97,64 +98,68 @@ export default function LoginPage() {
 
           <section className="surface auth-form-card sb-stack-20">
             <div className="sb-stack-12">
-              <div className="eyebrow">Giris Yap</div>
+              <div className="eyebrow">Giriş Yap</div>
               <div>
                 <h2 className="card-heading" style={{ fontSize: 30, marginBottom: 10 }}>
-                  Hesabina baglan
+                  Hesabına bağlan
                 </h2>
                 <p className="card-copy">
-                  Dashboard, rapor detaylari ve kayitli Trendyol analizlerin burada seni bekliyor.
+                  Dashboard, rapor detayları ve kayıtlı Trendyol analizlerin burada seni
+                  bekliyor.
                 </p>
               </div>
             </div>
 
             <form onSubmit={onSubmit} className="auth-form">
               <label className="form-label">
-                <span>Email</span>
+                <span>E-posta</span>
                 <input
                   type="email"
                   placeholder="ornek@markan.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(event) => setEmail(event.target.value)}
                   className="input"
                   autoComplete="email"
                 />
               </label>
 
               <label className="form-label">
-                <span>Sifre</span>
+                <span>Şifre</span>
                 <input
                   type="password"
-                  placeholder="Sifreni gir"
+                  placeholder="Şifreni gir"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(event) => setPassword(event.target.value)}
                   className="input"
                   autoComplete="current-password"
                 />
                 <span className="field-hint">
-                  Sifre unutma akisina hazir yer ayrildi; simdilik mevcut kimlik dogrulamasi ile devam eder.
+                  Şifre sıfırlama akışına uygun alan hazır; şimdilik mevcut kimlik
+                  doğrulama ile devam ediyor.
                 </span>
               </label>
 
               <div className="auth-benefit-list">
-                <div className="auth-benefit">Guvenli oturum ve kayitli rapor erisimi</div>
-                <div className="auth-benefit">Dashboard ve analiz kutuphanesine dogrudan gecis</div>
+                <div className="auth-benefit">Güvenli oturum ve kayıtlı rapor erişimi</div>
+                <div className="auth-benefit">
+                  Dashboard ve analiz kütüphanesine doğrudan geçiş
+                </div>
               </div>
 
               {error && <div className="alert alert-error">{error}</div>}
 
               <div className="form-actions">
                 <Link href="/" className="text-link">
-                  Ana sayfaya don
+                  Ana sayfaya dön
                 </Link>
                 <button type="submit" className="btn btn-primary" disabled={loading}>
                   {loading ? (
                     <>
                       <span className="spinner" />
-                      <span>Giris yapiliyor</span>
+                      <span>Giriş yapılıyor</span>
                     </>
                   ) : (
-                    "Giris Yap"
+                    "Giriş Yap"
                   )}
                 </button>
               </div>
@@ -163,9 +168,9 @@ export default function LoginPage() {
             <div className="subtle-divider" />
 
             <p className="text-caption">
-              Hesabin yok mu?{" "}
+              Hesabın yok mu?{" "}
               <Link href="/register" className="text-link" style={{ padding: 0, minHeight: 0 }}>
-                Kayit ol
+                Kayıt ol
               </Link>
             </p>
           </section>

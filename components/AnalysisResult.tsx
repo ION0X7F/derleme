@@ -496,7 +496,7 @@ function formatPriceDelta(delta?: number | null) {
 function getDeltaVisual(delta?: number | null) {
   if (typeof delta !== "number" || !Number.isFinite(delta) || delta === 0) {
     return {
-      arrow: "›",
+      arrow: "=",
       color: "#FB923C",
       background: "rgba(251,146,60,0.12)",
       border: "rgba(251,146,60,0.18)",
@@ -505,7 +505,7 @@ function getDeltaVisual(delta?: number | null) {
 
   if (delta < 0) {
     return {
-      arrow: "v",
+      arrow: "↓",
       color: "#4ADE80",
       background: "rgba(74,222,128,0.12)",
       border: "rgba(74,222,128,0.18)",
@@ -513,7 +513,7 @@ function getDeltaVisual(delta?: number | null) {
   }
 
   return {
-    arrow: "^",
+    arrow: "↑",
     color: "#F87171",
     background: "rgba(248,113,113,0.12)",
     border: "rgba(248,113,113,0.18)",
@@ -546,11 +546,21 @@ function formatRatingBreakdown(
   if (!breakdown) return null;
 
   const parts = [
-    typeof breakdown.five_star === "number" ? `5? ${breakdown.five_star}` : null,
-    typeof breakdown.four_star === "number" ? `4? ${breakdown.four_star}` : null,
-    typeof breakdown.three_star === "number" ? `3? ${breakdown.three_star}` : null,
-    typeof breakdown.two_star === "number" ? `2? ${breakdown.two_star}` : null,
-    typeof breakdown.one_star === "number" ? `1? ${breakdown.one_star}` : null,
+    typeof breakdown.five_star === "number"
+      ? `5 yıldız ${breakdown.five_star}`
+      : null,
+    typeof breakdown.four_star === "number"
+      ? `4 yıldız ${breakdown.four_star}`
+      : null,
+    typeof breakdown.three_star === "number"
+      ? `3 yıldız ${breakdown.three_star}`
+      : null,
+    typeof breakdown.two_star === "number"
+      ? `2 yıldız ${breakdown.two_star}`
+      : null,
+    typeof breakdown.one_star === "number"
+      ? `1 yıldız ${breakdown.one_star}`
+      : null,
   ].filter(Boolean);
 
   return parts.length > 0 ? parts.join(", ") : null;

@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "db:push": "prisma db push",
+    "db:seed": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs prisma/seed.ts",
     "test:ai-regression": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/ai-regression-test.ts",
     "test:ai-regression:auto": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/ai-regression-test.ts --mode=auto",
     "test:ai-regression:fallback": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/ai-regression-test.ts --mode=fallback",

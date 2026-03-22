@@ -2,13 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import LogoutButton from "@/app/components/LogoutButton";
-import AppChrome from "@/components/layout/AppChrome";
 import * as DashboardCharts from "@/components/DashboardCharts";
-import ReportHistory from "@/components/ReportHistory";
+import AppChrome from "@/components/layout/AppChrome";
 import { parseAnalysisSummary } from "@/lib/analysis-summary";
 import { campaignContent, getWorkspacePlanSummary } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 import { prepareSavedReportForClient } from "@/lib/report-access";
+import { getReadableReportTitle } from "@/lib/report-title";
 import {
   getEffectivePlanVariantFromRecord,
   hasEntitledSubscription,
@@ -20,26 +20,39 @@ import type { SavedReport } from "@/types";
 
 function getThemeLabel(theme?: string | null) {
   const map: Record<string, string> = {
-    delivery: "Teslimat", price: "Fiyat", trust: "Güven",
-    content: "İçerik", visual: "Görsel", reviews: "Yorum",
-    stock: "Stok", campaign: "Kampanya",
+    delivery: "Teslimat",
+    price: "Fiyat",
+    trust: "Güven",
+    content: "İçerik",
+    visual: "Görsel",
+    reviews: "Yorum",
+    stock: "Stok",
+    campaign: "Kampanya",
   };
+
   return map[theme || ""] || "Karışık";
 }
 
 function getThemeColor(theme?: string | null) {
   const map: Record<string, string> = {
-    delivery: "#0d6efd", price: "#f28705", trust: "#267365",
-    content: "#6f42c1", visual: "#d63384", reviews: "#20c997",
-    stock: "#dc3545", campaign: "#fd7e14",
+    delivery: "#1E403A",
+    price: "#205B73",
+    trust: "#7AB8BF",
+    content: "#BFB39B",
+    visual: "#3A7380",
+    reviews: "#568D95",
+    stock: "#0D2226",
+    campaign: "#6B807C",
   };
-  return map[theme || ""] || "#6c757d";
+
+  return map[theme || ""] || "#7A8F94";
 }
 
-function getScoreColor(score: number) {
-  if (score >= 70) return "#20c997";
-  if (score >= 50) return "#ffc107";
-  return "#dc3545";
+function getScoreTone(score?: number | null) {
+  if (typeof score !== "number") return "status-warn";
+  if (score >= 80) return "status-good";
+  if (score >= 50) return "status-warn";
+  return "status-danger";
 }
 
 function getNextRenewalDate() {
@@ -48,40 +61,88 @@ function getNextRenewalDate() {
   );
 }
 
+function getReportTitle(report: SavedReport) {
+  return getReadableReportTitle({
+    url: report.url,
+    extractedData:
+      report.extractedData && typeof report.extractedData === "object"
+        ? (report.extractedData as Record<string, unknown>)
+        : null,
+    fallback: "Kaydedilmiş rapor",
+  });
+}
+
 export default async function DashboardPage() {
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    include: { subscription: { include: { plan: true } } },
+    include: {
+      subscription: {
+        include: {
+          plan: true,
+        },
+      },
+    },
   });
-  if (!user) redirect("/login");
 
-  const reportCount = await prisma.report.count({ where: { userId: session.user.id } });
+  if (!user) {
+    redirect("/login");
+  }
+
+  const reportCount = await prisma.report.count({
+    where: { userId: session.user.id },
+  });
+
   const lastWeek = new Date();
   lastWeek.setDate(lastWeek.getDate() - 7);
+
   const weeklyReportCount = await prisma.report.count({
-    where: { userId: session.user.id, createdAt: { gte: lastWeek } },
+    where: {
+      userId: session.user.id,
+      createdAt: {
+        gte: lastWeek,
+      },
+    },
   });
 
   const recentReports = await prisma.report.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: "desc" },
+    where: {
+      userId: session.user.id,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
     take: 8,
     select: {
-      id: true, url: true, platform: true, category: true,
-      seoScore: true, conversionScore: true, overallScore: true,
-      dataCompletenessScore: true, priceCompetitiveness: true,
-      summary: true, dataSource: true, createdAt: true,
-      extractedData: true, derivedMetrics: true, coverage: true,
-      accessState: true, suggestions: true, priorityActions: true,
+      id: true,
+      url: true,
+      platform: true,
+      category: true,
+      seoScore: true,
+      conversionScore: true,
+      overallScore: true,
+      dataCompletenessScore: true,
+      priceCompetitiveness: true,
+      summary: true,
+      dataSource: true,
+      createdAt: true,
+      extractedData: true,
+      derivedMetrics: true,
+      coverage: true,
+      accessState: true,
+      suggestions: true,
+      priorityActions: true,
       analysisTrace: true,
     },
   });
 
-  const typedRecentReports = recentReports.map((r) =>
-    prepareSavedReportForClient(r)
+  const typedRecentReports = recentReports.map((report) =>
+    prepareSavedReportForClient(report)
   ) as SavedReport[];
 
   const currentPlanId = getEffectivePlanVariantFromRecord(user);
@@ -90,480 +151,450 @@ export default async function DashboardPage() {
     ? user.subscription?.plan?.monthlyAnalysisLimit ?? 10
     : 10;
   const periodKey = getMonthlyPeriodKey();
+
   const usageRecord = await prisma.userUsageRecord.findUnique({
-    where: { userId_action_periodKey: { userId: session.user.id, action: "analyze", periodKey } },
+    where: {
+      userId_action_periodKey: {
+        userId: session.user.id,
+        action: "analyze",
+        periodKey,
+      },
+    },
   });
 
   const used = usageRecord?.count ?? 0;
   const remaining = Math.max(monthlyLimit - used, 0);
   const usageStatus = getUsageStatus({
-    used, limit: monthlyLimit, remaining,
-    allowed: remaining > 0, type: "user", planLabel: planView.label, planId: currentPlanId,
+    used,
+    limit: monthlyLimit,
+    remaining,
+    allowed: remaining > 0,
+    type: "user",
+    planLabel: planView.label,
+    planId: currentPlanId,
   });
 
   const renewalDate = getNextRenewalDate();
-
   const recentDiagnoses = typedRecentReports
-    .map((r) => r.analysisTrace?.primaryDiagnosis || parseAnalysisSummary(r.summary).criticalDiagnosis)
-    .filter((d): d is string => !!d)
-    .slice(0, 3);
+    .map(
+      (report) =>
+        report.analysisTrace?.primaryDiagnosis ||
+        parseAnalysisSummary(report.summary).criticalDiagnosis
+    )
+    .filter((item): item is string => !!item)
+    .slice(0, 4);
 
-  const primaryThemeMap = typedRecentReports.reduce<Record<string, number>>((acc, r) => {
-    const key = r.analysisTrace?.primaryTheme || "mixed";
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
+  const primaryThemeMap = typedRecentReports.reduce<Record<string, number>>(
+    (acc, report) => {
+      const key = report.analysisTrace?.primaryTheme || "mixed";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    },
+    {}
+  );
 
-  const topThemes = Object.entries(primaryThemeMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const topThemes = Object.entries(primaryThemeMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
 
   const criticalCount = typedRecentReports.filter(
-    (r) => typeof r.overallScore === "number" && r.overallScore < 60
+    (report) =>
+      typeof report.overallScore === "number" && report.overallScore < 60
   ).length;
 
-  const avgOverall = typedRecentReports.length > 0
-    ? Math.round(typedRecentReports.reduce((s, r) => s + (r.overallScore ?? 0), 0) / typedRecentReports.length)
-    : 0;
+  const avgOverall =
+    typedRecentReports.length > 0
+      ? Math.round(
+          typedRecentReports.reduce(
+            (sum, report) => sum + (report.overallScore ?? 0),
+            0
+          ) / typedRecentReports.length
+        )
+      : 0;
 
   const highCoverageCount = typedRecentReports.filter(
-    (r) => r.coverage?.confidence === "high"
+    (report) => report.coverage?.confidence === "high"
   ).length;
 
   const includeAdmin = session.user.role === "ADMIN";
   const workspaceNav = getWorkspaceNav({ includeAdmin });
-
-  const kpiCards = [
-    {
-      label: "Toplam Rapor",
-      value: reportCount,
-      sub: "Tüm zamanlar",
-      icon: "📊",
-      color: "#0d6efd",
-    },
-    {
-      label: "Bu Hafta",
-      value: weeklyReportCount,
-      sub: "Son 7 gün",
-      icon: "📈",
-      color: "#20c997",
-    },
-    {
-      label: "Ort. Skor",
-      value: avgOverall || "--",
-      sub: "Genel analiz puanı",
-      icon: "⭐",
-      color: "#ffc107",
-    },
-    {
-      label: "Kritik Ürün",
-      value: criticalCount,
-      sub: "Skor < 60",
-      icon: "⚠️",
-      color: "#dc3545",
-    },
-    {
-      label: "Kalan Hak",
-      value: remaining,
-      sub: `/ ${monthlyLimit} aylık`,
-      icon: "🎯",
-      color: "#6f42c1",
-    },
-  ];
+  const orderedReports = typedRecentReports.slice().reverse();
 
   return (
     <AppChrome
       currentPath="/dashboard"
       eyebrow="Workspace"
       title={`Hoş geldin, ${session.user.name || "kullanıcı"}`}
-      description="AI destekli ürün analiz paneli"
+      description="Kullanım, son teşhisler ve ürün ritmi tek karar panelinde toplandı."
       navItems={workspaceNav}
       headerMeta={
         <>
           <span className="hero-point">Plan: {planView.label}</span>
           <span className="hero-point">Bu hafta: {weeklyReportCount} analiz</span>
-          <span className={`hero-point ${usageStatus.tone === "danger" ? "status-danger" : usageStatus.tone === "warn" ? "status-warn" : "status-good"}`}>
+          <span className="hero-point">Toplam: {reportCount} rapor</span>
+          <span
+            className={`hero-point ${
+              usageStatus.tone === "danger"
+                ? "status-danger"
+                : usageStatus.tone === "warn"
+                  ? "status-warn"
+                  : "status-good"
+            }`}
+          >
             {usageStatus.badge}
           </span>
         </>
       }
       actions={
         <>
-          <Link href="/analyze" className="btn btn-primary">+ Yeni Analiz</Link>
-          <Link href="/reports" className="btn btn-secondary">Arşiv</Link>
+          <Link href="/analyze" className="btn btn-primary">
+            Yeni Analiz
+          </Link>
+          <Link href="/reports" className="btn btn-secondary">
+            Raporlar
+          </Link>
         </>
       }
       sidebarMeta={
         <div className="sb-stack-12">
           <div className="surface-soft" style={{ padding: 16 }}>
             <div className="stat-card__label">Aktif plan</div>
-            <div className="card-heading" style={{ fontSize: 18, marginBottom: 6 }}>{planView.label}</div>
+            <div className="card-heading" style={{ fontSize: 18, marginBottom: 6 }}>
+              {planView.label}
+            </div>
             <p className="card-copy">{planView.note}</p>
           </div>
+
+          <div className="surface-soft" style={{ padding: 16 }}>
+            <div className="stat-card__label">Kampanya notu</div>
+            <div className="card-heading" style={{ fontSize: 18, marginBottom: 6 }}>
+              {campaignContent.title}
+            </div>
+            <p className="card-copy">{campaignContent.detail}</p>
+          </div>
+
           <div className="surface-soft" style={{ padding: 16 }}>
             <div className="stat-card__label">Rol</div>
-            <div className="card-heading" style={{ fontSize: 18, marginBottom: 6 }}>{session.user.role || "USER"}</div>
-            <p className="card-copy">{includeAdmin ? "Admin paneli erişilebilir." : "Kişisel panel aktif."}</p>
-          </div>
-          <div className="surface-soft" style={{ padding: 16 }}>
-            <div className="stat-card__label">{campaignContent.badge}</div>
-            <div className="card-heading" style={{ fontSize: 18, marginBottom: 6 }}>{campaignContent.title}</div>
-            <p className="card-copy">{campaignContent.detail}</p>
+            <div className="card-heading" style={{ fontSize: 18, marginBottom: 6 }}>
+              {session.user.role || "USER"}
+            </div>
+            <p className="card-copy">
+              {includeAdmin
+                ? "Admin ve kullanıcı yüzeyleri birlikte erişilebilir."
+                : "Kişisel karar panelin bu hesapla yönetiliyor."}
+            </p>
           </div>
         </div>
       }
       sidebarFooter={<LogoutButton />}
     >
-      {/* ── WELCOME BANNER ── */}
-      <div className="dash-welcome">
-        <div>
-          <h2 className="dash-welcome__title">
-            Hoş geldin, {session.user.name?.split(" ")[0] || "Kullanıcı"}! 👋
-          </h2>
-          <p className="dash-welcome__sub">
-            {planView.label} planındasın · Bugün ne analiz edelim?
-          </p>
-          <div className="dash-welcome__stats">
-            <div className="dash-welcome__stat">
-              <span className="dash-welcome__stat-val">{reportCount}</span>
-              <span className="dash-welcome__stat-label">Toplam Rapor</span>
-            </div>
-            <div className="dash-welcome__stat">
-              <span className="dash-welcome__stat-val">{weeklyReportCount}</span>
-              <span className="dash-welcome__stat-label">Bu Hafta</span>
-            </div>
-            <div className="dash-welcome__stat">
-              <span className="dash-welcome__stat-val">{remaining}/{monthlyLimit}</span>
-              <span className="dash-welcome__stat-label">Kalan Hak</span>
-            </div>
+      <section className="surface app-card sb-stack-20">
+        <div className="workspace-hero">
+          <div className="workspace-hero__content">
+            <div className="eyebrow">Karar özeti</div>
+            <h2 className="workspace-hero__title">
+              Yeni rapor açmadan önce hangi ürünlerin dikkat istediğini bir bakışta gör.
+            </h2>
+            <p className="section-card__text">
+              Dashboard artık dağınık kart yığını gibi değil; kullanım ritmini,
+              tekrar eden sorun alanlarını ve en son raporları tek bir akışta okutur.
+            </p>
           </div>
-        </div>
-        <div className="dash-welcome__img" aria-hidden>🚀</div>
-      </div>
 
-      {/* ── KPI CARDS ── */}
-      <div className="dash-kpi-grid">
-        {kpiCards.map((k) => (
-          <div key={k.label} className="dash-kpi">
-            <div className="dash-kpi__icon" style={{
-              background: `color-mix(in srgb, ${k.color} 12%, transparent)`,
-              border: `1px solid color-mix(in srgb, ${k.color} 22%, transparent)`,
-            }}>
-              {k.icon}
-            </div>
-            <div className="dash-kpi__body">
-              <div className="dash-kpi__label">{k.label}</div>
-              <div className="dash-kpi__value" style={{ color: k.color }}>{k.value}</div>
-              <div className="dash-kpi__sub">{k.sub}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── CHARTS ROW ── */}
-      <div className="dash-grid-3-1">
-
-        {/* Tema Dağılımı Bar Chart */}
-        <div className="dash-chart-card">
-          <div className="dash-section-header">
-            <div className="dash-section-header__left">
-              <h3 className="dash-chart-title">Sorun Alanları Dağılımı</h3>
-              <p className="dash-chart-sub">Son raporlarda tekrar eden ana tema kategorileri</p>
-            </div>
-          </div>
-          {topThemes.length > 0 ? (
-            <div className="dash-bar-list">
-              {topThemes.map(([theme, count]) => {
-                const pct = Math.round((count / (typedRecentReports.length || 1)) * 100);
-                return (
-                  <div key={theme} className="dash-bar-item">
-                    <div className="dash-bar-top">
-                      <span className="dash-bar-label">{getThemeLabel(theme)}</span>
-                      <span className="dash-bar-val">{count} rapor ({pct}%)</span>
-                    </div>
-                    <div className="dash-bar-track">
-                      <div
-                        className="dash-bar-fill"
-                        style={{ width: `${pct}%`, background: getThemeColor(theme) }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="state-card state-card--empty">
-              <div className="state-card__icon">📊</div>
-              <p className="state-card__text">Analiz yapıldıkça tema dağılımı oluşacak.</p>
-            </div>
-          )}
-        </div>
-
-        {/* Kullanım Durumu */}
-        <div className="dash-chart-card">
-          <h3 className="dash-chart-title">Kullanım Durumu</h3>
-          <p className="dash-chart-sub">{renewalDate.toLocaleDateString("tr-TR")} yenilenme</p>
-
-          <div className="dash-usage">
-            <div className="dash-usage__ring">
-              <svg className="dash-usage__svg" viewBox="0 0 88 88">
-                <circle className="dash-usage__track" cx="44" cy="44" r="36" />
-                <circle
-                  className="dash-usage__fill"
-                  cx="44" cy="44" r="36"
-                  stroke={usageStatus.tone === "danger" ? "#dc3545" : usageStatus.tone === "warn" ? "#ffc107" : "#20c997"}
-                  strokeDasharray={`${2 * Math.PI * 36}`}
-                  strokeDashoffset={`${2 * Math.PI * 36 * (1 - usageStatus.percent / 100)}`}
-                />
-              </svg>
-              <div className="dash-usage__center" style={{
-                color: usageStatus.tone === "danger" ? "#dc3545" : usageStatus.tone === "warn" ? "#ffc107" : "#20c997"
-              }}>
+          <div className="workspace-meter">
+            <div className="workspace-meter__head">
+              <span className="stat-card__label">Dönem kullanımı</span>
+              <span
+                className={`workspace-meter__value ${
+                  usageStatus.tone === "danger"
+                    ? "status-danger"
+                    : usageStatus.tone === "warn"
+                      ? "status-warn"
+                      : "status-good"
+                }`}
+              >
                 %{usageStatus.percent}
-              </div>
+              </span>
             </div>
-            <div className="dash-usage__info">
-              <p className="dash-usage__title">{used} / {monthlyLimit} kullanıldı</p>
-              <p className="dash-usage__detail">{usageStatus.detailMessage}</p>
-              <p className="dash-usage__renewal">Yenilenme: {renewalDate.toLocaleDateString("tr-TR")}</p>
+
+            <div className="analysis-meter__track">
+              <div
+                className={
+                  usageStatus.tone === "danger"
+                    ? "analysis-meter__fill analysis-meter__fill--danger"
+                    : usageStatus.tone === "warn"
+                      ? "analysis-meter__fill analysis-meter__fill--warn"
+                      : "analysis-meter__fill analysis-meter__fill--good"
+                }
+                style={{ width: `${usageStatus.percent}%` }}
+              />
+            </div>
+
+            <div className="analysis-meter__caption">
+              <span>{usageStatus.detailMessage}</span>
+              <span>{renewalDate.toLocaleDateString("tr-TR")}</span>
             </div>
           </div>
-
-          {planView.suggestedUpgrade && (
-            <div style={{ marginTop: 16 }}>
-              <Link href={planView.upgradeHref} className="btn btn-primary" style={{ width: "100%", justifyContent: "center" }}>
-                {planView.upgradeLabel}
-              </Link>
-            </div>
-          )}
         </div>
-      </div>
 
-      {/* ── AI TEŞHİSLER + HIZLI AKSİYON ── */}
-      <div className="dash-grid-2">
+        <div className="workspace-kpi-grid">
+          <article className="surface-soft workspace-kpi">
+            <div className="workspace-kpi__label">Genel ortalama</div>
+            <div className="workspace-kpi__value">{avgOverall || "--"}</div>
+            <div className="workspace-kpi__text">
+              Son raporların genel skor ortalaması.
+            </div>
+          </article>
+          <article className="surface-soft workspace-kpi">
+            <div className="workspace-kpi__label">Bu hafta</div>
+            <div className="workspace-kpi__value">{weeklyReportCount}</div>
+            <div className="workspace-kpi__text">
+              Son 7 günde tamamlanan analiz sayısı.
+            </div>
+          </article>
+          <article className="surface-soft workspace-kpi">
+            <div className="workspace-kpi__label">Kritik ürün</div>
+            <div className="workspace-kpi__value">{criticalCount}</div>
+            <div className="workspace-kpi__text">
+              Önce bakılması gereken düşük skorlu ürünler.
+            </div>
+          </article>
+          <article className="surface-soft workspace-kpi">
+            <div className="workspace-kpi__label">Kalan hak</div>
+            <div className="workspace-kpi__value">{remaining}</div>
+            <div className="workspace-kpi__text">
+              Bu dönemde yeni analiz için kalan kapasite.
+            </div>
+          </article>
+        </div>
+      </section>
 
-        {/* Son AI Teşhisler */}
-        <div className="dash-chart-card">
-          <div className="dash-section-header">
-            <div className="dash-section-header__left">
-              <h3 className="dash-chart-title">Son AI Teşhisleri</h3>
-              <p className="dash-chart-sub">Raporlarda öne çıkan kritik sorunlar</p>
+      <div className="section-grid-2">
+        <section className="surface app-card sb-stack-16">
+          <div className="section-card__header">
+            <div>
+              <h2 className="section-card__title">Sorun alanları</h2>
+              <p className="section-card__text">
+                Son raporlarda en çok tekrar eden tema dağılımı.
+              </p>
             </div>
           </div>
-          {recentDiagnoses.length > 0 ? (
-            <div className="dash-diagnosis-list">
-              {recentDiagnoses.map((d, i) => (
-                <div key={i} className="dash-diagnosis-item">
-                  <span className="dash-diagnosis-num">{String(i + 1).padStart(2, "0")}</span>
-                  <p className="dash-diagnosis-text">{d}</p>
-                </div>
-              ))}
-            </div>
+
+          {topThemes.length > 0 ? (
+            <DashboardCharts.BarChart
+              title="Sorun Alanları"
+              labels={topThemes.map(([theme]) => getThemeLabel(theme))}
+              values={topThemes.map(([, count]) => count)}
+              colors={topThemes.map(([theme]) => getThemeColor(theme))}
+            />
           ) : (
             <div className="state-card state-card--empty">
               <div className="state-card__icon">AI</div>
-              <p className="state-card__text">Yeni analizlerden sonra teşhisler burada görünecek.</p>
+              <h3 className="state-card__title">Henüz veri yok</h3>
+              <p className="state-card__text">
+                İlk analizlerden sonra tema dağılımı burada görünecek.
+              </p>
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Hızlı Aksiyon */}
-        <div className="dash-chart-card">
-          <div className="dash-section-header">
-            <div className="dash-section-header__left">
-              <h3 className="dash-chart-title">Hızlı Aksiyon</h3>
-              <p className="dash-chart-sub">Sık kullanılan işlemler</p>
+        <section className="surface app-card sb-stack-16">
+          <div className="section-card__header">
+            <div>
+              <h2 className="section-card__title">Skor dağılımı</h2>
+              <p className="section-card__text">
+                Son {typedRecentReports.length} raporda SEO, dönüşüm ve genel skor ritmi.
+              </p>
             </div>
           </div>
-          <div className="dash-action-grid">
-            <Link href="/analyze" className="dash-action-item">
-              <div className="dash-action-icon">🔍</div>
-              <div className="dash-action-body">
-                <div className="dash-action-title">Yeni Analiz</div>
-                <div className="dash-action-sub">Trendyol URL gir</div>
-              </div>
-            </Link>
-            <Link href="/reports" className="dash-action-item">
-              <div className="dash-action-icon">📋</div>
-              <div className="dash-action-body">
-                <div className="dash-action-title">Rapor Arşivi</div>
-                <div className="dash-action-sub">Geçmiş raporlar</div>
-              </div>
-            </Link>
-            <Link href="/account" className="dash-action-item">
-              <div className="dash-action-icon">⚙️</div>
-              <div className="dash-action-body">
-                <div className="dash-action-title">Hesap Ayarları</div>
-                <div className="dash-action-sub">Plan ve profil</div>
-              </div>
-            </Link>
-            {includeAdmin ? (
-              <Link href="/admin" className="dash-action-item">
-                <div className="dash-action-icon">🛡️</div>
-                <div className="dash-action-body">
-                  <div className="dash-action-title">Admin Panel</div>
-                  <div className="dash-action-sub">Yönetim merkezi</div>
-                </div>
-              </Link>
-            ) : planView.suggestedUpgrade ? (
-              <Link href={planView.upgradeHref} className="dash-action-item">
-                <div className="dash-action-icon">👑</div>
-                <div className="dash-action-body">
-                  <div className="dash-action-title">{planView.upgradeLabel}</div>
-                  <div className="dash-action-sub">{planView.suggestedUpgrade.note}</div>
-                </div>
-              </Link>
+
+          {typedRecentReports.length > 0 ? (
+            <DashboardCharts.LineChart
+              labels={orderedReports.map((_, index) => `R${index + 1}`)}
+              datasets={[
+                {
+                  label: "SEO",
+                  data: orderedReports.map((report) => report.seoScore ?? 0),
+                  color: "#205B73",
+                },
+                {
+                  label: "Dönüşüm",
+                  data: orderedReports.map(
+                    (report) => report.conversionScore ?? 0
+                  ),
+                  color: "#1E403A",
+                },
+                {
+                  label: "Genel",
+                  data: orderedReports.map((report) => report.overallScore ?? 0),
+                  color: "#7AB8BF",
+                },
+              ]}
+            />
+          ) : (
+            <div className="state-card state-card--empty">
+              <div className="state-card__icon">SK</div>
+              <h3 className="state-card__title">Skor akışı oluşmadı</h3>
+              <p className="state-card__text">
+                Skor trendi için en az bir rapor gerekiyor.
+              </p>
+            </div>
+          )}
+        </section>
+      </div>
+
+      <div className="section-grid-2">
+        <section className="surface app-card sb-stack-16">
+          <div className="section-card__header">
+            <div>
+              <h2 className="section-card__title">Son AI teşhisleri</h2>
+              <p className="section-card__text">
+                Tekrar eden darboğazları hızlıca oku ve önceliği belirle.
+              </p>
+            </div>
+          </div>
+
+          <div className="workspace-stack-list">
+            {recentDiagnoses.length > 0 ? (
+              recentDiagnoses.map((diagnosis, index) => (
+                <article
+                  key={`${diagnosis}-${index}`}
+                  className="workspace-insight-card"
+                >
+                  <div className="workspace-insight-card__index">
+                    {String(index + 1).padStart(2, "0")}
+                  </div>
+                  <p className="card-copy" style={{ color: "var(--text)" }}>
+                    {diagnosis}
+                  </p>
+                </article>
+              ))
             ) : (
-              <Link href="/account" className="dash-action-item">
-                <div className="dash-action-icon">⚙️</div>
-                <div className="dash-action-body">
-                  <div className="dash-action-title">Plan Detayı</div>
-                  <div className="dash-action-sub">Mevcut plan ve limitler</div>
-                </div>
-              </Link>
+              <div className="state-card state-card--empty">
+                <div className="state-card__icon">AI</div>
+                <h3 className="state-card__title">Teşhis birikiyor</h3>
+                <p className="state-card__text">
+                  Yeni analizlerden sonra bu alan tekrar eden AI teşhislerini gösterecek.
+                </p>
+              </div>
             )}
           </div>
+        </section>
 
-          {/* Veri güveni */}
-          <div style={{ marginTop: 20, padding: "14px 16px", borderRadius: "var(--radius-sm)", border: "1px solid var(--line)", background: "color-mix(in srgb, var(--surface-soft) 60%, transparent)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Veri Güveni</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--accent)" }}>{highCoverageCount}/{typedRecentReports.length || 0}</span>
+        <section className="surface app-card sb-stack-16">
+          <div className="section-card__header">
+            <div>
+              <h2 className="section-card__title">Hızlı aksiyonlar</h2>
+              <p className="section-card__text">
+                Tek tıkla analiz başlat, arşive geç veya hesap yönetimine dön.
+              </p>
             </div>
-            <div className="dash-bar-track">
-              <div className="dash-bar-fill" style={{
-                width: typedRecentReports.length > 0 ? `${Math.round((highCoverageCount / typedRecentReports.length) * 100)}%` : "0%",
-                background: "#20c997"
-              }} />
-            </div>
-            <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--text-muted)" }}>
-              Yüksek kapsamlı rapor oranı — AI yorumları daha güvenilir.
+          </div>
+
+          <div className="workspace-action-grid">
+            <Link href="/analyze" className="workspace-action-card">
+              <div className="workspace-action-card__title">Yeni analiz başlat</div>
+              <p className="workspace-action-card__text">
+                Trendyol ürün linkini gir ve rapora doğrudan geç.
+              </p>
+            </Link>
+            <Link href="/reports" className="workspace-action-card">
+              <div className="workspace-action-card__title">Rapor arşivi</div>
+              <p className="workspace-action-card__text">
+                Geçmiş raporlarını aç, filtrele ve yeniden incele.
+              </p>
+            </Link>
+            <Link href="/account" className="workspace-action-card">
+              <div className="workspace-action-card__title">Hesap ve plan</div>
+              <p className="workspace-action-card__text">
+                Plan seviyeni, kullanım durumunu ve yenilenme tarihini yönet.
+              </p>
+            </Link>
+            {includeAdmin ? (
+              <Link href="/admin" className="workspace-action-card">
+                <div className="workspace-action-card__title">Admin merkezi</div>
+                <p className="workspace-action-card__text">
+                  Kullanıcı, plan ve sistem operasyon paneline geç.
+                </p>
+              </Link>
+            ) : (
+              <article className="workspace-action-card">
+                <div className="workspace-action-card__title">Veri güveni</div>
+                <p className="workspace-action-card__text">
+                  Yüksek kapsamlı rapor oranı: {highCoverageCount}/
+                  {typedRecentReports.length || 0}
+                </p>
+              </article>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <section className="surface app-card sb-stack-16">
+        <div className="section-card__header">
+          <div>
+            <h2 className="section-card__title">Son raporlar</h2>
+            <p className="section-card__text">
+              Son analizler burada kompakt bir akış halinde tutulur; tam arşiv için
+              raporlar sayfasına geçebilirsin.
             </p>
           </div>
-        </div>
-      </div>
-
-      {/* ── GRAFİKLER ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-        <div style={{ background: "var(--dm-card-bg, #fff)", border: "1px solid var(--dm-border, #e2e8f0)", borderRadius: 16, padding: 24 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Sorun Alanları</h3>
-            <span style={{ fontSize: 12, color: "var(--dm-text-soft, #718096)" }}>Son raporlar</span>
-          </div>
-          <DashboardCharts.BarChart
-            title="Sorun Alanları"
-            labels={topThemes.map(([t]) => getThemeLabel(t))}
-            values={topThemes.map(([, c]) => c)}
-            colors={topThemes.map(([t]) => getThemeColor(t))}
-          />
-        </div>
-
-        <div style={{ background: "var(--dm-card-bg, #fff)", border: "1px solid var(--dm-border, #e2e8f0)", borderRadius: 16, padding: 24 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Skor Dağılımı</h3>
-            <span style={{ fontSize: 12, color: "var(--dm-text-soft, #718096)" }}>Son {typedRecentReports.length} rapor</span>
-          </div>
-          <DashboardCharts.LineChart
-            labels={typedRecentReports.slice().reverse().map((_, i) => `R${i + 1}`)}
-            datasets={[
-              { label: "SEO", data: typedRecentReports.slice().reverse().map((r) => r.seoScore ?? 0), color: "#0d6efd" },
-              { label: "Dönüşüm", data: typedRecentReports.slice().reverse().map((r) => r.conversionScore ?? 0), color: "#20c997" },
-              { label: "Genel", data: typedRecentReports.slice().reverse().map((r) => r.overallScore ?? 0), color: "#f28705" },
-            ]}
-          />
-        </div>
-      </div>
-
-      {/* ── SON RAPORLAR TABLOSU ── */}
-      <div className="dash-chart-card">
-        <div className="dash-section-header">
-          <div className="dash-section-header__left">
-            <h3 className="dash-chart-title">Son Raporlar</h3>
-            <p className="dash-chart-sub">En son analiz edilen ürünler</p>
-          </div>
-          <Link href="/reports" className="btn btn-secondary">Tümünü Gör</Link>
+          <Link href="/reports" className="btn btn-secondary">
+            Tümünü Gör
+          </Link>
         </div>
 
         {typedRecentReports.length > 0 ? (
-          <div className="dash-table-wrap">
-            <table className="dash-table">
-              <thead>
-                <tr>
-                  <th>Ürün URL</th>
-                  <th>Platform</th>
-                  <th>SEO</th>
-                  <th>Dönüşüm</th>
-                  <th>Genel</th>
-                  <th>Tarih</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {typedRecentReports.slice(0, 6).map((report) => {
-                  const overall = report.overallScore ?? 0;
-                  const seo = report.seoScore ?? 0;
-                  const conv = report.conversionScore ?? 0;
-                  return (
-                    <tr key={report.id}>
-                      <td>
-                        <div className="dash-table-url" title={report.url}>
-                          🔗 {report.url}
-                        </div>
-                      </td>
-                      <td>
-                        {report.platform && (
-                          <span className="dash-platform-tag">{report.platform}</span>
-                        )}
-                      </td>
-                      <td>
-                        <span className="dash-score-pill" style={{
-                          background: `color-mix(in srgb, ${getScoreColor(seo)} 12%, transparent)`,
-                          color: getScoreColor(seo),
-                          border: `1px solid color-mix(in srgb, ${getScoreColor(seo)} 25%, transparent)`,
-                        }}>
-                          {seo || "--"}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="dash-score-pill" style={{
-                          background: `color-mix(in srgb, ${getScoreColor(conv)} 12%, transparent)`,
-                          color: getScoreColor(conv),
-                          border: `1px solid color-mix(in srgb, ${getScoreColor(conv)} 25%, transparent)`,
-                        }}>
-                          {conv || "--"}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="dash-score-pill" style={{
-                          background: `color-mix(in srgb, ${getScoreColor(overall)} 12%, transparent)`,
-                          color: getScoreColor(overall),
-                          border: `1px solid color-mix(in srgb, ${getScoreColor(overall)} 25%, transparent)`,
-                          fontWeight: 800,
-                        }}>
-                          {overall || "--"}
-                        </span>
-                      </td>
-                      <td style={{ color: "var(--text-faint)", fontSize: 12, whiteSpace: "nowrap" }}>
-                        {new Date(report.createdAt).toLocaleDateString("tr-TR")}
-                      </td>
-                      <td>
-                        <Link href={`/reports/${report.id}`} className="dash-table-link">
-                          Detay →
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="dashboard-report-list">
+            {typedRecentReports.slice(0, 5).map((report) => (
+              <article key={report.id} className="dashboard-report-row">
+                <div className="dashboard-report-row__main">
+                  <div className="dashboard-report-row__title">
+                    {getReportTitle(report)}
+                  </div>
+                  <div className="dashboard-report-row__meta">
+                    {(report.platform || "Trendyol") +
+                      " • " +
+                      (report.category || "Genel") +
+                      " • " +
+                      new Date(report.createdAt).toLocaleDateString("tr-TR")}
+                  </div>
+                </div>
+
+                <div className="dashboard-report-row__metrics">
+                  <span className={`hero-point ${getScoreTone(report.seoScore)}`}>
+                    SEO {report.seoScore ?? "--"}
+                  </span>
+                  <span
+                    className={`hero-point ${getScoreTone(report.conversionScore)}`}
+                  >
+                    Dönüşüm {report.conversionScore ?? "--"}
+                  </span>
+                  <span
+                    className={`hero-point ${getScoreTone(report.overallScore)}`}
+                  >
+                    Genel {report.overallScore ?? "--"}
+                  </span>
+                  <Link href={`/reports/${report.id}`} className="btn btn-secondary">
+                    Aç
+                  </Link>
+                </div>
+              </article>
+            ))}
           </div>
         ) : (
           <div className="state-card state-card--empty">
-            <div className="state-card__icon">📊</div>
+            <div className="state-card__icon">RP</div>
             <h3 className="state-card__title">Henüz rapor yok</h3>
-            <p className="state-card__text">İlk analizini yap, raporlar burada görünsün.</p>
-            <Link href="/analyze" className="btn btn-primary">Analiz Başlat</Link>
+            <p className="state-card__text">
+              İlk analizi yaptığında raporların bu akışta görünmeye başlayacak.
+            </p>
+            <Link href="/analyze" className="btn btn-primary">
+              Analiz Başlat
+            </Link>
           </div>
         )}
-      </div>
+      </section>
     </AppChrome>
   );
 }

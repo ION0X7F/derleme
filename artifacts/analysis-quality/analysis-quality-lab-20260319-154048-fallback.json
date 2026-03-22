@@ -1,0 +1,507 @@
+{
+  "generatedAt": "2026-03-19T12:40:48.970Z",
+  "requestedMode": "fallback",
+  "effectiveMode": "fallback",
+  "scenarioCount": 7,
+  "passedScenarioCount": 7,
+  "averageScore": 100,
+  "scenarios": [
+    {
+      "name": "delivery-case",
+      "description": "Kategori benchmarkina gore yavas teslimat ana darbozaga donusmeli.",
+      "passed": true,
+      "score": 100,
+      "passedChecks": 10,
+      "totalChecks": 10,
+      "criticalDiagnosis": "Veriler gosteriyor ki kategori benchmarkina gore yavas teslimat ana darbozaga donusuyor.",
+      "primaryTheme": "delivery",
+      "firstSuggestion": "Sepet oncesi bariyeri azaltin",
+      "suggestionCount": 4,
+      "topSignalLabels": [
+        "Teslimat benchmark gerisinde",
+        "Gorsel benchmark gerisinde",
+        "Ucretsiz kargo gorunuyor"
+      ],
+      "checks": [
+        {
+          "key": "summary-no-field-leak",
+          "passed": true,
+          "detail": "Summary icinde ham alan adi sizintisi yok."
+        },
+        {
+          "key": "suggestions-no-field-leak",
+          "passed": true,
+          "detail": "Onerilerde ham alan adi sizintisi yok."
+        },
+        {
+          "key": "suggestion-count",
+          "passed": true,
+          "detail": "Oneri sayisi: 4."
+        },
+        {
+          "key": "critical-keywords",
+          "passed": true,
+          "detail": "Kritik teshis: Veriler gosteriyor ki kategori benchmarkina gore yavas teslimat ana darbozaga donusuyor."
+        },
+        {
+          "key": "first-suggestion-keywords",
+          "passed": true,
+          "detail": "Ilk oneri: Sepet oncesi bariyeri azaltin"
+        },
+        {
+          "key": "structured-summary",
+          "passed": true,
+          "detail": "Summary parser tarafindan bolunebildi."
+        },
+        {
+          "key": "recipe-count",
+          "passed": true,
+          "detail": "Recete satiri sayisi yeterli: 3."
+        },
+        {
+          "key": "recipe-align-1",
+          "passed": true,
+          "detail": "1. recete satiri Sepet oncesi bariyeri azaltin ile hizali."
+        },
+        {
+          "key": "recipe-align-2",
+          "passed": true,
+          "detail": "2. recete satiri Rakip fiyat farkini kapatin ile hizali."
+        },
+        {
+          "key": "recipe-align-3",
+          "passed": true,
+          "detail": "3. recete satiri Gorsel vitrini benchmark seviyesine tasiyin ile hizali."
+        }
+      ],
+      "scores": {
+        "seo": 100,
+        "conversion": 90,
+        "overall": 97
+      }
+    },
+    {
+      "name": "stock-case",
+      "description": "Stok kesintisi varsa baska sinyallerin onune gecmeli.",
+      "passed": true,
+      "score": 100,
+      "passedChecks": 8,
+      "totalChecks": 8,
+      "criticalDiagnosis": "Veriler gosteriyor ki urun stokta olmadigi icin satisin onundeki ana darbozag dogrudan erisilebilirlik problemi.",
+      "primaryTheme": "stock",
+      "firstSuggestion": "Stogu once geri acin",
+      "suggestionCount": 1,
+      "topSignalLabels": [
+        "Stok erisilebilirligi kritik",
+        "Yorum guveni destekliyor",
+        "Resmi satici sinyali var",
+        "Ucretsiz kargo gorunuyor"
+      ],
+      "checks": [
+        {
+          "key": "summary-no-field-leak",
+          "passed": true,
+          "detail": "Summary icinde ham alan adi sizintisi yok."
+        },
+        {
+          "key": "suggestions-no-field-leak",
+          "passed": true,
+          "detail": "Onerilerde ham alan adi sizintisi yok."
+        },
+        {
+          "key": "suggestion-count",
+          "passed": true,
+          "detail": "Oneri sayisi: 1."
+        },
+        {
+          "key": "critical-keywords",
+          "passed": true,
+          "detail": "Kritik teshis: Veriler gosteriyor ki urun stokta olmadigi icin satisin onundeki ana darbozag dogrudan erisilebilirlik problemi."
+        },
+        {
+          "key": "first-suggestion-keywords",
+          "passed": true,
+          "detail": "Ilk oneri: Stogu once geri acin"
+        },
+        {
+          "key": "structured-summary",
+          "passed": true,
+          "detail": "Summary parser tarafindan bolunebildi."
+        },
+        {
+          "key": "recipe-count",
+          "passed": true,
+          "detail": "Recete satiri sayisi yeterli: 3."
+        },
+        {
+          "key": "recipe-align-1",
+          "passed": true,
+          "detail": "1. recete satiri Stogu once geri acin ile hizali."
+        }
+      ],
+      "scores": {
+        "seo": 100,
+        "conversion": 85,
+        "overall": 96
+      }
+    },
+    {
+      "name": "content-case",
+      "description": "Detay sayfasi ikna zayifligi benchmark ve icerik sinyalleriyle one cikmali.",
+      "passed": true,
+      "score": 100,
+      "passedChecks": 10,
+      "totalChecks": 10,
+      "criticalDiagnosis": "Veriler gosteriyor ki urun detayi kategori benchmarkinin gerisinde kaldigi icin trafik karar asamasinda eriyor.",
+      "primaryTheme": "content",
+      "firstSuggestion": "Detay sayfasini ikna edici hale getirin",
+      "suggestionCount": 3,
+      "topSignalLabels": [
+        "Aciklama derinligi benchmark gerisinde",
+        "Yorum guveni destekliyor",
+        "Resmi satici sinyali var",
+        "Ucretsiz kargo gorunuyor"
+      ],
+      "checks": [
+        {
+          "key": "summary-no-field-leak",
+          "passed": true,
+          "detail": "Summary icinde ham alan adi sizintisi yok."
+        },
+        {
+          "key": "suggestions-no-field-leak",
+          "passed": true,
+          "detail": "Onerilerde ham alan adi sizintisi yok."
+        },
+        {
+          "key": "suggestion-count",
+          "passed": true,
+          "detail": "Oneri sayisi: 3."
+        },
+        {
+          "key": "critical-keywords",
+          "passed": true,
+          "detail": "Kritik teshis: Veriler gosteriyor ki urun detayi kategori benchmarkinin gerisinde kaldigi icin trafik karar asamasinda eriyor."
+        },
+        {
+          "key": "first-suggestion-keywords",
+          "passed": true,
+          "detail": "Ilk oneri: Detay sayfasini ikna edici hale getirin"
+        },
+        {
+          "key": "structured-summary",
+          "passed": true,
+          "detail": "Summary parser tarafindan bolunebildi."
+        },
+        {
+          "key": "recipe-count",
+          "passed": true,
+          "detail": "Recete satiri sayisi yeterli: 3."
+        },
+        {
+          "key": "recipe-align-1",
+          "passed": true,
+          "detail": "1. recete satiri Detay sayfasini ikna edici hale getirin ile hizali."
+        },
+        {
+          "key": "recipe-align-2",
+          "passed": true,
+          "detail": "2. recete satiri Urun videosu sinyalini kontrol edin ile hizali."
+        },
+        {
+          "key": "recipe-align-3",
+          "passed": true,
+          "detail": "3. recete satiri Diger saticilardan ayrismayi guclendirin ile hizali."
+        }
+      ],
+      "scores": {
+        "seo": 90,
+        "conversion": 95,
+        "overall": 95
+      }
+    },
+    {
+      "name": "visual-case",
+      "description": "Benchmarka gore zayif gorsel vitrin kritik teshise cikmali.",
+      "passed": true,
+      "score": 100,
+      "passedChecks": 9,
+      "totalChecks": 9,
+      "criticalDiagnosis": "Veriler gosteriyor ki gorsel anlatim kategori standardinin gerisinde kaldigi icin karar aninda ikna zayifliyor.",
+      "primaryTheme": "visual",
+      "firstSuggestion": "Gorsel vitrini benchmark seviyesine tasiyin",
+      "suggestionCount": 2,
+      "topSignalLabels": [
+        "Gorsel benchmark gerisinde",
+        "Vitrin gucu sinirli",
+        "Yorum guveni destekliyor",
+        "Resmi satici sinyali var",
+        "Ucretsiz kargo gorunuyor"
+      ],
+      "checks": [
+        {
+          "key": "summary-no-field-leak",
+          "passed": true,
+          "detail": "Summary icinde ham alan adi sizintisi yok."
+        },
+        {
+          "key": "suggestions-no-field-leak",
+          "passed": true,
+          "detail": "Onerilerde ham alan adi sizintisi yok."
+        },
+        {
+          "key": "suggestion-count",
+          "passed": true,
+          "detail": "Oneri sayisi: 2."
+        },
+        {
+          "key": "critical-keywords",
+          "passed": true,
+          "detail": "Kritik teshis: Veriler gosteriyor ki gorsel anlatim kategori standardinin gerisinde kaldigi icin karar aninda ikna zayifliyor."
+        },
+        {
+          "key": "first-suggestion-keywords",
+          "passed": true,
+          "detail": "Ilk oneri: Gorsel vitrini benchmark seviyesine tasiyin"
+        },
+        {
+          "key": "structured-summary",
+          "passed": true,
+          "detail": "Summary parser tarafindan bolunebildi."
+        },
+        {
+          "key": "recipe-count",
+          "passed": true,
+          "detail": "Recete satiri sayisi yeterli: 3."
+        },
+        {
+          "key": "recipe-align-1",
+          "passed": true,
+          "detail": "1. recete satiri Gorsel vitrini benchmark seviyesine tasiyin ile hizali."
+        },
+        {
+          "key": "recipe-align-2",
+          "passed": true,
+          "detail": "2. recete satiri Rakip fiyat farkini kapatin ile hizali."
+        }
+      ],
+      "scores": {
+        "seo": 90,
+        "conversion": 95,
+        "overall": 95
+      }
+    },
+    {
+      "name": "price-case",
+      "description": "Rakip ve benchmark ustu fiyat guven telafisi zayifsa ana darbozaga donusmeli.",
+      "passed": true,
+      "score": 100,
+      "passedChecks": 9,
+      "totalChecks": 9,
+      "criticalDiagnosis": "Veriler gosteriyor ki fiyat benchmark ustunde kalirken bunu tasiyacak guven sinyali sinirli oldugu icin teklif zayifliyor.",
+      "primaryTheme": "price",
+      "firstSuggestion": "Rakip fiyat farkini kapatin",
+      "suggestionCount": 2,
+      "topSignalLabels": [
+        "Yorum guveni destekliyor",
+        "Ucretsiz kargo gorunuyor",
+        "Fiyat benchmark ustunde",
+        "Satici guveni benchmark gerisinde"
+      ],
+      "checks": [
+        {
+          "key": "summary-no-field-leak",
+          "passed": true,
+          "detail": "Summary icinde ham alan adi sizintisi yok."
+        },
+        {
+          "key": "suggestions-no-field-leak",
+          "passed": true,
+          "detail": "Onerilerde ham alan adi sizintisi yok."
+        },
+        {
+          "key": "suggestion-count",
+          "passed": true,
+          "detail": "Oneri sayisi: 2."
+        },
+        {
+          "key": "critical-keywords",
+          "passed": true,
+          "detail": "Kritik teshis: Veriler gosteriyor ki fiyat benchmark ustunde kalirken bunu tasiyacak guven sinyali sinirli oldugu icin teklif zayifliyor."
+        },
+        {
+          "key": "first-suggestion-keywords",
+          "passed": true,
+          "detail": "Ilk oneri: Rakip fiyat farkini kapatin"
+        },
+        {
+          "key": "structured-summary",
+          "passed": true,
+          "detail": "Summary parser tarafindan bolunebildi."
+        },
+        {
+          "key": "recipe-count",
+          "passed": true,
+          "detail": "Recete satiri sayisi yeterli: 3."
+        },
+        {
+          "key": "recipe-align-1",
+          "passed": true,
+          "detail": "1. recete satiri Rakip fiyat farkini kapatin ile hizali."
+        },
+        {
+          "key": "recipe-align-2",
+          "passed": true,
+          "detail": "2. recete satiri Satici guven sinyallerini guclendirin ile hizali."
+        }
+      ],
+      "scores": {
+        "seo": 100,
+        "conversion": 100,
+        "overall": 100
+      }
+    },
+    {
+      "name": "trust-case",
+      "description": "Satici guveni benchmark altina duserse kritik teshis guven temasina kaymali.",
+      "passed": true,
+      "score": 100,
+      "passedChecks": 10,
+      "totalChecks": 10,
+      "criticalDiagnosis": "Veriler gosteriyor ki satici guveni kategori standardinin altinda kaldigi icin satin alma karari zayifliyor.",
+      "primaryTheme": "trust",
+      "firstSuggestion": "Guven sinyallerini sertlestirin",
+      "suggestionCount": 3,
+      "topSignalLabels": [
+        "Yorum guveni destekliyor",
+        "Ucretsiz kargo gorunuyor",
+        "Satici guveni benchmark gerisinde"
+      ],
+      "checks": [
+        {
+          "key": "summary-no-field-leak",
+          "passed": true,
+          "detail": "Summary icinde ham alan adi sizintisi yok."
+        },
+        {
+          "key": "suggestions-no-field-leak",
+          "passed": true,
+          "detail": "Onerilerde ham alan adi sizintisi yok."
+        },
+        {
+          "key": "suggestion-count",
+          "passed": true,
+          "detail": "Oneri sayisi: 3."
+        },
+        {
+          "key": "critical-keywords",
+          "passed": true,
+          "detail": "Kritik teshis: Veriler gosteriyor ki satici guveni kategori standardinin altinda kaldigi icin satin alma karari zayifliyor."
+        },
+        {
+          "key": "first-suggestion-keywords",
+          "passed": true,
+          "detail": "Ilk oneri: Guven sinyallerini sertlestirin"
+        },
+        {
+          "key": "structured-summary",
+          "passed": true,
+          "detail": "Summary parser tarafindan bolunebildi."
+        },
+        {
+          "key": "recipe-count",
+          "passed": true,
+          "detail": "Recete satiri sayisi yeterli: 3."
+        },
+        {
+          "key": "recipe-align-1",
+          "passed": true,
+          "detail": "1. recete satiri Guven sinyallerini sertlestirin ile hizali."
+        },
+        {
+          "key": "recipe-align-2",
+          "passed": true,
+          "detail": "2. recete satiri Rakip fiyat farkini kapatin ile hizali."
+        },
+        {
+          "key": "recipe-align-3",
+          "passed": true,
+          "detail": "3. recete satiri Satici guven skorunu yukseltecek adimlari one cikarin ile hizali."
+        }
+      ],
+      "scores": {
+        "seo": 100,
+        "conversion": 95,
+        "overall": 99
+      }
+    },
+    {
+      "name": "review-case",
+      "description": "Ilgi yuksek ama yorum/sosyal kanit zayifsa sepet oncesi surtunme one cikmali.",
+      "passed": true,
+      "score": 100,
+      "passedChecks": 9,
+      "totalChecks": 9,
+      "criticalDiagnosis": "Veriler gosteriyor ki urun ilgi cekiyor ancak sepet oncesi guven veya teklif bariyeri satisa donusmeyi kesiyor.",
+      "primaryTheme": "trust",
+      "firstSuggestion": "Sepet oncesi bariyeri azaltin",
+      "suggestionCount": 2,
+      "topSignalLabels": [
+        "Resmi satici sinyali var",
+        "Ucretsiz kargo gorunuyor"
+      ],
+      "checks": [
+        {
+          "key": "summary-no-field-leak",
+          "passed": true,
+          "detail": "Summary icinde ham alan adi sizintisi yok."
+        },
+        {
+          "key": "suggestions-no-field-leak",
+          "passed": true,
+          "detail": "Onerilerde ham alan adi sizintisi yok."
+        },
+        {
+          "key": "suggestion-count",
+          "passed": true,
+          "detail": "Oneri sayisi: 2."
+        },
+        {
+          "key": "critical-keywords",
+          "passed": true,
+          "detail": "Kritik teshis: Veriler gosteriyor ki urun ilgi cekiyor ancak sepet oncesi guven veya teklif bariyeri satisa donusmeyi kesiyor."
+        },
+        {
+          "key": "first-suggestion-keywords",
+          "passed": true,
+          "detail": "Ilk oneri: Sepet oncesi bariyeri azaltin"
+        },
+        {
+          "key": "structured-summary",
+          "passed": true,
+          "detail": "Summary parser tarafindan bolunebildi."
+        },
+        {
+          "key": "recipe-count",
+          "passed": true,
+          "detail": "Recete satiri sayisi yeterli: 3."
+        },
+        {
+          "key": "recipe-align-1",
+          "passed": true,
+          "detail": "1. recete satiri Sepet oncesi bariyeri azaltin ile hizali."
+        },
+        {
+          "key": "recipe-align-2",
+          "passed": true,
+          "detail": "2. recete satiri Teslimat cezasini dusurun ile hizali."
+        }
+      ],
+      "scores": {
+        "seo": 100,
+        "conversion": 90,
+        "overall": 97
+      }
+    }
+  ]
+}

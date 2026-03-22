@@ -23,8 +23,8 @@ export default function AnalyzeForm({
   placeholder,
   showMarketingMeta = true,
 }: Props) {
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     if (loading || !url.trim()) return;
     onSubmit();
   };
@@ -61,7 +61,7 @@ export default function AnalyzeForm({
   if (!isWorkspace) {
     return (
       <form onSubmit={handleSubmit} className="analyze-form analyze-form--marketing">
-        <div className="surface-soft analyze-form__panel analyze-form__panel--marketing">
+        <div className="analyze-form__panel analyze-form__panel--marketing">
           <label className="form-label analyze-form__field" style={{ gap: 10 }}>
             <span className="analyze-form__label">Ürün Linki</span>
 
@@ -69,9 +69,10 @@ export default function AnalyzeForm({
               <input
                 type="url"
                 value={url}
-                onChange={(e) => onChange(e.target.value)}
+                onChange={(event) => onChange(event.target.value)}
                 placeholder={
-                  placeholder || "https://www.trendyol.com/... ürün linkini buraya yapıştır"
+                  placeholder ||
+                  "https://www.trendyol.com/... ürün linkini buraya yapıştır"
                 }
                 className="input analyze-form__input"
                 autoComplete="off"
@@ -90,9 +91,7 @@ export default function AnalyzeForm({
                     <span>Analiz hazırlanıyor</span>
                   </>
                 ) : (
-                  <>
-                    <span>{buttonLabel}</span>
-                  </>
+                  <span>{buttonLabel}</span>
                 )}
               </button>
             </div>
@@ -103,7 +102,8 @@ export default function AnalyzeForm({
           {showMarketingMeta && (
             <div className="analyze-form__marketing-meta">
               <p className="hero-note" style={{ margin: 0 }}>
-                Linki yapıştır, ürününün satış potansiyelini büyütecek içgörüler anında gelsin.
+                Linki yapıştır, ürününün satış potansiyelini büyütecek içgörüler
+                birkaç saniyede gelsin.
               </p>
 
               <div className="pill-row">
@@ -128,16 +128,13 @@ export default function AnalyzeForm({
       <div className="surface-soft analyze-form__panel">
         <div className="analyze-form__header">
           <div>
-            <div className="stat-card__label">{isWorkspace ? "Analiz komutu" : "Analiz girişi"}</div>
+            <div className="stat-card__label">Analiz komutu</div>
             <div className="card-heading" style={{ marginBottom: 0 }}>
-              {isWorkspace
-                ? "Trendyol ürün linkini yapıştır ve raporu karar paneline taşı"
-                : "Trendyol ürün linkini doğrudan karar paneline taşıyın"}
+              Trendyol ürün linkini yapıştır ve raporu karar paneline taşı
             </div>
             <p className="analyze-form__subtitle">
-              {isWorkspace
-                ? "Bu giriş, benchmark farkı ile AI teşhisini aynı akışta tetikler ve kayıtlı rapora giden yolu hazırlar."
-                : "URL, sayfa okuma ve AI muhakemesini aynı yerden başlatır."}
+              Bu giriş, benchmark farkı ile AI teşhisini aynı akışta tetikler ve
+              kayıtlı rapora giden yolu hazırlar.
             </p>
           </div>
 
@@ -150,24 +147,18 @@ export default function AnalyzeForm({
           </div>
         </div>
 
-        <div
-          className={`analyze-form__input-shell${
-            isWorkspace ? " analyze-form__input-shell--workspace" : ""
-          }`}
-        >
-          {isWorkspace && (
-            <div className="analyze-form__prefix">
-              <span className="stat-card__label">Girilen</span>
-              <span className="mono">URL</span>
-            </div>
-          )}
+        <div className="analyze-form__input-shell analyze-form__input-shell--workspace">
+          <div className="analyze-form__prefix">
+            <span className="stat-card__label">Girilen</span>
+            <span className="mono">URL</span>
+          </div>
 
           <label className="form-label" style={{ gap: 0 }}>
             <span className="sr-only">Trendyol ürün linki</span>
             <input
               type="url"
               value={url}
-              onChange={(e) => onChange(e.target.value)}
+              onChange={(event) => onChange(event.target.value)}
               placeholder="Trendyol ürün linkini yapıştır... örnek: https://www.trendyol.com/..."
               className="input analyze-form__input"
               autoComplete="off"
@@ -197,16 +188,14 @@ export default function AnalyzeForm({
 
         {loadingNotice}
 
-        {isWorkspace && (
-          <div className="analyze-form__workspace-notes">
-            {workspaceNotes.map((item) => (
-              <article key={item.label} className="analyze-form__workspace-note">
-                <div className="stat-card__label">{item.label}</div>
-                <p className="card-copy">{item.text}</p>
-              </article>
-            ))}
-          </div>
-        )}
+        <div className="analyze-form__workspace-notes">
+          {workspaceNotes.map((item) => (
+            <article key={item.label} className="analyze-form__workspace-note">
+              <div className="stat-card__label">{item.label}</div>
+              <p className="card-copy">{item.text}</p>
+            </article>
+          ))}
+        </div>
       </div>
 
       <div
@@ -219,8 +208,8 @@ export default function AnalyzeForm({
         }}
       >
         <p className="hero-note" style={{ margin: 0 }}>
-          Trendyol ürün linkini girin. Sonuç ekranında güven, fiyat, içerik,
-          rakip ve karar sinyallerini tek panelde okuyun.
+          Trendyol ürün linkini gir. Sonuç ekranında güven, fiyat, içerik, rakip ve
+          karar sinyallerini tek panelde oku.
         </p>
 
         <div className="pill-row">

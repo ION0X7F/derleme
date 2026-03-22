@@ -6,7 +6,8 @@ type ThemeMode = "dark" | "light";
 
 function applyTheme(theme: ThemeMode) {
   document.documentElement.dataset.theme = theme;
-  document.documentElement.style.colorScheme = theme === "light" ? "light" : "dark";
+  document.documentElement.style.colorScheme =
+    theme === "light" ? "light" : "dark";
   localStorage.setItem("sellboost-theme", theme);
 }
 
@@ -29,16 +30,14 @@ export default function ThemeToggle() {
         applyTheme(nextTheme);
         setTheme(nextTheme);
       }}
-      aria-label={
-        theme === "dark" ? "Gunduz temasina gec" : "Gece temasina gec"
-      }
-      title={theme === "dark" ? "Gunduz temasi" : "Gece temasi"}
+      aria-label={theme === "dark" ? "Gündüz temasına geç" : "Gece temasına geç"}
+      title={theme === "dark" ? "Gündüz teması" : "Gece teması"}
     >
       <span className="theme-toggle__track" aria-hidden="true">
         <span className="theme-toggle__thumb" />
       </span>
       <span className="theme-toggle__label">
-        {theme === "dark" ? "Gece" : "Gunduz"}
+        {theme === "dark" ? "Gece" : "Gündüz"}
       </span>
     </button>
   );

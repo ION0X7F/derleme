@@ -7,12 +7,14 @@ type Props = {
   children: ReactNode;
   navItems?: MarketingNavItem[];
   variant?: "default" | "bright";
+  showFooter?: boolean;
 };
 
 export default function MarketingShell({
   children,
   navItems,
   variant = "default",
+  showFooter = true,
 }: Props) {
   return (
     <div className={`sb-shell${variant === "bright" ? " sb-shell--bright" : ""}`}>
@@ -20,7 +22,7 @@ export default function MarketingShell({
       <main className={`sb-page${variant === "bright" ? " sb-page--bright" : ""}`}>
         {children}
       </main>
-      <SiteFooter variant={variant} />
+      {showFooter ? <SiteFooter variant={variant} /> : null}
     </div>
   );
 }

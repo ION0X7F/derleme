@@ -40,8 +40,8 @@ export default function SiteHeader({
             </span>
             <span className="brand__subtitle">
               {isBright
-                ? "AI satis teshisi ve karar akisi"
-                : "Trendyol urun analizi ve karar paneli"}
+                ? "AI satış teşhisi ve karar akışı"
+                : "Trendyol ürün analizi ve karar paneli"}
             </span>
           </span>
         </Link>
@@ -52,9 +52,7 @@ export default function SiteHeader({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`nav-link${
-                  pathname === item.href ? " is-active" : ""
-                }`}
+                className={`nav-link${pathname === item.href ? " is-active" : ""}`}
               >
                 {item.label}
               </Link>
@@ -78,10 +76,10 @@ export default function SiteHeader({
             ) : (
               <>
                 <Link href="/login" className="btn btn-secondary">
-                  Giris Yap
+                  Giriş Yap
                 </Link>
                 <Link href="/register" className="btn btn-primary">
-                  Ucretsiz Dene
+                  Ücretsiz Dene
                 </Link>
               </>
             )}

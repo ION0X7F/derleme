@@ -9,17 +9,28 @@ type BarChartProps = {
   title: string;
 };
 
+type LineChartProps = {
+  labels: string[];
+  datasets: { label: string; data: number[]; color: string }[];
+};
+
+type DestroyableChart = {
+  destroy: () => void;
+};
+
 export function BarChart({ labels, values, colors, title }: BarChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;
-    let chart: any;
+
+    let chart: DestroyableChart | null = null;
 
     async function init() {
       const { Chart, registerables } = await import("chart.js");
       Chart.register(...registerables);
-      if (chart) chart.destroy();
+
+      chart?.destroy();
       chart = new Chart(canvasRef.current!, {
         type: "bar",
         data: {
@@ -29,18 +40,22 @@ export function BarChart({ labels, values, colors, title }: BarChartProps) {
               label: title,
               data: values,
               backgroundColor: colors,
-              borderRadius: 8,
+              borderRadius: 10,
               borderSkipped: false,
+              maxBarThickness: 48,
             },
           ],
         },
         options: {
           responsive: true,
-          plugins: { legend: { display: false } },
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+          },
           scales: {
             y: {
               beginAtZero: true,
-              grid: { color: "rgba(0,0,0,0.05)" },
+              grid: { color: "rgba(100, 116, 139, 0.12)" },
               ticks: { font: { size: 11 } },
             },
             x: {
@@ -53,57 +68,66 @@ export function BarChart({ labels, values, colors, title }: BarChartProps) {
     }
 
     init();
+
     return () => {
-      if (chart) chart.destroy();
+      chart?.destroy();
     };
   }, [labels, values, colors, title]);
 
-  return <canvas ref={canvasRef} />;
+  return (
+    <div className="dashboard-chart-canvas">
+      <canvas ref={canvasRef} />
+    </div>
+  );
 }
-
-type LineChartProps = {
-  labels: string[];
-  datasets: { label: string; data: number[]; color: string }[];
-};
 
 export function LineChart({ labels, datasets }: LineChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;
-    let chart: any;
+
+    let chart: DestroyableChart | null = null;
 
     async function init() {
       const { Chart, registerables } = await import("chart.js");
       Chart.register(...registerables);
-      if (chart) chart.destroy();
+
+      chart?.destroy();
       chart = new Chart(canvasRef.current!, {
         type: "line",
         data: {
           labels,
-          datasets: datasets.map((d) => ({
-            label: d.label,
-            data: d.data,
-            borderColor: d.color,
-            backgroundColor: d.color + "18",
+          datasets: datasets.map((dataset) => ({
+            label: dataset.label,
+            data: dataset.data,
+            borderColor: dataset.color,
+            backgroundColor: `${dataset.color}18`,
             fill: true,
-            tension: 0.4,
+            tension: 0.35,
             pointRadius: 4,
-            pointBackgroundColor: d.color,
+            pointHoverRadius: 5,
+            pointBackgroundColor: dataset.color,
           })),
         },
         options: {
           responsive: true,
+          maintainAspectRatio: false,
           plugins: {
             legend: {
               position: "top",
-              labels: { font: { size: 11 }, boxWidth: 12 },
+              align: "start",
+              labels: {
+                font: { size: 11 },
+                boxWidth: 12,
+                usePointStyle: true,
+              },
             },
           },
           scales: {
             y: {
               beginAtZero: true,
-              grid: { color: "rgba(0,0,0,0.05)" },
+              grid: { color: "rgba(100, 116, 139, 0.12)" },
               ticks: { font: { size: 11 } },
             },
             x: {
@@ -116,10 +140,15 @@ export function LineChart({ labels, datasets }: LineChartProps) {
     }
 
     init();
+
     return () => {
-      if (chart) chart.destroy();
+      chart?.destroy();
     };
   }, [labels, datasets]);
 
-  return <canvas ref={canvasRef} />;
+  return (
+    <div className="dashboard-chart-canvas">
+      <canvas ref={canvasRef} />
+    </div>
+  );
 }

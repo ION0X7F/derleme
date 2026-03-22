@@ -21,7 +21,6 @@ type PreviewMetric = {
   label: string;
   value: string;
   unit: string;
-  tone: "good" | "warn";
 };
 
 type PreviewBar = {
@@ -55,17 +54,12 @@ function getLockedSections(result: AnalysisResult | null) {
   return result?.access?.lockedSections?.length ?? 0;
 }
 
-function getMetricTone(score: number | null | undefined): "good" | "warn" {
-  const normalizedScore = clampScore(score);
-  return normalizedScore !== null && normalizedScore >= 70 ? "good" : "warn";
-}
-
 function getPreviewMetrics(teaser: AnalysisResult | null): PreviewMetric[] {
   if (!teaser) {
     return [
-      { label: "SEO skoru", value: "87", unit: "/100", tone: "good" },
-      { label: "Görsel", value: "26", unit: " adet", tone: "good" },
-      { label: "Yorum", value: "179", unit: " değ.", tone: "warn" },
+      { label: "Genel skor", value: "84", unit: "/100" },
+      { label: "SEO", value: "78", unit: "/100" },
+      { label: "Teklif baskısı", value: "3", unit: " sinyal" },
     ];
   }
 
@@ -79,19 +73,16 @@ function getPreviewMetrics(teaser: AnalysisResult | null): PreviewMetric[] {
       label: "Genel skor",
       value: overallScore !== null ? String(overallScore) : "--",
       unit: overallScore !== null ? "/100" : "",
-      tone: getMetricTone(teaser.overallScore),
     },
     {
       label: "SEO",
       value: seoScore !== null ? String(seoScore) : "--",
       unit: seoScore !== null ? "/100" : "",
-      tone: getMetricTone(teaser.seoScore),
     },
     {
       label: "Teklif baskısı",
       value: String(offerPressure),
       unit: " sinyal",
-      tone: offerPressure <= 1 ? "good" : "warn",
     },
   ];
 }
@@ -99,9 +90,9 @@ function getPreviewMetrics(teaser: AnalysisResult | null): PreviewMetric[] {
 function getPreviewBars(teaser: AnalysisResult | null): PreviewBar[] {
   if (!teaser) {
     return [
-      { label: "Başlık gücü", width: 90 },
-      { label: "Teklif netliği", width: 75 },
-      { label: "Güven seviyesi", width: 60 },
+      { label: "Genel skor", width: 84 },
+      { label: "SEO sinyali", width: 72 },
+      { label: "Veri güveni", width: 66 },
     ];
   }
 
@@ -126,17 +117,17 @@ function getPreviewActions(teaser: AnalysisResult | null): PreviewAction[] {
     return [
       {
         number: "1",
-        label: "Başlıkta dönüşüm niyetini güçlendir.",
+        label: "Vitrin anlatımını ilk bakışta daha ikna edici hale getir.",
         width: 84,
       },
       {
         number: "2",
-        label: "Rakip teklif baskısını fiyat ve teslimatla dengele.",
+        label: "Rakip teklif baskısını fiyat ve teslimat diliyle dengele.",
         width: 72,
       },
       {
         number: "3",
-        label: "Güven sinyallerini yorum ve içerikle öne çıkar.",
+        label: "Yorum ve güven sinyallerini üst alanda daha görünür yap.",
         width: 60,
       },
     ];
@@ -164,13 +155,15 @@ export default function HomeHeroClient() {
   const previewMetrics = getPreviewMetrics(teaser);
   const previewBars = getPreviewBars(teaser);
   const previewActions = getPreviewActions(teaser);
+  const showPreview = loading || !!teaser;
+
   const diagnosisText = teaser
     ? truncateText(
         summarySections.criticalDiagnosis ||
           teaser.summary ||
-          "Teaser raporu hazır. Tam karar panelinde daha derin içgörüler açılır.",
+          "Teaser raporu hazır. Tam karar panelinde daha derin içgörüler açılır."
       )
-    : "Ürün linkini gönderdiğinde fiyat, güven, içerik ve rekabet sinyalleri tek bakışta okunur.";
+    : "Ürün linkini bırak. SellBoost fiyat, güven, içerik ve rakip sinyallerini tek bir satış teşhisine dönüştürsün.";
 
   const displayDiagnosisText = teaser
     ? truncateText(
@@ -230,11 +223,6 @@ export default function HomeHeroClient() {
 
         <div className="sb-container bright-hero__content">
           <div className="bright-hero__copy">
-            <div className="bright-badge">
-              <span className="bright-badge__dot" />
-              Trendyol ürün linkinden ilk satış teşhisine
-            </div>
-
             <h1 className="bright-hero__title">
               Satışı yavaşlatan sinyalleri
               <span> ilk ekranda gör.</span>
@@ -275,7 +263,7 @@ export default function HomeHeroClient() {
               </p>
 
               <div className="hero-actions" style={{ marginTop: 0 }}>
-                <Link href="#features" className="btn btn-secondary">
+                <Link href="/how-it-works" className="btn btn-secondary">
                   Nasıl çalıştığını gör
                 </Link>
                 <Link href="/register" className="btn btn-primary">
@@ -287,7 +275,8 @@ export default function HomeHeroClient() {
         </div>
       </section>
 
-      <section className="bright-preview" aria-live="polite">
+      {showPreview ? (
+        <section className="bright-preview" aria-live="polite">
         <div className="sb-container bright-preview__stack">
           <div className="bright-preview__frame">
             <div className="bright-preview__bar">
@@ -308,7 +297,11 @@ export default function HomeHeroClient() {
             <div className="bright-preview__body">
               <div className="bright-preview__lead">
                 <div className="bright-section-kicker">
-                  {loading ? "Analiz akışı" : teaser ? "İlk teşhis hazır" : "Karar özeti"}
+                  {loading
+                    ? "Analiz akışı"
+                    : teaser
+                      ? "İlk teşhis hazır"
+                      : "Karar özeti"}
                 </div>
                 <h2 className="bright-preview__title">
                   {teaser
@@ -354,10 +347,16 @@ export default function HomeHeroClient() {
                   <div className="mock-analysis__label">Öncelikli aksiyonlar</div>
 
                   {previewActions.map((action) => (
-                    <div key={`${action.number}-${action.label}`} className="landing-preview__summary">
+                    <div
+                      key={`${action.number}-${action.label}`}
+                      className="landing-preview__summary"
+                    >
                       <div className="mock-action">
                         <span className="mock-action__num">{action.number}</span>
-                        <div className="mock-action__line" style={{ width: `${action.width}%` }} />
+                        <div
+                          className="mock-action__line"
+                          style={{ width: `${action.width}%` }}
+                        />
                       </div>
                       <p className="mock-action__copy">{action.label}</p>
                     </div>
@@ -447,7 +446,8 @@ export default function HomeHeroClient() {
             ))}
           </div>
         </div>
-      </section>
+        </section>
+      ) : null}
     </>
   );
 }

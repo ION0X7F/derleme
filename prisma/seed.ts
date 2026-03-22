@@ -1,26 +1,11 @@
 import "dotenv/config";
-import path from "path";
 import { PrismaClient, PlanCode } from "@prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import {
+  createPrismaAdapter,
+  getRequiredDatabaseUrl,
+} from "../lib/prisma-adapter";
 
-const rawDatabaseUrl = process.env.DATABASE_URL;
-
-if (!rawDatabaseUrl) {
-  throw new Error("DATABASE_URL is not defined");
-}
-
-if (!rawDatabaseUrl.startsWith("file:")) {
-  throw new Error("Only SQLite file URLs are supported");
-}
-
-const sqlitePath = rawDatabaseUrl.replace(/^file:/, "");
-const absoluteSqlitePath = path.isAbsolute(sqlitePath)
-  ? sqlitePath
-  : path.resolve(process.cwd(), sqlitePath);
-
-const adapter = new PrismaBetterSqlite3({
-  url: `file:${absoluteSqlitePath}`,
-});
+const adapter = createPrismaAdapter(getRequiredDatabaseUrl());
 
 const prisma = new PrismaClient({ adapter });
 
