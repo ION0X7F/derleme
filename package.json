@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:ai-regression": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/ai-regression-test.ts",
+    "test:ai-regression:auto": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/ai-regression-test.ts --mode=auto",
+    "test:ai-regression:fallback": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/ai-regression-test.ts --mode=fallback",
+    "lab:analysis-quality": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/analysis-quality-lab.ts",
+    "lab:analysis-quality:auto": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/analysis-quality-lab.ts --mode=auto",
+    "lab:analysis-quality:fallback": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/analysis-quality-lab.ts --mode=fallback"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -15,6 +21,7 @@
     "@prisma/client": "^7.5.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.8.0",
+    "chart.js": "^4.5.1",
     "cheerio": "^1.2.0",
     "next": "16.1.6",
     "next-auth": "^5.0.0-beta.30",

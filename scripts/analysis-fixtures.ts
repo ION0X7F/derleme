@@ -1,0 +1,141 @@
+import type { ExtractedProductFields, LearningContext } from "../types/analysis";
+
+export const TEST_PLATFORM = "trendyol";
+export const TEST_CATEGORY = "__TEST_Elektronik";
+export const TEST_URL = "https://www.trendyol.com/test";
+export const TEST_STRUCTURED_SUMMARY =
+  "[KRITIK TESHIS]: Test lider urun.\n[VERI CARPISTIRMA]: Test veri.\n[STRATEJIK RECETE]:\n1. Test.\n2. Test.\n3. Test.\n[SISTEM OGRENISI]: Test bellegi.";
+
+export function createExtracted(
+  overrides: Partial<ExtractedProductFields>
+): ExtractedProductFields {
+  return {
+    title: "Test Elektronik Urun",
+    meta_description: "Test urun aciklamasi",
+    h1: "Test Elektronik Urun",
+    brand: "TestBrand",
+    product_name: "Test Urun",
+    model_code: "TB-1234",
+    sku: null,
+    mpn: null,
+    gtin: null,
+    price: "999 TL",
+    normalized_price: 999,
+    original_price: 1199,
+    discount_rate: 17,
+    currency: "TRY",
+    image_count: 10,
+    has_video: true,
+    rating_value: 4.7,
+    rating_breakdown: null,
+    review_count: 2500,
+    review_snippets: null,
+    qa_snippets: null,
+    review_summary: null,
+    review_themes: null,
+    top_positive_review_hits: null,
+    top_negative_review_hits: null,
+    question_count: 12,
+    description_length: 420,
+    bullet_point_count: 6,
+    has_add_to_cart: true,
+    has_shipping_info: true,
+    has_free_shipping: true,
+    shipping_days: 2,
+    has_return_info: true,
+    has_specs: true,
+    has_faq: true,
+    variant_count: 2,
+    stock_quantity: 100,
+    stock_status: "in_stock",
+    seller_name: "Test Satici",
+    merchant_id: 1,
+    listing_id: "test-listing",
+    seller_badges: ["Hizli Satici"],
+    seller_score: 9.2,
+    follower_count: 5000,
+    favorite_count: 120000,
+    other_sellers_count: 5,
+    other_seller_offers: null,
+    other_sellers_summary: {
+      count: 5,
+      scored_count: 5,
+      avg_score: 8.9,
+      top_score: 9.4,
+      official_count: 1,
+      fast_delivery_count: 3,
+      high_follower_count: 1,
+      seller_names: ["A", "B", "C"],
+      min_price: 950,
+      max_price: 1100,
+      avg_price: 1010,
+      cheapest_seller_name: "A",
+      same_price_count: 0,
+      cheaper_count: 1,
+      more_expensive_count: 4,
+    },
+    has_brand_page: true,
+    official_seller: true,
+    has_campaign: true,
+    campaign_label: "Kargo Bedava",
+    promotion_labels: ["Kargo Bedava"],
+    delivery_type: "fast_delivery",
+    is_best_seller: false,
+    best_seller_rank: null,
+    best_seller_badge: null,
+    category: TEST_CATEGORY,
+    extractor_status: "ok",
+    platform: TEST_PLATFORM,
+    ...overrides,
+  };
+}
+
+export function createLearningContext(
+  overrides?: Partial<LearningContext>
+): LearningContext {
+  return {
+    benchmark: {
+      platform: TEST_PLATFORM,
+      category: TEST_CATEGORY,
+      sampleSize: 12,
+      successfulSampleSize: 6,
+      avgShippingDays: 2,
+      avgImageCount: 9,
+      avgDescriptionLength: 380,
+      avgRatingValue: 4.5,
+      avgSellerScore: 8.8,
+      avgPrice: 1100,
+      avgReviewCount: 1500,
+      avgFavoriteCount: 90000,
+      avgOtherSellersCount: 4,
+      fastDeliveryRate: 0.7,
+      freeShippingRate: 0.75,
+      hasVideoRate: 0.5,
+      officialSellerRate: 0.45,
+      campaignRate: 0.55,
+      bestSellerRate: 0.2,
+      successfulAvgShippingDays: 2,
+      successfulAvgImageCount: 10,
+      successfulAvgRatingValue: 4.7,
+      successfulAvgSellerScore: 9.1,
+      successfulAvgPrice: 1120,
+      successfulFastDeliveryRate: 0.8,
+      successfulVideoRate: 0.6,
+      successfulOfficialSellerRate: 0.5,
+    },
+    rules: [
+      {
+        ruleKey: "fast-delivery-advantage",
+        title: "Hizli teslimat kritik",
+        insight:
+          "Bu kategoride hizli teslimat karar hizini belirgin artiriyor.",
+        confidence: 0.74,
+        supportCount: 6,
+      },
+    ],
+    memorySnippets: ["Teslimat hizi dusuk urunler zorlaniyor."],
+    systemLearning:
+      "Bu kategoride hizli teslimat ve zengin gorsel anlatim daha guclu sonuc uretiyor.",
+    ...overrides,
+  };
+}

@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
+import {
+  buildAnalysisAccessState,
+  resolveAccessPlan,
+} from "@/lib/analysis-access";
+import { isUnlimitedUser } from "@/lib/is-unlimited-user";
 import { prisma } from "@/lib/prisma";
 import { sanitizeStoredReportForAccess } from "@/lib/report-access";
+import { getUserMembershipSnapshot } from "@/lib/user-membership";
+import { validateProductUrl } from "@/lib/url-validation";
 
 type SaveReportBody = {
   url?: string;
@@ -21,6 +28,7 @@ type SaveReportBody = {
   accessState?: unknown;
   suggestions?: unknown;
   priorityActions?: unknown;
+  analysisTrace?: unknown;
 };
 
 export async function POST(req: NextRequest) {
@@ -32,11 +40,17 @@ export async function POST(req: NextRequest) {
     }
 
     const body = (await req.json()) as SaveReportBody;
-    const url = typeof body.url === "string" ? body.url.trim() : "";
+    const rawUrl = typeof body.url === "string" ? body.url : "";
+    const validatedUrl = validateProductUrl(rawUrl);
 
-    if (!url) {
-      return NextResponse.json({ error: "Eksik alan: url" }, { status: 400 });
+    if (!validatedUrl.ok) {
+      return NextResponse.json(
+        { error: validatedUrl.message },
+        { status: 400 }
+      );
     }
+
+    const url = validatedUrl.normalizedUrl;
 
     const seoScore =
       body.seoScore === null ||
@@ -78,14 +92,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Gecersiz skor alanlari" }, { status: 400 });
     }
 
+    const unlimited = isUnlimitedUser(session.user.email);
+    const membership = await getUserMembershipSnapshot(session.user.id);
+    const accessPlan = resolveAccessPlan({
+      sessionUserId: session.user.id,
+      userPlan:
+        membership?.planCode ??
+        ("plan" in session.user ? String(session.user.plan) : null),
+      unlimited,
+    });
+    const accessState = buildAnalysisAccessState(accessPlan);
+
     const sanitizedReport = sanitizeStoredReportForAccess({
       extractedData: body.extractedData ?? {},
       derivedMetrics: body.derivedMetrics ?? null,
       coverage: body.coverage ?? null,
       priceCompetitiveness: body.priceCompetitiveness ?? null,
-      accessState: body.accessState ?? null,
+      accessState,
       suggestions: body.suggestions ?? [],
       priorityActions: body.priorityActions ?? [],
+      analysisTrace: body.analysisTrace ?? null,
     });
 
     const report = await prisma.report.create({
@@ -96,7 +122,7 @@ export async function POST(req: NextRequest) {
           },
         },
         url,
-        platform: body.platform ?? null,
+        platform: validatedUrl.platform,
         category: body.category ?? null,
         seoScore,
         dataCompletenessScore,
@@ -121,12 +147,7 @@ export async function POST(req: NextRequest) {
             : sanitizedReport.coverage === undefined
               ? undefined
               : (sanitizedReport.coverage as Prisma.InputJsonValue),
-        accessState:
-          body.accessState === null
-            ? Prisma.JsonNull
-            : body.accessState === undefined
-              ? undefined
-              : (body.accessState as Prisma.InputJsonValue),
+        accessState: accessState as Prisma.InputJsonValue,
         suggestions:
           body.suggestions === null
             ? Prisma.JsonNull
@@ -135,6 +156,12 @@ export async function POST(req: NextRequest) {
           body.priorityActions === null
             ? Prisma.JsonNull
             : ((sanitizedReport.priorityActions ?? []) as Prisma.InputJsonValue),
+        analysisTrace:
+          sanitizedReport.analysisTrace === null
+            ? Prisma.JsonNull
+            : sanitizedReport.analysisTrace === undefined
+              ? undefined
+              : (sanitizedReport.analysisTrace as Prisma.InputJsonValue),
       },
     });
 

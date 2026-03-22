@@ -49,6 +49,7 @@ export async function GET() {
         accessState: true,
         priorityActions: true,
         suggestions: true,
+        analysisTrace: true,
         extractedData: true,
         createdAt: true,
       },

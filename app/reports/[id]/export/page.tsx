@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { parseAnalysisSummary } from "@/lib/analysis-summary";
 import { getCoverageLabel } from "@/lib/coverage-utils";
 import { getPlanLabel } from "@/lib/plan-label";
 import { getPriceCompetitivenessLabel } from "@/lib/price-competitiveness";
@@ -37,6 +38,47 @@ function formatPriceDelta(delta?: number | null) {
   const abs = formatCurrency(Math.abs(delta));
   if (!abs) return null;
   return delta < 0 ? `${abs} daha ucuz` : `${abs} daha pahali`;
+}
+
+function formatTraceThemeLabel(value?: SavedReport["analysisTrace"] extends infer T
+  ? T extends { primaryTheme?: infer Theme }
+    ? Theme
+    : never
+  : never) {
+  switch (value) {
+    case "stock":
+      return "Stok bariyeri";
+    case "price":
+      return "Fiyat baskisi";
+    case "delivery":
+      return "Teslimat bariyeri";
+    case "content":
+      return "Icerik iknasi";
+    case "visual":
+      return "Gorsel vitrin";
+    case "trust":
+      return "Guven bariyeri";
+    case "reviews":
+      return "Yorum surtunmesi";
+    case "faq":
+      return "Soru-cevap bariyeri";
+    case "campaign":
+      return "Kampanya farki";
+    case "mixed":
+      return "Karma tema";
+    default:
+      return null;
+  }
+}
+
+function formatTraceModeLabel(value?: SavedReport["analysisTrace"] extends infer T
+  ? T extends { mode?: infer Mode }
+    ? Mode
+    : never
+  : never) {
+  if (value === "ai_enriched") return "AI destekli";
+  if (value === "deterministic") return "Deterministik";
+  return null;
 }
 
 function Row({
@@ -175,7 +217,7 @@ export default function ReportExportPage() {
                 <Link href="/dashboard" className="btn btn-secondary">
                   Dashboard&apos;a Don
                 </Link>
-                <Link href="/fiyatlandirma" className="btn btn-primary">
+                <Link href="/pricing" className="btn btn-primary">
                   Premium Ac
                 </Link>
               </div>
@@ -190,6 +232,8 @@ export default function ReportExportPage() {
   const extracted = (report.extractedData ?? {}) as NonNullable<
     SavedReport["extractedData"]
   >;
+  const parsedSummary = parseAnalysisSummary(report.summary);
+  const analysisTrace = report.analysisTrace ?? null;
 
   return (
     <>
@@ -230,7 +274,7 @@ export default function ReportExportPage() {
                   <button onClick={() => window.print()} className="btn btn-primary">
                     Yazdir / PDF
                   </button>
-                  <Link href={`/reports/${report.id}`} className="btn btn-secondary">
+                  <Link href={`/report/${report.id}`} className="btn btn-secondary">
                     Raporu Ac
                   </Link>
                 </div>
@@ -391,7 +435,6 @@ export default function ReportExportPage() {
                     label="Fiyat rekabeti"
                     value={getPriceCompetitivenessLabel(report.priceCompetitiveness)}
                   />
-                  <Row label="Ozet" value={report.summary} />
                 </PaperSection>
 
                 <PaperSection title="Cekilen ana veriler">
@@ -463,6 +506,127 @@ export default function ReportExportPage() {
                   />
                 </PaperSection>
               </div>
+
+              {(parsedSummary.hasStructuredSummary || parsedSummary.raw) && (
+                <PaperSection title="Karar ozeti">
+                  {parsedSummary.hasStructuredSummary ? (
+                    <div style={{ display: "grid", gap: 14 }}>
+                      {parsedSummary.criticalDiagnosis && (
+                        <div>
+                          <div className="stat-card__label">Kritik teshis</div>
+                          <p className="card-copy" style={{ color: "#475467" }}>
+                            {parsedSummary.criticalDiagnosis}
+                          </p>
+                        </div>
+                      )}
+
+                      {parsedSummary.dataCollision && (
+                        <div>
+                          <div className="stat-card__label">Veri carpistirma</div>
+                          <p className="card-copy" style={{ color: "#475467" }}>
+                            {parsedSummary.dataCollision}
+                          </p>
+                        </div>
+                      )}
+
+                      {parsedSummary.strategicRecipe.length > 0 && (
+                        <div>
+                          <div className="stat-card__label">Stratejik recete</div>
+                          <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+                            {parsedSummary.strategicRecipe.map((item, index) => (
+                              <div key={`${item}-${index}`} className="card-copy" style={{ color: "#475467" }}>
+                                {index + 1}. {item}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {parsedSummary.systemLearning && (
+                        <div>
+                          <div className="stat-card__label">Sistem ogrenisi</div>
+                          <p className="card-copy" style={{ color: "#475467" }}>
+                            {parsedSummary.systemLearning}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="card-copy" style={{ color: "#475467" }}>
+                      {parsedSummary.raw}
+                    </p>
+                  )}
+                </PaperSection>
+              )}
+
+              {analysisTrace && (
+                <PaperSection title="Karar izi">
+                  <Row
+                    label="Karar modu"
+                    value={formatTraceModeLabel(analysisTrace.mode)}
+                  />
+                  <Row
+                    label="Ana tema"
+                    value={formatTraceThemeLabel(analysisTrace.primaryTheme)}
+                  />
+                  <Row label="Ana teshis" value={analysisTrace.primaryDiagnosis} />
+                  <Row
+                    label="Kapsam guveni"
+                    value={analysisTrace.confidence}
+                  />
+
+                  {analysisTrace.topSignals?.length ? (
+                    <div style={{ marginTop: 16 }}>
+                      <div className="stat-card__label">Tetikleyici sinyaller</div>
+                      <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+                        {analysisTrace.topSignals.map((item, index) => (
+                          <div
+                            key={`${item.key || item.label || "signal"}-${index}`}
+                            className="card-copy"
+                            style={{ color: "#475467" }}
+                          >
+                            {item.label}: {item.detail}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {analysisTrace.recommendedFocus?.length ? (
+                    <div style={{ marginTop: 16 }}>
+                      <div className="stat-card__label">Odak rotasi</div>
+                      <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+                        {analysisTrace.recommendedFocus.map((item, index) => (
+                          <div
+                            key={`${item}-${index}`}
+                            className="card-copy"
+                            style={{ color: "#475467" }}
+                          >
+                            {index + 1}. {item}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {analysisTrace.decisionFlow?.length ? (
+                    <div style={{ marginTop: 16 }}>
+                      <div className="stat-card__label">Karar akisi</div>
+                      <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+                        {analysisTrace.decisionFlow.map((item, index) => (
+                          <div
+                            key={`${item.key || item.title || "flow"}-${index}`}
+                            className="card-copy"
+                            style={{ color: "#475467" }}
+                          >
+                            {item.title}: {item.detail}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </PaperSection>
+              )}
 
               {(report.priorityActions?.length || report.suggestions?.length) && (
                 <div className="section-grid-2" style={{ marginTop: 18 }}>

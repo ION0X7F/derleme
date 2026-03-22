@@ -2,25 +2,25 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import {
   IBM_Plex_Mono,
-  Manrope,
-  Space_Grotesk,
+  Inter,
+  Sora,
 } from "next/font/google";
 import "./globals.css";
 import Providers from "./providers";
 
-const manrope = Manrope({
+const inter = Inter({
   variable: "--font-manrope",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
 });
 
-const spaceGrotesk = Space_Grotesk({
+const sora = Sora({
   variable: "--font-space-grotesk",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
 });
 
 const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "600"],
 });
 
@@ -28,12 +28,12 @@ const themeInitScript = `
   (() => {
     try {
       const stored = localStorage.getItem("sellboost-theme");
-      const theme = stored === "light" || stored === "dark" ? stored : "dark";
+      const theme = stored === "light" || stored === "dark" ? stored : "light";
       document.documentElement.dataset.theme = theme;
       document.documentElement.style.colorScheme = theme === "light" ? "light" : "dark";
     } catch {
-      document.documentElement.dataset.theme = "dark";
-      document.documentElement.style.colorScheme = "dark";
+      document.documentElement.dataset.theme = "light";
+      document.documentElement.style.colorScheme = "light";
     }
   })();
 `;
@@ -57,8 +57,8 @@ export default function RootLayout({
     <html
       lang="tr"
       suppressHydrationWarning
-      data-theme="dark"
-      className={`${manrope.variable} ${spaceGrotesk.variable} ${plexMono.variable}`}
+      data-theme="light"
+      className={`${inter.variable} ${sora.variable} ${plexMono.variable}`}
     >
       <body className="sb-body">
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />

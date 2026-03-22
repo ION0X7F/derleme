@@ -1,5 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import {
+  parseAnalysisSummary,
+  syncStructuredSummaryWithSuggestions,
+} from "@/lib/analysis-summary";
 import type {
+  AnalysisSuggestion,
   DecisionSupportPacket,
   ExtractedProductFields,
   LearningContext,
@@ -94,6 +99,16 @@ type RawAiAnalysisResult = {
   overall_score: number;
 };
 
+type AiBaselineContext = {
+  summary?: string | null;
+  strengths?: string[] | null;
+  weaknesses?: string[] | null;
+  suggestions?: AnalysisSuggestion[] | null;
+  seo_score?: number | null;
+  conversion_score?: number | null;
+  overall_score?: number | null;
+};
+
 const SUPPORTED_DEPENDENCIES: SupportedDependency[] = [
   "title",
   "h1",
@@ -142,6 +157,21 @@ const SUPPORTED_DEPENDENCIES: SupportedDependency[] = [
   "best_seller_badge",
 ];
 
+const TURKISH_COMPARABLE_CHAR_MAP: Record<string, string> = {
+  "ç": "c",
+  "Ç": "c",
+  "ğ": "g",
+  "Ğ": "g",
+  "ı": "i",
+  "İ": "i",
+  "ö": "o",
+  "Ö": "o",
+  "ş": "s",
+  "Ş": "s",
+  "ü": "u",
+  "Ü": "u",
+};
+
 function hasText(value: string | null | undefined) {
   return !!value && value.trim().length > 0;
 }
@@ -149,6 +179,57 @@ function hasText(value: string | null | undefined) {
 function scoreToRange(value: unknown) {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function humanizeAiText(value: string) {
+  const replacements: Array<[RegExp, string]> = [
+    [/\bnormalized_price\b/gi, "fiyat"],
+    [/\boriginal_price\b/gi, "orijinal fiyat"],
+    [/\bdiscount_rate\b/gi, "indirim orani"],
+    [/\bmin_price\b/gi, "en dusuk rakip fiyat"],
+    [/\bavg_price\b/gi, "rakip ortalama fiyat"],
+    [/\bshipping_days\b/gi, "teslimat suresi"],
+    [/\bdelivery_type\b/gi, "teslimat tipi"],
+    [/\bfavorite_count\b/gi, "favori sayisi"],
+    [/\breview_count\b/gi, "yorum sayisi"],
+    [/\breview_summary\b/gi, "yorum ozeti"],
+    [/\breview_risk\b/gi, "yorum riski"],
+    [/\blow_rated_count\b/gi, "dusuk yildizli yorum sayisi"],
+    [/\bpositive_count\b/gi, "olumlu yorum sayisi"],
+    [/\bnegative_count\b/gi, "olumsuz yorum sayisi"],
+    [/\bimage_count\b/gi, "gorsel sayisi"],
+    [/\bseller_score\b/gi, "satici puani"],
+    [/\bother_sellers_summary\b/gi, "rakip ozeti"],
+    [/\bother_sellers_count\b/gi, "diger satici sayisi"],
+    [/\bbest_seller_rank\b/gi, "cok satan sirasi"],
+    [/\bhas_free_shipping\b/gi, "ucretsiz kargo"],
+    [/\bhas_return_info\b/gi, "iade bilgisi"],
+    [/\bhas_specs\b/gi, "ozellik alani"],
+    [/\bdescription_length\b/gi, "aciklama derinligi"],
+    [/\bweak\b/gi, "zayif"],
+    [/\bstrong\b/gi, "guclu"],
+    [/\bmedium\b/gi, "orta"],
+    [/\bnot_enough_data\b/gi, "veri sinirli"],
+    [/rakip en dusuk rakip fiyat/gi, "en dusuk rakip fiyat"],
+    [/yorum ozetideki/gi, "yorum ozetindeki"],
+    [/kategori benchmark[ıi]/gi, "kategori ortalamasi"],
+  ];
+
+  let next = value;
+
+  for (const [pattern, replacement] of replacements) {
+    next = next.replace(pattern, replacement);
+  }
+
+  return next
+    .replace(/["']/g, "")
+    .replace(/[^\S\r\n]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function containsSuspiciousSummaryArtifacts(value: string) {
+  return /\b[a-z]+_[a-z0-9_]+\b/.test(value);
 }
 
 function formatPrice(value: number | null | undefined) {
@@ -159,16 +240,398 @@ function formatPrice(value: number | null | undefined) {
   })} TL`;
 }
 
+function foldComparableCharacters(value: string) {
+  return value.replace(/[çÇğĞıİöÖşŞüÜ]/g, (char) => {
+    return TURKISH_COMPARABLE_CHAR_MAP[char] || char;
+  });
+}
+
+function normalizeComparableText(value: string) {
+  return foldComparableCharacters(value)
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function dedupeStrings(items: Array<string | null | undefined>, limit: number) {
+  const seen = new Set<string>();
+  const next: string[] = [];
+
+  for (const item of items) {
+    if (!item || !item.trim()) continue;
+    const normalized = normalizeComparableText(item);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    next.push(item.trim());
+    if (next.length >= limit) break;
+  }
+
+  return next;
+}
+
+function suggestionScore(severity: "high" | "medium" | "low") {
+  if (severity === "high") return 3;
+  if (severity === "medium") return 2;
+  return 1;
+}
+
+function getSuggestionTheme(title: string, detail: string) {
+  const text = normalizeComparableText(`${title} ${detail}`);
+
+  if (/(stok|varyant|envanter)/.test(text)) return "stock";
+  if (/(fiyat|rakip|min fiyat|kupon|indirim)/.test(text)) return "price";
+  if (/(teslim|kargo|sevkiyat|shipping|delivery)/.test(text)) return "delivery";
+  if (/(guven|satici|magaza|yorum memnuniyeti|resmi satici|garanti|iade)/.test(text)) {
+    return "trust";
+  }
+  if (/(icerik|aciklama|spec|ozellik|teknik|title|h1|meta|detay sayfasi|ikna)/.test(text)) {
+    return "content";
+  }
+  if (/(gorsel|video|vitrin|fotograf|görüntü|medya)/.test(text)) return "visual";
+  if (/(yorum|yildiz|social proof|sosyal kanit|review|sepet)/.test(text)) return "reviews";
+  if (/(soru|cevap|sss|faq)/.test(text)) return "faq";
+  if (/(kampanya|promosyon)/.test(text)) return "campaign";
+  return null;
+}
+
+function getDiagnosisTheme(value: string | null | undefined) {
+  const text = normalizeComparableText(value || "");
+
+  if (!text) return null;
+  if (/(stok|envanter|varyant)/.test(text)) return "stock";
+  if (/(fiyat|rakip|min fiyat|indirim|kupon)/.test(text)) return "price";
+  if (/(teslim|kargo|sevkiyat|shipping|delivery)/.test(text)) return "delivery";
+  if (/(icerik|aciklama|ozellik|teknik|detay sayfasi|title|h1|meta)/.test(text)) {
+    return "content";
+  }
+  if (/(guven|satici|magaza|garanti|iade)/.test(text)) return "trust";
+  if (/(yorum|yildiz|sosyal kanit|review)/.test(text)) return "reviews";
+  if (/(gorsel|video|goruntu|fotograf|vitrin)/.test(text)) return "visual";
+  if (/(soru|cevap|sss|faq)/.test(text)) return "faq";
+  if (/(kampanya|promosyon)/.test(text)) return "campaign";
+  return null;
+}
+
+function prioritizeThemeAlignedSuggestions<
+  T extends { title: string; detail: string }
+>(items: T[], summary: string, fallbackSummary?: string | null) {
+  const primaryTheme =
+    getDiagnosisTheme(parseAnalysisSummary(summary).criticalDiagnosis) ||
+    getDiagnosisTheme(parseAnalysisSummary(fallbackSummary).criticalDiagnosis);
+
+  if (!primaryTheme) {
+    return items;
+  }
+
+  const aligned: T[] = [];
+  const remaining: T[] = [];
+
+  for (const item of items) {
+    if (getSuggestionTheme(item.title, item.detail) === primaryTheme) {
+      aligned.push(item);
+      continue;
+    }
+
+    remaining.push(item);
+  }
+
+  if (aligned.length === 0) {
+    return items;
+  }
+
+  return [...aligned, ...remaining];
+}
+
+function dedupeSuggestions(
+  items: Array<{
+    key: string;
+    severity: "high" | "medium" | "low";
+    title: string;
+    detail: string;
+  }>,
+  limit: number
+) {
+  const bestByFingerprint = new Map<
+    string,
+    {
+      key: string;
+      severity: "high" | "medium" | "low";
+      title: string;
+      detail: string;
+    }
+  >();
+  const order: string[] = [];
+
+  for (const item of items) {
+    const title = item.title.trim();
+    const detail = item.detail.trim();
+
+    if (!title || !detail) continue;
+
+    const theme = getSuggestionTheme(title, detail);
+    const fingerprint = theme
+      ? `theme:${theme}`
+      : `${normalizeComparableText(title)}::${normalizeComparableText(detail)}`;
+    const existing = bestByFingerprint.get(fingerprint);
+
+    if (!existing) {
+      bestByFingerprint.set(fingerprint, {
+        ...item,
+        title,
+        detail,
+      });
+      order.push(fingerprint);
+      continue;
+    }
+
+    if (suggestionScore(item.severity) > suggestionScore(existing.severity)) {
+      bestByFingerprint.set(fingerprint, {
+        ...item,
+        title,
+        detail,
+      });
+    }
+  }
+
+  return order
+    .map((fingerprint) => bestByFingerprint.get(fingerprint))
+    .filter(
+      (
+        item
+      ): item is {
+        key: string;
+        severity: "high" | "medium" | "low";
+        title: string;
+        detail: string;
+      } => !!item
+    )
+    .slice(0, limit);
+}
+
+function ensureStructuredSummary(params: {
+  summary: string;
+  fallbackSummary: string;
+  learningContext?: LearningContext | null;
+}) {
+  const normalized = humanizeAiText(
+    params.summary
+      .replace(/\r/g, "")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
+  const fallbackNormalized = humanizeAiText(params.fallbackSummary);
+  const parsed = parseAnalysisSummary(normalized);
+
+  if (!parsed.hasStructuredSummary) {
+    return fallbackNormalized;
+  }
+
+  if (containsSuspiciousSummaryArtifacts(normalized)) {
+    return fallbackNormalized;
+  }
+
+  if (normalized.includes("[SISTEM OGRENISI]:")) {
+    return normalized;
+  }
+
+  return `${normalized}\n[SISTEM OGRENISI]: ${
+    params.learningContext?.systemLearning ||
+    "Bu kategoride yeterli tarihsel ogrenim birikmedigi icin sistem ilk benchmark setini olusturuyor."
+  }`;
+}
+
+function getScoreGuardrail(confidence: DecisionSupportPacket["coverage"]["confidence"]) {
+  if (confidence === "high") return 18;
+  if (confidence === "medium") return 12;
+  return 8;
+}
+
+function guardScore(params: {
+  candidate: number;
+  baseline: number;
+  confidence: DecisionSupportPacket["coverage"]["confidence"];
+}) {
+  const maxDrift = getScoreGuardrail(params.confidence);
+  return Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        Math.max(
+          params.baseline - maxDrift,
+          Math.min(params.baseline + maxDrift, params.candidate)
+        )
+      )
+    )
+  );
+}
+
+function buildBenchmarkDeltaSummary(
+  extracted: ExtractedProductFields,
+  learningContext: LearningContext | null | undefined
+) {
+  const benchmark = learningContext?.benchmark;
+
+  if (!benchmark || benchmark.sampleSize < 5) {
+    return [];
+  }
+
+  const deltas: string[] = [];
+
+  if (
+    typeof extracted.shipping_days === "number" &&
+    typeof benchmark.avgShippingDays === "number"
+  ) {
+    if (extracted.shipping_days > benchmark.avgShippingDays * 1.25) {
+      deltas.push(
+        `Teslimat hizi kategori ortalamasindan yavas: mevcut ${extracted.shipping_days} gun, kategori ${benchmark.avgShippingDays} gun.`
+      );
+    } else if (
+      typeof benchmark.successfulAvgShippingDays === "number" &&
+      extracted.shipping_days <= benchmark.successfulAvgShippingDays
+    ) {
+      deltas.push(
+        `Teslimat hizi basarili urun bandina yakin: mevcut ${extracted.shipping_days} gun.`
+      );
+    }
+  }
+
+  if (
+    typeof extracted.image_count === "number" &&
+    typeof benchmark.avgImageCount === "number"
+  ) {
+    if (extracted.image_count < benchmark.avgImageCount * 0.75) {
+      deltas.push(
+        `Gorsel cesitliligi kategori ortalamasinin altinda: mevcut ${extracted.image_count}, kategori ${benchmark.avgImageCount}.`
+      );
+    } else if (
+      typeof benchmark.successfulAvgImageCount === "number" &&
+      extracted.image_count >= benchmark.successfulAvgImageCount
+    ) {
+      deltas.push(
+        `Gorsel cesitliligi basarili urun bandini yakaliyor: mevcut ${extracted.image_count}.`
+      );
+    }
+  }
+
+  if (
+    typeof extracted.description_length === "number" &&
+    typeof benchmark.avgDescriptionLength === "number" &&
+    extracted.description_length < benchmark.avgDescriptionLength * 0.75
+  ) {
+    deltas.push(
+      `Aciklama derinligi kategori ortalamasinin altinda: mevcut ${extracted.description_length}, kategori ${benchmark.avgDescriptionLength}.`
+    );
+  }
+
+  if (
+    typeof extracted.seller_score === "number" &&
+    typeof benchmark.avgSellerScore === "number" &&
+    extracted.seller_score < benchmark.avgSellerScore - 0.3
+  ) {
+    deltas.push(
+      `Satici guveni kategori ortalamasinin gerisinde: mevcut ${extracted.seller_score}, kategori ${benchmark.avgSellerScore}.`
+    );
+  }
+
+  if (
+    typeof extracted.normalized_price === "number" &&
+    typeof benchmark.avgPrice === "number" &&
+    extracted.normalized_price > benchmark.avgPrice * 1.15 &&
+    !extracted.official_seller &&
+    (extracted.seller_score ?? 0) < 8.5
+  ) {
+    deltas.push(
+      `Fiyat kategori ortalamasinin ustunde ama bunu telafi edecek guven sinyali sinirli: mevcut ${formatPrice(
+        extracted.normalized_price
+      )}, kategori ${formatPrice(benchmark.avgPrice)}.`
+    );
+  }
+
+  return deltas.slice(0, 4);
+}
+
+function buildSignalDigest(params: {
+  packet: DecisionSupportPacket;
+  extracted: ExtractedProductFields;
+  learningContext?: LearningContext | null;
+  missingDataReport?: MissingDataReport | null;
+}) {
+  const { packet, extracted, learningContext, missingDataReport } = params;
+  const criticalCandidates: string[] = [];
+
+  if (
+    extracted.stock_status?.toLocaleLowerCase("tr-TR").includes("tuk") ||
+    extracted.stock_status?.toLocaleLowerCase("tr-TR").includes("stokta yok") ||
+    extracted.stock_quantity === 0
+  ) {
+    criticalCandidates.push("Stok erisilebilirligi kritik risk.");
+  }
+
+  if (
+    extracted.other_sellers_summary &&
+    typeof extracted.other_sellers_summary.cheaper_count === "number" &&
+    extracted.other_sellers_summary.cheaper_count > 0
+  ) {
+    criticalCandidates.push("Rakip fiyat baskisi mevcut.");
+  }
+
+  if (typeof extracted.shipping_days === "number" && extracted.shipping_days >= 6) {
+    criticalCandidates.push("Teslimat bariyeri belirgin.");
+  }
+
+  if (
+    hasText(extracted.title) &&
+    hasText(extracted.h1) &&
+    ((extracted.description_length ?? 0) < 120 || extracted.has_specs === false)
+  ) {
+    criticalCandidates.push("Trafik sinyali var ama detay sayfasi iknasi zayif.");
+  }
+
+  if (
+    (extracted.favorite_count ?? 0) >= 500000 &&
+    ((extracted.review_count ?? 0) < 50 ||
+      (!!extracted.review_summary &&
+        extracted.review_summary.sampled_count > 0 &&
+        extracted.review_summary.low_rated_count >=
+          Math.max(2, Math.ceil(extracted.review_summary.sampled_count * 0.4))))
+  ) {
+    criticalCandidates.push("Ilgi var ama sepet oncesi guven veya teklif surtunmesi var.");
+  }
+
+  return {
+    coverage_confidence: packet.coverage.confidence,
+    unresolved_critical_fields: missingDataReport?.unresolvedCriticalFields ?? [],
+    critical_candidates: criticalCandidates.slice(0, 4),
+    benchmark_deltas: buildBenchmarkDeltaSummary(extracted, learningContext),
+    top_rules:
+      learningContext?.rules
+        .filter((rule) => rule.confidence >= 0.55)
+        .map((rule) => rule.insight)
+        .slice(0, 2) ?? [],
+  };
+}
+
 function buildPrompt(
   packet: DecisionSupportPacket,
+  extracted: ExtractedProductFields,
   url: string,
   learningContext: LearningContext | null | undefined,
   missingDataReport: MissingDataReport | null | undefined
 ) {
+  const signalDigest = buildSignalDigest({
+    packet,
+    extracted,
+    learningContext,
+    missingDataReport,
+  });
   const payload = {
     url,
     supported_dependencies: SUPPORTED_DEPENDENCIES,
     packet,
+    signal_digest: signalDigest,
     learning_context: learningContext ?? null,
     missing_data_report: missingDataReport ?? null,
   };
@@ -198,6 +661,8 @@ ANALIZ AKISI:
 
 5. Kendi Kendine Ogrenme ve Adaptasyon:
 - learning_context icindeki benchmark, rules ve memorySnippets alanlarini kullan.
+- signal_digest.critical_candidates alanini ana darbozag aday listesi olarak kullan.
+- signal_digest.benchmark_deltas ve signal_digest.top_rules alanlarini veri carpistirma bolumune sadece gercek destek varsa dahil et.
 - Kategori benchmark'i varsa sabit esik kullanma; urunu kategori ortalamasi ve basarili orneklerle karsilastir.
 - is_best_seller veya best_seller_rank sinyali varsa bunu ogretmen verisi gibi yorumla.
 - Pahali ama guclu yorum/guven/hizli teslimat kombinasyonu varsa telafi faktorunu acikca not et.
@@ -232,6 +697,7 @@ CIKTI KURALLARI:
 15. Summary sonuna su blok eklenmek zorunda:
 [SISTEM OGRENISI]: ...
 16. learning_context.benchmark?.sampleSize dusukse kesin kural yazma; "veri yetersizligi" de.
+17. packet.coverage.confidence dusukse skor ve iddialari asiri uclara tasima.
 
 Veri:
 ${JSON.stringify(payload)}
@@ -460,49 +926,222 @@ function sanitizeAiResult(raw: unknown): RawAiAnalysisResult | null {
 function postProcessAiResult(
   result: RawAiAnalysisResult,
   extracted: ExtractedProductFields,
+  fallback: AiAnalysisResult,
+  confidence: DecisionSupportPacket["coverage"]["confidence"],
   learningContext?: LearningContext | null
 ): AiAnalysisResult {
-  const weaknesses = result.weaknesses
-    .filter((item) =>
-      item.depends_on.every((dependency) => hasDependencyData(dependency, extracted))
-    )
-    .map((item) => item.text)
-    .slice(0, 5);
+  if (confidence === "low") {
+    return fallback;
+  }
 
-  const suggestions = result.suggestions
-    .filter((item) =>
-      item.depends_on.every((dependency) => hasDependencyData(dependency, extracted))
-    )
-    .map((item) => ({
-      key: item.key,
-      severity: item.severity,
-      title: item.title,
-      detail: item.detail,
-    }))
-    .slice(0, 5);
+  const validatedAiSuggestions = dedupeSuggestions(
+    result.suggestions
+      .filter((item) =>
+        item.depends_on.every((dependency) => hasDependencyData(dependency, extracted))
+      )
+      .map((item) => ({
+        key: item.key,
+        severity: item.severity,
+        title: humanizeAiText(item.title),
+        detail: humanizeAiText(item.detail),
+      }))
+      .slice(0, 5),
+    5
+  );
 
-  const baseSummary = result.summary
-    .replace(/\r/g, "")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  const weaknesses = dedupeStrings(
+    [
+      ...result.weaknesses
+        .filter((item) =>
+          item.depends_on.every((dependency) => hasDependencyData(dependency, extracted))
+        )
+        .map((item) => humanizeAiText(item.text))
+        .slice(0, 5),
+      ...fallback.weaknesses,
+    ],
+    5
+  );
+
+  const mergedSuggestions = dedupeSuggestions(
+    [...fallback.suggestions, ...validatedAiSuggestions],
+    5
+  );
+  const prioritizedSuggestions = prioritizeThemeAlignedSuggestions(
+    mergedSuggestions,
+    fallback.summary,
+    result.summary
+  );
+  const suggestions = fallback.suggestions[0]
+    ? dedupeSuggestions([fallback.suggestions[0], ...prioritizedSuggestions], 5)
+    : prioritizedSuggestions;
+
+  const ensuredSummary = ensureStructuredSummary({
+    summary: result.summary,
+    fallbackSummary: fallback.summary,
+    learningContext,
+  });
   const summary =
-    baseSummary.includes("[SISTEM OGRENISI]:")
-      ? baseSummary
-      : `${baseSummary}\n[SISTEM OGRENISI]: ${
-          learningContext?.systemLearning ||
-          "Bu kategoride yeterli tarihsel ogrenim birikmedigi icin sistem ilk benchmark setini olusturuyor."
-        }`;
+    syncStructuredSummaryWithSuggestions({
+      summary: ensuredSummary,
+      fallbackSummary: fallback.summary,
+      suggestions,
+      systemLearning: learningContext?.systemLearning,
+    }) || ensuredSummary;
+  const safeSummary = containsSuspiciousSummaryArtifacts(summary)
+    ? fallback.summary
+    : summary;
+  const safeSuggestions = suggestions.some((item) =>
+    containsSuspiciousSummaryArtifacts(`${item.title} ${item.detail}`)
+  )
+    ? fallback.suggestions
+    : suggestions;
 
   return {
-    summary,
-    strengths: result.strengths,
+    summary: safeSummary,
+    strengths: dedupeStrings(
+      [...result.strengths.map((item) => humanizeAiText(item)), ...fallback.strengths],
+      4
+    ),
     weaknesses,
-    suggestions,
-    seo_score: result.seo_score,
-    conversion_score: result.conversion_score,
-    overall_score: result.overall_score,
+    suggestions: safeSuggestions,
+    seo_score: guardScore({
+      candidate: result.seo_score,
+      baseline: fallback.seo_score,
+      confidence,
+    }),
+    conversion_score: guardScore({
+      candidate: result.conversion_score,
+      baseline: fallback.conversion_score,
+      confidence,
+    }),
+    overall_score: guardScore({
+      candidate: result.overall_score,
+      baseline: fallback.overall_score,
+      confidence,
+    }),
   };
+}
+
+type StrategicCriticalCandidate = {
+  theme: "delivery" | "visual" | "content" | "trust" | "price";
+  score: number;
+  criticalDiagnosis: string;
+  dataCollision: string;
+  weakness: AiWeaknessItem;
+};
+
+function getTopBenchmarkCriticalCandidate(
+  extracted: ExtractedProductFields,
+  learningContext?: LearningContext | null
+) {
+  const benchmark = learningContext?.benchmark;
+
+  if (!benchmark || benchmark.sampleSize < 5) {
+    return null;
+  }
+
+  const candidates: StrategicCriticalCandidate[] = [];
+
+  if (
+    typeof extracted.shipping_days === "number" &&
+    typeof benchmark.avgShippingDays === "number" &&
+    benchmark.avgShippingDays > 0 &&
+    extracted.shipping_days > benchmark.avgShippingDays * 1.4
+  ) {
+    candidates.push({
+      theme: "delivery",
+      score: extracted.shipping_days / benchmark.avgShippingDays,
+      criticalDiagnosis:
+        "Veriler gosteriyor ki kategori benchmarkina gore yavas teslimat ana darbozaga donusuyor.",
+      dataCollision: `Mevcut teslimat suresi ${extracted.shipping_days} gun iken kategori ortalamasi ${benchmark.avgShippingDays} gun; teklif makul olsa bile musteri daha hizli teslim edilen alternatiflere kayabilir.`,
+      weakness: {
+        text: "Teslimat hizi kategori standardinin belirgin gerisinde kaldigi icin karar aninda kayip yaratiyor.",
+        depends_on: ["shipping_days"],
+      },
+    });
+  }
+
+  if (
+    typeof extracted.image_count === "number" &&
+    typeof benchmark.avgImageCount === "number" &&
+    benchmark.avgImageCount > 0 &&
+    extracted.image_count < benchmark.avgImageCount * 0.7
+  ) {
+    candidates.push({
+      theme: "visual",
+      score: benchmark.avgImageCount / Math.max(extracted.image_count, 1),
+      criticalDiagnosis:
+        "Veriler gosteriyor ki gorsel anlatim kategori standardinin gerisinde kaldigi icin karar aninda ikna zayifliyor.",
+      dataCollision: `Mevcut sayfada ${extracted.image_count} gorsel bulunurken kategori ortalamasi ${benchmark.avgImageCount}; lider urunler urunu daha zengin gorsel vitrinle anlatiyor.`,
+      weakness: {
+        text: "Gorsel cesitliligi benchmark seviyesinin altinda kaldigi icin urun yeterince guclu anlatilmiyor.",
+        depends_on: ["image_count"],
+      },
+    });
+  }
+
+  if (
+    typeof extracted.description_length === "number" &&
+    typeof benchmark.avgDescriptionLength === "number" &&
+    benchmark.avgDescriptionLength > 0 &&
+    (extracted.description_length < benchmark.avgDescriptionLength * 0.65 ||
+      extracted.has_specs === false)
+  ) {
+    candidates.push({
+      theme: "content",
+      score:
+        benchmark.avgDescriptionLength / Math.max(extracted.description_length, 40) +
+        (extracted.has_specs === false ? 0.4 : 0),
+      criticalDiagnosis:
+        "Veriler gosteriyor ki urun detayi kategori benchmarkinin gerisinde kaldigi icin trafik karar asamasinda eriyor.",
+      dataCollision: `Aciklama derinligi ve ozellik alani benchmark seviyesini yakalayamiyor; kategori ortalamasi ${benchmark.avgDescriptionLength} karakter civarindayken mevcut urun ${extracted.description_length} karakterde kaliyor.`,
+      weakness: {
+        text: "Aciklama ve ozellik derinligi benchmark seviyesini yakalayamadigi icin detay sayfasi ikna gucunu kaybediyor.",
+        depends_on: ["description_length", "has_specs"],
+      },
+    });
+  }
+
+  if (
+    typeof extracted.seller_score === "number" &&
+    typeof benchmark.avgSellerScore === "number" &&
+    extracted.seller_score < benchmark.avgSellerScore - 0.45
+  ) {
+    candidates.push({
+      theme: "trust",
+      score: benchmark.avgSellerScore - extracted.seller_score,
+      criticalDiagnosis:
+        "Veriler gosteriyor ki satici guveni kategori standardinin altinda kaldigi icin satin alma karari zayifliyor.",
+      dataCollision: `Mevcut satici puani ${extracted.seller_score} seviyesindeyken kategori ortalamasi ${benchmark.avgSellerScore}; guven farki benzer tekliflerde rakibe alan aciyor.`,
+      weakness: {
+        text: "Satici puani benchmark seviyesinin altinda kaldigi icin guven duvari olusuyor.",
+        depends_on: ["seller_score"],
+      },
+    });
+  }
+
+  if (
+    typeof extracted.normalized_price === "number" &&
+    typeof benchmark.avgPrice === "number" &&
+    benchmark.avgPrice > 0 &&
+    extracted.normalized_price > benchmark.avgPrice * 1.18 &&
+    !extracted.official_seller &&
+    (extracted.seller_score ?? 0) < 8.5
+  ) {
+    candidates.push({
+      theme: "price",
+      score: extracted.normalized_price / benchmark.avgPrice,
+      criticalDiagnosis:
+        "Veriler gosteriyor ki fiyat benchmark ustunde kalirken bunu tasiyacak guven sinyali sinirli oldugu icin teklif zayifliyor.",
+      dataCollision: `Mevcut fiyat ${formatPrice(extracted.normalized_price)} seviyesindeyken kategori ortalamasi ${formatPrice(benchmark.avgPrice)} bandinda; guven telafisi zayif oldugunda fiyat primi karar kaybina donusuyor.`,
+      weakness: {
+        text: "Fiyat benchmark ustunde kaldigi halde bunu tasiyacak guven sinyali yeterince guclu degil.",
+        depends_on: ["normalized_price", "seller_score", "official_seller"],
+      },
+    });
+  }
+
+  return candidates.sort((left, right) => right.score - left.score)[0] || null;
 }
 
 function buildStrategicSections(params: {
@@ -547,6 +1186,22 @@ function buildStrategicSections(params: {
   const competitorDeliveryBetter = typeof fastDeliveryCount === "number" && fastDeliveryCount >= 2;
   const sellerTrustWeak =
     typeof extracted.seller_score === "number" && extracted.seller_score < 7.5;
+  const benchmark = learningContext?.benchmark;
+  const benchmarkVisualWeak =
+    typeof extracted.image_count === "number" &&
+    typeof benchmark?.avgImageCount === "number" &&
+    benchmark.avgImageCount > 0 &&
+    extracted.image_count < benchmark.avgImageCount * 0.75;
+  const benchmarkContentWeak =
+    typeof extracted.description_length === "number" &&
+    typeof benchmark?.avgDescriptionLength === "number" &&
+    benchmark.avgDescriptionLength > 0 &&
+    (extracted.description_length < benchmark.avgDescriptionLength * 0.75 ||
+      extracted.has_specs === false);
+  const topBenchmarkCritical = getTopBenchmarkCriticalCandidate(
+    extracted,
+    learningContext
+  );
 
   if (
     typeof extracted.rating_value === "number" &&
@@ -589,6 +1244,10 @@ function buildStrategicSections(params: {
         "Veriler stok kesintisi gosteriyor; urun listede kalsa da satis akisi durur, bu nedenle once stok ve varyant erisilebilirligini normale dondurun.",
       depends_on: ["stock_status", "stock_quantity"],
     });
+  } else if (topBenchmarkCritical) {
+    criticalDiagnosis = topBenchmarkCritical.criticalDiagnosis;
+    dataCollision = topBenchmarkCritical.dataCollision;
+    weaknesses.push(topBenchmarkCritical.weakness);
   } else if (
     typeof priceDelta === "number" &&
     priceDelta > 0 &&
@@ -700,6 +1359,32 @@ function buildStrategicSections(params: {
     });
   }
 
+  if (benchmarkVisualWeak) {
+    suggestions.push({
+      key: "lift-visual-benchmark",
+      severity: topBenchmarkCritical?.theme === "visual" ? "high" : "medium",
+      title: "Gorsel vitrini benchmark seviyesine tasiyin",
+      detail:
+        typeof benchmark?.avgImageCount === "number"
+          ? `Mevcut ${extracted.image_count} gorsel kategori ortalamasi olan ${benchmark.avgImageCount} seviyesinin gerisinde kaliyor; farkli acilar, kullanim sahneleri ve detay yakin planlariyla urun anlatimini zenginlestirin.`
+          : "Gorsel cesitliligini artirarak urunun ilk bakista anlasilmasini kolaylastirin.",
+      depends_on: ["image_count", "has_video"],
+    });
+  }
+
+  if (benchmarkContentWeak && !(titleStrong && contentWeak)) {
+    suggestions.push({
+      key: "raise-content-depth",
+      severity: topBenchmarkCritical?.theme === "content" ? "high" : "medium",
+      title: "Icerik derinligini benchmark seviyesine cekin",
+      detail:
+        typeof benchmark?.avgDescriptionLength === "number"
+          ? `Aciklama derinligi kategori ortalamasi olan ${benchmark.avgDescriptionLength} karakter bandinin gerisinde; kullanim, fark ve teknik detaylari daha net katmanlayarak karar anini destekleyin.`
+          : "Aciklama ve teknik detay katmanini genisleterek karar icin gereken bilgi derinligini artirin.",
+      depends_on: ["description_length", "has_specs"],
+    });
+  }
+
   if (sellerTrustWeak) {
     suggestions.push({
       key: "reinforce-trust-signals",
@@ -763,22 +1448,62 @@ function buildDeterministicFallback(params: {
   extracted: ExtractedProductFields;
   learningContext?: LearningContext | null;
   missingDataReport?: MissingDataReport | null;
+  baseline?: AiBaselineContext | null;
 }) {
   const strategic = buildStrategicSections(params);
+  const suggestions = prioritizeThemeAlignedSuggestions(
+    dedupeSuggestions(
+      [
+        ...strategic.suggestions.map((item) => ({
+          key: item.key,
+          severity: item.severity,
+          title: item.title,
+          detail: item.detail,
+        })),
+        ...((params.baseline?.suggestions ?? []).map((item) => ({
+          key: item.key,
+          severity: item.severity,
+          title: item.title,
+          detail: item.detail,
+        })) as AiAnalysisResult["suggestions"]),
+      ],
+      5
+    ),
+    strategic.summary,
+    params.baseline?.summary ?? null
+  );
+  const summary =
+    syncStructuredSummaryWithSuggestions({
+      summary: strategic.summary,
+      fallbackSummary: params.baseline?.summary,
+      suggestions,
+      systemLearning: params.learningContext?.systemLearning,
+    }) || strategic.summary;
 
   return {
-    summary: strategic.summary,
-    strengths: strategic.strengths,
-    weaknesses: strategic.weaknesses.map((item) => item.text),
-    suggestions: strategic.suggestions.map((item) => ({
-      key: item.key,
-      severity: item.severity,
-      title: item.title,
-      detail: item.detail,
-    })),
-    seo_score: scoreToRange(params.packet.metrics.contentQuality.score) ?? 0,
-    conversion_score: scoreToRange(params.packet.metrics.offerStrength.score) ?? 0,
+    summary,
+    strengths: dedupeStrings(
+      [...strategic.strengths, ...(params.baseline?.strengths ?? [])],
+      4
+    ),
+    weaknesses: dedupeStrings(
+      [
+        ...strategic.weaknesses.map((item) => item.text),
+        ...(params.baseline?.weaknesses ?? []),
+      ],
+      5
+    ),
+    suggestions,
+    seo_score:
+      scoreToRange(params.baseline?.seo_score) ??
+      scoreToRange(params.packet.metrics.contentQuality.score) ??
+      0,
+    conversion_score:
+      scoreToRange(params.baseline?.conversion_score) ??
+      scoreToRange(params.packet.metrics.offerStrength.score) ??
+      0,
     overall_score:
+      scoreToRange(params.baseline?.overall_score) ??
       scoreToRange(
         ((params.packet.metrics.contentQuality.score ?? 0) +
           (params.packet.metrics.trustStrength.score ?? 0) +
@@ -795,13 +1520,16 @@ export async function analyzeWithAi(params: {
   url: string;
   learningContext?: LearningContext | null;
   missingDataReport?: MissingDataReport | null;
+  baseline?: AiBaselineContext | null;
 }): Promise<AiAnalysisResult | null> {
   try {
+    const fallback = buildDeterministicFallback(params);
+
     if (!genAI) {
       console.warn(
         "AI analysis fallback active: GEMINI_API_KEY is missing, deterministic strategy engine will be used."
       );
-      return buildDeterministicFallback(params);
+      return fallback;
     }
 
     const model = genAI.getGenerativeModel({
@@ -817,6 +1545,7 @@ export async function analyzeWithAi(params: {
 
     const prompt = buildPrompt(
       params.packet,
+      params.extracted,
       params.url,
       params.learningContext,
       params.missingDataReport
@@ -827,10 +1556,16 @@ export async function analyzeWithAi(params: {
     const sanitized = sanitizeAiResult(parsed);
 
     if (!sanitized) {
-      return buildDeterministicFallback(params);
+      return fallback;
     }
 
-    return postProcessAiResult(sanitized, params.extracted, params.learningContext);
+    return postProcessAiResult(
+      sanitized,
+      params.extracted,
+      fallback,
+      params.packet.coverage.confidence,
+      params.learningContext
+    );
   } catch (err) {
     console.error("AI analysis error:", err);
     return buildDeterministicFallback(params);

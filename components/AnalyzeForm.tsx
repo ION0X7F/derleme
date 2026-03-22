@@ -1,10 +1,16 @@
 "use client";
 
+type AnalyzeFormVariant = "marketing" | "workspace";
+
 type Props = {
   url: string;
   loading: boolean;
   onChange: (value: string) => void;
   onSubmit: () => void;
+  variant?: AnalyzeFormVariant;
+  submitLabel?: string;
+  placeholder?: string;
+  showMarketingMeta?: boolean;
 };
 
 export default function AnalyzeForm({
@@ -12,6 +18,10 @@ export default function AnalyzeForm({
   loading,
   onChange,
   onSubmit,
+  variant = "marketing",
+  submitLabel,
+  placeholder,
+  showMarketingMeta = true,
 }: Props) {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -19,67 +29,184 @@ export default function AnalyzeForm({
     onSubmit();
   };
 
-  return (
-    <form onSubmit={handleSubmit} className="sb-stack-12">
-      <div className="surface-soft" style={{ padding: 14 }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            flexWrap: "wrap",
-            marginBottom: 12,
-          }}
-        >
-          <div>
-            <div className="stat-card__label">Analiz girisi</div>
-            <div className="card-heading" style={{ marginBottom: 0 }}>
-              Trendyol urun linkini dogrudan karar paneline tasiyin
+  const isWorkspace = variant === "workspace";
+  const pills = isWorkspace
+    ? ["URL > extractor > AI", "Karar izi hazır", "Kayıtlı rapor akışı"]
+    : ["Anında satış teşhisi", "Tek linkle AI yorum", "Tam rapora hızlı geçiş"];
+  const buttonLabel = submitLabel || (isWorkspace ? "Analiz Et" : "Analizi Başlat");
+
+  const workspaceNotes = [
+    {
+      label: "Okunan katman",
+      text: "Fiyat, teslimat, yorum, görsel ve güven sinyalleri tek akış olarak toplanır.",
+    },
+    {
+      label: "Nihai çıktı",
+      text: "Kritik teşhis, öncelikli aksiyonlar ve karar izi aynı rapora taşınır.",
+    },
+  ];
+
+  const loadingNotice = loading ? (
+    <div className="analyze-form__loading">
+      <span className="spinner" />
+      <div className="analyze-form__loading-copy">
+        <div className="analyze-form__loading-title">AI analiz ediyor</div>
+        <div className="analyze-form__loading-text">
+          Ürün sayfası, fiyat, güven ve rakip sinyalleri okunuyor...
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  if (!isWorkspace) {
+    return (
+      <form onSubmit={handleSubmit} className="analyze-form analyze-form--marketing">
+        <div className="surface-soft analyze-form__panel analyze-form__panel--marketing">
+          <label className="form-label analyze-form__field" style={{ gap: 10 }}>
+            <span className="analyze-form__label">Ürün Linki</span>
+
+            <div className="analyze-form__input-shell analyze-form__input-shell--marketing">
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={
+                  placeholder || "https://www.trendyol.com/... ürün linkini buraya yapıştır"
+                }
+                className="input analyze-form__input"
+                autoComplete="off"
+                spellCheck={false}
+                inputMode="url"
+              />
+
+              <button
+                type="submit"
+                className="btn btn-primary analyze-form__submit"
+                disabled={loading || !url.trim()}
+              >
+                {loading ? (
+                  <>
+                    <span className="spinner" />
+                    <span>Analiz hazırlanıyor</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{buttonLabel}</span>
+                  </>
+                )}
+              </button>
             </div>
+          </label>
+
+          {loadingNotice}
+
+          {showMarketingMeta && (
+            <div className="analyze-form__marketing-meta">
+              <p className="hero-note" style={{ margin: 0 }}>
+                Linki yapıştır, ürününün satış potansiyelini büyütecek içgörüler anında gelsin.
+              </p>
+
+              <div className="pill-row">
+                {pills.map((pill) => (
+                  <span key={pill} className="hero-point">
+                    {pill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="analyze-form sb-stack-12 analyze-form--workspace"
+    >
+      <div className="surface-soft analyze-form__panel">
+        <div className="analyze-form__header">
+          <div>
+            <div className="stat-card__label">{isWorkspace ? "Analiz komutu" : "Analiz girişi"}</div>
+            <div className="card-heading" style={{ marginBottom: 0 }}>
+              {isWorkspace
+                ? "Trendyol ürün linkini yapıştır ve raporu karar paneline taşı"
+                : "Trendyol ürün linkini doğrudan karar paneline taşıyın"}
+            </div>
+            <p className="analyze-form__subtitle">
+              {isWorkspace
+                ? "Bu giriş, benchmark farkı ile AI teşhisini aynı akışta tetikler ve kayıtlı rapora giden yolu hazırlar."
+                : "URL, sayfa okuma ve AI muhakemesini aynı yerden başlatır."}
+            </p>
           </div>
 
           <div className="pill-row">
-            <span className="hero-point">Link / veri / muhakeme</span>
-            <span className="hero-point">Dark / Light uyumlu</span>
+            {pills.map((pill) => (
+              <span key={pill} className="hero-point">
+                {pill}
+              </span>
+            ))}
           </div>
         </div>
 
-        <div className="analyze-form-shell">
+        <div
+          className={`analyze-form__input-shell${
+            isWorkspace ? " analyze-form__input-shell--workspace" : ""
+          }`}
+        >
+          {isWorkspace && (
+            <div className="analyze-form__prefix">
+              <span className="stat-card__label">Girilen</span>
+              <span className="mono">URL</span>
+            </div>
+          )}
+
           <label className="form-label" style={{ gap: 0 }}>
-            <span className="sr-only">Trendyol urun linki</span>
+            <span className="sr-only">Trendyol ürün linki</span>
             <input
               type="url"
               value={url}
               onChange={(e) => onChange(e.target.value)}
-              placeholder="Trendyol urun linkini yapistir... ornek: https://www.trendyol.com/..."
-              className="input"
+              placeholder="Trendyol ürün linkini yapıştır... örnek: https://www.trendyol.com/..."
+              className="input analyze-form__input"
               autoComplete="off"
               spellCheck={false}
               inputMode="url"
-              style={{ minHeight: 62 }}
             />
           </label>
 
           <button
             type="submit"
-            className="btn btn-primary"
+            className="btn btn-primary analyze-form__submit"
             disabled={loading || !url.trim()}
-            style={{ minHeight: 62, minWidth: 168 }}
           >
             {loading ? (
               <>
                 <span className="spinner" />
-                <span>Analiz ediliyor</span>
+                <span>Analiz hazırlanıyor</span>
               </>
             ) : (
               <>
-                <span>Analiz Et</span>
+                <span>{buttonLabel}</span>
                 <span className="mono">{">"}</span>
               </>
             )}
           </button>
         </div>
+
+        {loadingNotice}
+
+        {isWorkspace && (
+          <div className="analyze-form__workspace-notes">
+            {workspaceNotes.map((item) => (
+              <article key={item.label} className="analyze-form__workspace-note">
+                <div className="stat-card__label">{item.label}</div>
+                <p className="card-copy">{item.text}</p>
+              </article>
+            ))}
+          </div>
+        )}
       </div>
 
       <div
@@ -92,14 +219,14 @@ export default function AnalyzeForm({
         }}
       >
         <p className="hero-note" style={{ margin: 0 }}>
-          Trendyol urun linkini girin. Sonuc ekraninda guven, fiyat, icerik,
+          Trendyol ürün linkini girin. Sonuç ekranında güven, fiyat, içerik,
           rakip ve karar sinyallerini tek panelde okuyun.
         </p>
 
         <div className="pill-row">
-          <span className="hero-point">Hizli ilk okuma</span>
-          <span className="hero-point">AI teshis</span>
-          <span className="hero-point">Rapor akisi</span>
+          <span className="hero-point">Hızlı ilk okuma</span>
+          <span className="hero-point">AI teşhis</span>
+          <span className="hero-point">Rapor akışı</span>
         </div>
       </div>
     </form>

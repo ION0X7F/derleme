@@ -1,3 +1,4 @@
+import { buildAnalysisTrace } from "@/lib/analysis-trace";
 import type {
   AccessPlan,
   AnalysisSuggestion,
@@ -1512,12 +1513,13 @@ function getSuggestions(
   return suggestions.slice(0, 5);
 }
 
-function buildPriorityActions(
+export function buildPriorityActions(
   extracted: ExtractedProductFields,
   metrics: DerivedMetrics,
   suggestions: AnalysisSuggestion[]
 ): PriorityAction[] {
   const base: Array<{ title: string; detail: string; weight: number }> = [];
+  const lowRatedRatio = getLowRatedSampleRatio(extracted);
 
   const pushAction = (params: {
     title: string;
@@ -1562,6 +1564,19 @@ function buildPriorityActions(
   }
 
   if (
+    (extracted.favorite_count ?? 0) >= 500000 &&
+    ((typeof extracted.review_count === "number" && extracted.review_count < 50) ||
+      (lowRatedRatio != null && lowRatedRatio >= 0.4))
+  ) {
+    pushAction({
+      title: "Sosyal kaniti hizla guclendirin",
+      detail:
+        "Ilgi yuksek kalirken yorum hacmi veya yorum tonu guven tasimiyorsa sepet oncesi kayip artar; yorum, puan ve musteri memnuniyeti sinyallerini ilk ekranda daha net toplayin.",
+      weight: 94,
+    });
+  }
+
+  if (
     metrics.contentQuality.label === "weak" ||
     (extracted.description_length || 0) < 120 ||
     extracted.has_specs === false
@@ -1584,6 +1599,19 @@ function buildPriorityActions(
       detail:
         "Video, kullanim senaryosu ve ek gorseller urunun algilanan kalitesini ve ikna hizini artirir.",
       weight: 78,
+    });
+  }
+
+  if (
+    Array.isArray(extracted.qa_snippets) &&
+    extracted.qa_snippets.length > 0 &&
+    extracted.has_faq === false
+  ) {
+    pushAction({
+      title: "Tekrarlanan sorulari tek blokta kapatin",
+      detail:
+        "Musteri ayni konulari tekrar soruyorsa bu itirazlari aciklama ve SSS katmaninda daha gorunur cevaplamak karar hizini artirir.",
+      weight: 72,
     });
   }
 
@@ -1884,6 +1912,22 @@ export function buildAnalysis({
     conversionScore,
     derivedMetrics,
   });
+  const decisionSupportPacket = buildDecisionSupportPacket({
+    extracted,
+    planContext,
+    derivedMetrics,
+  });
+  const analysisTrace = buildAnalysisTrace({
+    mode: "deterministic",
+    summary,
+    suggestions,
+    packet: decisionSupportPacket,
+    extracted,
+    derivedMetrics,
+    seoScore,
+    conversionScore,
+    overallScore,
+  });
 
   return {
     summary,
@@ -1893,15 +1937,12 @@ export function buildAnalysis({
     overallScore,
     extractedData: extracted,
     derivedMetrics,
-    decisionSupportPacket: buildDecisionSupportPacket({
-      extracted,
-      planContext,
-      derivedMetrics,
-    }),
+    decisionSupportPacket,
     strengths,
     weaknesses,
     suggestions,
     priorityActions,
+    analysisTrace,
     priceCompetitiveness: getPriceCompetitiveness(extracted),
     dataSource: "real-extraction",
   };

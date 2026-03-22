@@ -1,466 +1,297 @@
-"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useSession } from "next-auth/react";
-import { analyzeUrl, fetchReports } from "@/lib/api";
-import { AnalysisResult, SavedReport } from "@/types";
-import AnalyzeForm from "@/components/AnalyzeForm";
-import AnalysisResultBox from "@/components/AnalysisResult";
-import ReportHistory from "@/components/ReportHistory";
-import SiteFooter from "@/components/layout/SiteFooter";
-import SiteHeader from "@/components/layout/SiteHeader";
+import HomeHeroClient from "@/components/marketing/HomeHeroClient";
+import MarketingShell from "@/components/layout/MarketingShell";
+import { pricingPlans } from "@/lib/plans";
+import { faqItems } from "@/content/site";
 
-const features = [
-  {
-    icon: "AI",
-    title: "Tek ekranlik karar paneli",
-    text: "Baslik, fiyat, guven, teslimat, yorum ve rakip sinyallerini tek analiz akisinda birlestirir.",
-  },
-  {
-    icon: "DV",
-    title: "Veri carpistiran teshis mantigi",
-    text: "Sadece alan saymaz; fiyat ile teslimati, favori ile yorumu, guven ile rekabeti birlikte yorumlar.",
-  },
-  {
-    icon: "AC",
-    title: "Aksiyon odakli cikti",
-    text: "Kullaniciya sadece skor degil; zayif nokta, kritik sebep ve uygulanabilir aksiyon sirasi verir.",
-  },
+const homeNavItems = [
+  { href: "#features", label: "Özellikler" },
+  { href: "#pricing", label: "Planlar" },
+  { href: "#resources", label: "Kaynaklar" },
+  { href: "#faqs", label: "SSS" },
 ];
 
-const howItWorks = [
+const featureRows = [
   {
-    title: "Linki yapistir",
-    text: "Trendyol urun sayfasi URL'si ile giris yap. Sistem hem sayfa HTML'ini hem gercek teklif sinyallerini okur.",
-  },
-  {
-    title: "AI muhakemesi calissin",
-    text: "SellBoost urundeki icerik, teklif, guven ve rekabet katmanlarini birbirine carptirarak darbogazi bulur.",
-  },
-  {
-    title: "Oncelikli aksiyonu uygula",
-    text: "Rapor ekraninda neyin iyi, neyin riskli ve hangi hamlenin once gelmesi gerektigi net gorunur.",
-  },
-];
-
-const planPreview = [
-  {
-    name: "Guest",
-    price: "0 TL",
-    subtitle: "Hizli ilk deneme",
-    features: [
-      "Sinirli ilk analiz gorunumu",
-      "Anlik AI teshis girisi",
-      "Kayit olmadan urun hissi",
+    eyebrow: "Teşhis motoru",
+    title: "Satışı yavaşlatan darboğazı metrik değil karar olarak okur",
+    text: "SellBoost yalnızca skor göstermez. Fiyat, güven, içerik ve teklif baskısını aynı satış kararının içindeki etki alanları olarak yorumlar.",
+    metricValue: "01",
+    metricLabel: "Ana teşhis",
+    bullets: [
+      "Kritik darboğazı ilk ekranda görünür kılar.",
+      "AI yorumunu veriye ve benchmark farkına bağlar.",
+      "Satış hızını düşüren katmanı önceliklendirir.",
     ],
   },
   {
-    name: "Free",
-    price: "0 TL",
-    subtitle: "Kayitli temel kullanim",
-    features: [
-      "Dashboard ve rapor gecmisi",
-      "Temel analiz metrikleri",
-      "Daha fazla aylik kullanim",
+    eyebrow: "Rekabet katmanı",
+    title: "Rakip satıcıları, teslimatı ve fiyatı birlikte tartar",
+    text: "Teklif baskısı yalnızca fiyat değildir. Rakiplerin güveni, kargo hızı ve görünürlüğü de karar anındaki baskıyı belirler.",
+    metricValue: "02",
+    metricLabel: "Teklif baskısı",
+    bullets: [
+      "Rakip fiyat aralığını hızla özetler.",
+      "Diğer satıcıların baskısını ilk görünümde işler.",
+      "Daha pahalı olsan bile neden kaybettiğini ayırır.",
     ],
   },
   {
-    name: "Pro",
-    price: "Yakinda",
-    subtitle: "Premium karar paneli",
-    featured: true,
-    features: [
-      "Rakip teklif baskisi ve detayli rapor",
-      "Export, yeniden analiz, premium aksiyon plani",
-      "Daha derin AI icgorusu ve onceliklendirme",
+    eyebrow: "İçerik ve güven",
+    title: "Başlık, görsel ve yorumları satış iknası açısından konumlar",
+    text: "Başlık netliği, görsel yeterliliği ve yorum gücü; kullanıcının ürünü ilk bakışta neden seçmediğini anlamak için birlikte okunur.",
+    metricValue: "03",
+    metricLabel: "İkna alanı",
+    bullets: [
+      "Güçlü yorumları daha görünür aksiyona çevirir.",
+      "İçerik tarafındaki zayıf halkayı hızla işaret eder.",
+      "İlk ekranı daha net bir ikna akışına taşır.",
     ],
   },
 ];
 
-const faqs = [
+const processSteps = [
   {
-    q: "SellBoost AI tam olarak neyi analiz ediyor?",
-    a: "Trendyol urun sayfasindaki icerik, fiyat, teslimat, yorum, guven ve rakip satici sinyallerini tek karar panelinde topluyor.",
+    step: "01",
+    title: "Linki bırak",
+    text: "Trendyol ürün linkini yapıştır. Sayfa, satıcı ve teklif katmanları aynı akışta okunmaya başlar.",
   },
   {
-    q: "Bu arac sadece skor mu veriyor?",
-    a: "Hayir. Asil hedef, neden satmadigini bulmak ve kullaniciya hangi aksiyonun once gelmesi gerektigini gostermek.",
+    step: "02",
+    title: "Sinyalleri birleştir",
+    text: "Fiyat, teslimat, güven, yorum ve içerik alanları tek bir teşhis modeline bağlanır.",
   },
   {
-    q: "Raporlar kaydoluyor mu?",
-    a: "Kayitli kullanicilarin uygun plan seviyesinde raporlari gecmise eklenir ve daha sonra detay ekranindan tekrar acilabilir.",
+    step: "03",
+    title: "Önceliği gör",
+    text: "İlk ekranda hangi alanın satışı yavaşlattığı ve neyin önce düzelmesi gerektiği görünür.",
+  },
+  {
+    step: "04",
+    title: "Raporu derinleştir",
+    text: "Kayıtlı deneyimde tam rapor, rapor kütüphanesi ve dışa aktarma akışı açılır.",
   },
 ];
 
-const trustSignals = [
+const resourceItems = [
   {
-    title: "Teklif baskisi okunur",
-    text: "Ayni urunu satan diger saticilarin fiyat ve teslimat farki hizla yorumlanir.",
+    eyebrow: "Rapor kütüphanesi",
+    title: "Aynı ürünü yeniden aç, karşılaştır ve geçmişe dön",
+    text: "Kaydedilen raporlar ekip içinde tekrar okunabilir kalır. Böylece aksiyonlar tek seferlik değil takip edilebilir olur.",
+    href: "/reports",
+    cta: "Rapor akışını gör",
   },
   {
-    title: "Yorum riski ayiklanir",
-    text: "Olumsuz tema, dusuk yildiz ve guven sinyali tek yerde toplanir.",
+    eyebrow: "Karar izi",
+    title: "AI’nin neye bakarak teşhis verdiğini ekipçe anlatılabilir kıl",
+    text: "Deterministik sinyaller, benchmark farkı ve AI yorumu tek bir karar hikâyesi halinde okunur.",
+    href: "/how-it-works",
+    cta: "Sistem nasıl çalışıyor",
   },
   {
-    title: "Aksiyon sirasi netlesir",
-    text: "Rapor ekrani sorunu tarif etmekle kalmaz, neyin once gelmesi gerektigini soyler.",
+    eyebrow: "Ticari derinlik",
+    title: "Teaser deneyiminden tam rekabet ve aksiyon katmanına geç",
+    text: "İlk sonuç ekranı hızlı karar için yeterli, tam rapor ise daha güçlü ekip operasyonu için tasarlandı.",
+    href: "/pricing",
+    cta: "Planları incele",
   },
 ];
+
+export const metadata: Metadata = {
+  title: "Trendyol ürününüz neden satmıyor? | SellBoost AI",
+  description:
+    "Ürün linkinizi yapıştırın. AI saniyeler içinde analiz etsin, somut aksiyon planı çıkarsın.",
+};
 
 export default function HomePage() {
-  const { status } = useSession();
-  const [url, setUrl] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [autoSaved, setAutoSaved] = useState(false);
-  const [reports, setReports] = useState<SavedReport[]>([]);
-  const [historyLimit, setHistoryLimit] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (status !== "authenticated") {
-      setReports([]);
-      return;
-    }
-
-    fetchReports()
-      .then((data) => {
-        setReports(data.reports);
-        setHistoryLimit(data.historyLimit);
-      })
-      .catch(() => {
-        setReports([]);
-        setHistoryLimit(null);
-      });
-  }, [status]);
-
-  const quickStats = useMemo(
-    () => [
-      {
-        label: "Odak platform",
-        value: "Trendyol",
-        text: "Urun detay ve rakip satici mantigina ozel tasarlandi.",
-      },
-      {
-        label: "Analiz hizi",
-        value: "AI",
-        text: "URL girildigi anda premium karar paneli akisi baslar.",
-      },
-      {
-        label: "Raporlar",
-        value: status === "authenticated" ? `${reports.length}` : "Hazir",
-        text:
-          status === "authenticated"
-            ? "Kayitli raporlar dashboard ve rapor kutuphanesinde durur."
-            : "Kayitli kullanimda rapor gecmisi ve panel acilir.",
-      },
-      {
-        label: "Cikti tipi",
-        value: "Teshis",
-        text: "Skordan fazlasi: darbogaz, veri carpistirma ve recete.",
-      },
-    ],
-    [reports.length, status]
-  );
-
-  const handleAnalyze = async () => {
-    if (!url.trim()) return;
-
-    setLoading(true);
-    setResult(null);
-    setError(null);
-    setAutoSaved(false);
-
-    try {
-      const report = await analyzeUrl(url);
-      setResult(report);
-
-      const isLoggedIn = status === "authenticated";
-      setAutoSaved(isLoggedIn);
-
-      if (isLoggedIn) {
-        fetchReports()
-          .then((data) => {
-            setReports(data.reports);
-            setHistoryLimit(data.historyLimit);
-          })
-          .catch(() => {
-            setReports([]);
-            setHistoryLimit(null);
-          });
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Bir hata olustu.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <div className="sb-shell">
-      <SiteHeader />
+    <MarketingShell navItems={homeNavItems} variant="bright">
+      <HomeHeroClient />
 
-      <main className="sb-page">
-        <div className="sb-container sb-stack-32">
-          <section className="marketing-hero">
-            <div className="marketing-hero__grid">
-              <div className="surface marketing-hero__panel sb-stack-24">
-                <div className="eyebrow">AI destekli Trendyol analiz platformu</div>
+      <section className="bright-section" id="features">
+        <div className="sb-container bright-section__stack">
+          <div className="bright-section__intro">
+            <div className="bright-section-kicker">Özellikler</div>
+            <h2 className="bright-section__title">
+              Güzel görünen değil, satış kararını hızlandıran bir analiz akışı
+            </h2>
+            <p className="bright-section__text">
+              BrightSaaS ritmindeki akışı, senin sistemine uyarladım: koyu,
+              odaklı, büyük başlıklar ve kartsız section yapısı. Ama içerik
+              tamamen SellBoost’un teşhis mantığına göre çalışıyor.
+            </p>
+          </div>
 
-                <div className="sb-stack-16">
-                  <h1 className="hero-title">
-                    Urunun neden <strong>satmadigini</strong> veriden okuyun.
-                  </h1>
-                  <p className="hero-lead">
-                    SellBoost AI, Trendyol urun sayfasini sadece puanlamaz. darbogazi
-                    bulur, verileri carptirir ve sana karar odakli aksiyon plani verir.
-                  </p>
+          <div className="bright-feature-stream">
+            {featureRows.map((item, index) => (
+              <article
+                key={item.title}
+                className={`bright-feature-row${index % 2 === 1 ? " is-reverse" : ""}`}
+              >
+                <div className="bright-feature-row__visual">
+                  <div className="bright-feature-row__metric">{item.metricValue}</div>
+                  <div className="bright-feature-row__metric-label">{item.metricLabel}</div>
+                  <div className="bright-feature-row__visual-copy">{item.text}</div>
                 </div>
 
-                <div className="hero-points">
-                  <span className="hero-point">Premium SaaS deneyimi</span>
-                  <span className="hero-point">Rakip teklif okuma</span>
-                  <span className="hero-point">AI teshis ve recete</span>
-                </div>
-
-                <AnalyzeForm
-                  url={url}
-                  loading={loading}
-                  onChange={setUrl}
-                  onSubmit={handleAnalyze}
-                />
-
-                {error && <div className="alert alert-error">{error}</div>}
-
-                <div className="hero-actions">
-                  <Link href="/fiyatlandirma" className="btn btn-secondary">
-                    Fiyatlandirmayi Incele
-                  </Link>
-                  <Link href="/hakkimizda" className="btn btn-ghost">
-                    Nasil calistigini gor
-                  </Link>
-                </div>
-              </div>
-
-              <div className="surface preview-panel">
-                <div className="preview-panel__top">
-                  <div>
-                    <div className="eyebrow">Canli urun hissi</div>
-                    <h2 className="card-heading" style={{ marginTop: 14 }}>
-                      Premium karar paneli gorunumu
-                    </h2>
-                  </div>
-                  <span className="hero-point">Dark default</span>
-                </div>
-
-                <div className="preview-panel__grid">
-                  {quickStats.map((item) => (
-                    <div key={item.label} className="preview-metric">
-                      <div className="preview-metric__label">{item.label}</div>
-                      <div className="preview-metric__value">{item.value}</div>
-                      <div className="card-copy">{item.text}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="preview-list">
-                  <div className="preview-list__item">
-                    <span className="preview-list__label">Kritik teshis</span>
-                    <span className="preview-list__value">Teslimat bariyeri</span>
-                  </div>
-                  <div className="preview-list__item">
-                    <span className="preview-list__label">Rakip baskisi</span>
-                    <span className="preview-list__value status-danger">3 satici daha ucuz</span>
-                  </div>
-                  <div className="preview-list__item">
-                    <span className="preview-list__label">Guven sinyali</span>
-                    <span className="preview-list__value status-good">Yuksek yorum puani</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {result && (
-            <section className="sb-stack-16">
-              <div className="section-heading">
-                <div className="eyebrow">Analiz cikti paneli</div>
-                <h2 className="section-title">AI raporu hazir</h2>
-                <p className="section-text">
-                  Asagidaki panel, linkten cekilen gercek sinyallerle olusturuldu.
-                  Guclu ve zayif alanlar ile rakip baskisini tek akista gorebilirsin.
-                </p>
-              </div>
-
-              <AnalysisResultBox result={result} autoSaved={autoSaved} />
-            </section>
-          )}
-
-          <section className="sb-stack-20" id="ozellikler">
-            <div className="section-heading">
-              <div className="eyebrow">Neden SellBoost</div>
-              <h2 className="section-title">Basit rapor degil, urunlesmis karar deneyimi</h2>
-              <p className="section-text">
-                Arac sadece satir satir veri vermez. Once problemi bulur, sonra
-                nedenini veri carpistirarak anlatir ve uygulanabilir aksiyona indirger.
-              </p>
-            </div>
-
-            <div className="feature-grid">
-              {features.map((feature) => (
-                <article key={feature.title} className="surface feature-card">
-                  <div className="feature-card__icon">{feature.icon}</div>
-                  <h3 className="feature-card__title">{feature.title}</h3>
-                  <p className="feature-card__text">{feature.text}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="section-grid-2" id="nasil-calisir">
-            <div className="surface feature-card">
-              <div className="section-heading" style={{ marginBottom: 0 }}>
-                <div className="eyebrow">Nasil calisir</div>
-                <h2 className="section-title" style={{ fontSize: "clamp(28px, 4vw, 42px)" }}>
-                  Tek linkten premium rapora
-                </h2>
-                <p className="section-text">
-                  Akis sade ama urunun hissettirdigi deneyim ciddi: analiz girisi,
-                  yorumlama, kayitli rapor ve karar odakli cikti tek aileye ait.
-                </p>
-              </div>
-            </div>
-
-            <div className="timeline">
-              {howItWorks.map((item, index) => (
-                <div key={item.title} className="surface-soft timeline__item">
-                  <div className="timeline__index">0{index + 1}</div>
-                  <div>
-                    <h3 className="timeline__title">{item.title}</h3>
-                    <p className="timeline__text">{item.text}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="section-grid-3">
-            {trustSignals.map((item) => (
-              <article key={item.title} className="surface feature-card">
-                <div className="eyebrow" style={{ marginBottom: 10 }}>
-                  Premium signal
-                </div>
-                <h3 className="feature-card__title">{item.title}</h3>
-                <p className="feature-card__text">{item.text}</p>
-              </article>
-            ))}
-          </section>
-
-          <section className="sb-stack-20" id="fiyatlandirma">
-            <div className="section-heading">
-              <div className="eyebrow">Planlar</div>
-              <h2 className="section-title">Kullanim derinligini ihtiyacina gore sec</h2>
-              <p className="section-text">
-                Deneme, kayitli kullanim ve premium karar paneli ayni tasarim ailesi
-                icinde ilerler. Gectigin anda deneyim buyur, karmasa artmaz.
-              </p>
-            </div>
-
-            <div className="section-grid-3">
-              {planPreview.map((plan) => (
-                <article
-                  key={plan.name}
-                  className={`surface pricing-card${plan.featured ? " is-featured" : ""}`}
-                >
-                  <div className="pricing-card__head">
-                    <div>
-                      <h3 className="pricing-card__name">{plan.name}</h3>
-                      <p className="pricing-card__subtitle">{plan.subtitle}</p>
-                    </div>
-                    {plan.featured && <div className="eyebrow">En populer</div>}
-                  </div>
-
-                  <p className="pricing-card__price">{plan.price}</p>
-
-                  <ul className="pricing-card__list">
-                    {plan.features.map((feature) => (
-                      <li key={feature}>{feature}</li>
+                <div className="bright-feature-row__copy">
+                  <div className="bright-section-kicker">{item.eyebrow}</div>
+                  <h3 className="bright-feature-row__title">{item.title}</h3>
+                  <p className="bright-feature-row__text">{item.text}</p>
+                  <ul className="bright-inline-points">
+                    {item.bullets.map((bullet) => (
+                      <li key={bullet}>{bullet}</li>
                     ))}
                   </ul>
+                </div>
+              </article>
+            ))}
+          </div>
 
+          <div className="bright-process">
+            {processSteps.map((step) => (
+              <article key={step.step} className="bright-process__item">
+                <div className="bright-process__step">{step.step}</div>
+                <div className="bright-process__body">
+                  <h3 className="bright-process__title">{step.title}</h3>
+                  <p className="bright-process__text">{step.text}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bright-section bright-section--accent" id="pricing">
+        <div className="sb-container bright-section__stack">
+          <div className="bright-section__intro">
+            <div className="bright-section-kicker">Planlar</div>
+            <h2 className="bright-section__title">
+              Kart dizisi değil, net bir seçim akışı
+            </h2>
+            <p className="bright-section__text">
+              Fiyatlandırmayı daha editorial bir düzene çektim. Her plan ayrı
+              kutu gibi değil, aşağı doğru akan karar satırları gibi okunuyor.
+            </p>
+          </div>
+
+          <div className="bright-plan-list">
+            {pricingPlans.map((plan) => (
+              <article
+                key={plan.key}
+                className={`bright-plan-row${plan.featured ? " is-featured" : ""}`}
+              >
+                <div className="bright-plan-row__head">
+                  <div className="bright-section-kicker">
+                    {plan.badge || plan.subtitle}
+                  </div>
+                  <h3 className="bright-plan-row__title">{plan.name}</h3>
+                  <p className="bright-plan-row__text">{plan.description}</p>
+                </div>
+
+                <div className="bright-plan-row__price">
+                  <span className="bright-plan-row__amount">{plan.price}</span>
+                  <span className="bright-plan-row__billing">{plan.billing}</span>
+                </div>
+
+                <ul className="bright-plan-row__features">
+                  {plan.features.slice(0, 4).map((feature) => (
+                    <li key={feature}>{feature}</li>
+                  ))}
+                </ul>
+
+                <div className="bright-plan-row__action">
                   <Link
-                    href={plan.name === "Pro" ? "/register" : "/fiyatlandirma"}
+                    href={plan.ctaHref}
                     className={plan.featured ? "btn btn-primary" : "btn btn-secondary"}
                   >
-                    {plan.name === "Pro" ? "Haberdar Ol" : "Detaylari Gor"}
+                    {plan.ctaLabel}
                   </Link>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          {status === "authenticated" && (
-            <section className="sb-stack-16">
-              <div className="section-heading">
-                <div className="eyebrow">Kayitli raporlar</div>
-                <h2 className="section-title">Gecmis analizler tek kutuphanede</h2>
-                <p className="section-text">
-                  Uygun plan seviyende kayitli raporlarini tekrar ac, karsilastir ve
-                  ayni urunde zaman icinde neler degistigini izle.
-                </p>
-                {typeof historyLimit === "number" && (
-                  <p className="section-text">
-                    Mevcut pakette son {historyLimit} rapor gosteriliyor.
-                  </p>
-                )}
-              </div>
-
-              <div className="surface app-card">
-                <ReportHistory reports={reports} />
-              </div>
-            </section>
-          )}
-
-          <section className="sb-stack-20" id="sss">
-            <div className="section-heading">
-              <div className="eyebrow">SSS</div>
-              <h2 className="section-title">Karar vermeden once temel sorular</h2>
-            </div>
-
-            <div className="faq-list">
-              {faqs.map((item) => (
-                <article key={item.q} className="surface faq-item">
-                  <h3 className="faq-item__q">{item.q}</h3>
-                  <p className="faq-item__a">{item.a}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="surface marketing-hero__panel sb-stack-20">
-            <div className="eyebrow">Hazirsan baslayalim</div>
-            <h2 className="section-title">Trendyol urun sayfana premium karar paneli ekle</h2>
-            <p className="section-text">
-              SellBoost AI, ogrenci projesi gibi degil urunlesmis bir karar araci
-              gibi hissettirmek icin tasarlandi. Simdi linki gir ve darbogazi gor.
-            </p>
-
-            <div className="hero-actions">
-              <Link href="/register" className="btn btn-primary">
-                Ucretsiz Basla
-              </Link>
-              <Link href="/dashboard" className="btn btn-secondary">
-                Dashboarda Git
-              </Link>
-            </div>
-          </section>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
-      </main>
+      </section>
 
-      <SiteFooter />
-    </div>
+      <section className="bright-section" id="resources">
+        <div className="sb-container bright-section__stack">
+          <div className="bright-section__intro">
+            <div className="bright-section-kicker">Kaynaklar</div>
+            <h2 className="bright-section__title">
+              İlk teşhisten sonra sistem seni boş bırakmaz
+            </h2>
+            <p className="bright-section__text">
+              Homepage yalnızca giriş noktası. Asıl değer, raporların ekip içinde
+              tekrar açılabilir ve karar verilebilir hale gelmesinde.
+            </p>
+          </div>
+
+          <div className="bright-resource-list">
+            {resourceItems.map((item) => (
+              <article key={item.title} className="bright-resource">
+                <div className="bright-resource__main">
+                  <div className="bright-section-kicker">{item.eyebrow}</div>
+                  <h3 className="bright-resource__title">{item.title}</h3>
+                  <p className="bright-resource__text">{item.text}</p>
+                </div>
+                <Link href={item.href} className="bright-resource__link">
+                  {item.cta}
+                </Link>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bright-section bright-section--soft" id="faqs">
+        <div className="sb-container bright-section__stack">
+          <div className="bright-section__intro">
+            <div className="bright-section-kicker">SSS</div>
+            <h2 className="bright-section__title">
+              Ürün, üyelik ve rapor akışı hakkında en net sorular
+            </h2>
+            <p className="bright-section__text">
+              Referanstaki gibi son bölümde bariyer azaltan, kısa ama yeterince
+              açıklayıcı bir soru-cevap alanı bıraktım.
+            </p>
+          </div>
+
+          <div className="bright-faq-list">
+            {faqItems.slice(0, 4).map((item) => (
+              <article key={item.q} className="bright-faq-item">
+                <h3 className="bright-faq-item__q">{item.q}</h3>
+                <p className="bright-faq-item__a">{item.a}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bright-cta">
+        <div className="sb-container bright-cta__inner">
+          <div>
+            <div className="bright-section-kicker">Hazırsan başla</div>
+            <h2 className="bright-cta__title">
+              Linki bırak, ilk satış teşhisini şimdi al.
+            </h2>
+            <p className="bright-cta__text">
+              Teaser ile ilk sinyalleri gör, kaydolunca tam rapor ve karar
+              akışına geç.
+            </p>
+          </div>
+
+          <div className="hero-actions" style={{ marginTop: 0 }}>
+            <Link href="/register" className="btn btn-primary btn--lg">
+              Ücretsiz başla
+            </Link>
+            <Link href="/pricing" className="btn btn-secondary btn--lg">
+              Planları incele
+            </Link>
+          </div>
+        </div>
+      </section>
+    </MarketingShell>
   );
 }
-
-

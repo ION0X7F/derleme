@@ -59,9 +59,13 @@ function getPlanBadge(plan?: string | null) {
   };
 }
 
-function formatDate(dateString: string) {
+function formatDate(dateValue: string | Date | null | undefined) {
+  if (!dateValue) {
+    return "-";
+  }
+
   try {
-    return new Date(dateString).toLocaleString("tr-TR", {
+    return new Date(dateValue).toLocaleString("tr-TR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -69,7 +73,7 @@ function formatDate(dateString: string) {
       minute: "2-digit",
     });
   } catch {
-    return dateString;
+    return String(dateValue);
   }
 }
 
@@ -101,6 +105,11 @@ function buildSignalBadges(report: SavedReport) {
   if (!extracted) return [];
 
   const badges: string[] = [];
+  const sellerBadges = Array.isArray(extracted.seller_badges)
+    ? extracted.seller_badges.filter(
+        (badge): badge is string => typeof badge === "string" && badge.trim().length > 0
+      )
+    : [];
 
   if (extracted.has_free_shipping === true) {
     badges.push("Ucretsiz kargo");
@@ -118,8 +127,8 @@ function buildSignalBadges(report: SavedReport) {
     badges.push("Resmi satici");
   }
 
-  if (Array.isArray(extracted.seller_badges) && extracted.seller_badges.length > 0) {
-    badges.push(extracted.seller_badges[0]);
+  if (sellerBadges.length > 0) {
+    badges.push(sellerBadges[0]);
   }
 
   if (typeof extracted.seller_score === "number" && extracted.seller_score >= 8.5) {
@@ -236,7 +245,9 @@ export default function ReportHistory({ reports }: Props) {
         const platformLabel = report.platform || getDomainLabel(report.url);
         const categoryLabel = report.category || "Genel";
         const planBadge = getPlanBadge(report.accessState?.plan);
-        const lockedCount = report.accessState?.lockedSections?.length ?? 0;
+        const lockedCount = Array.isArray(report.accessState?.lockedSections)
+          ? report.accessState.lockedSections.length
+          : 0;
         const signalBadges = buildSignalBadges(report);
         const coverageBadge = getCoverageBadge(report.coverage?.confidence);
         const completeness = getTone(report.dataCompletenessScore, "Veri");
@@ -263,7 +274,7 @@ export default function ReportHistory({ reports }: Props) {
                   </p>
                 </div>
 
-                <Link href={`/reports/${report.id}`} className="btn btn-primary">
+                <Link href={`/report/${report.id}`} className="btn btn-primary">
                   Detayi Gor
                 </Link>
               </div>
@@ -329,7 +340,7 @@ export default function ReportHistory({ reports }: Props) {
                   </span>
                 ))}
 
-                {report.priceCompetitiveness && (
+                {typeof report.priceCompetitiveness === "string" && (
                   <span className="hero-point">
                     {getPriceCompetitivenessLabel(report.priceCompetitiveness)}
                   </span>

@@ -53,6 +53,7 @@ export async function GET() {
         accessState: true,
         suggestions: true,
         priorityActions: true,
+        analysisTrace: true,
       },
     });
 

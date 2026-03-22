@@ -1,4 +1,18 @@
+import { sanitizeAnalysisTraceForAccess } from "@/lib/analysis-trace";
+import type { SavedReport } from "@/types";
+
 type StoredReportLike = {
+  id?: unknown;
+  url?: unknown;
+  platform?: unknown;
+  category?: unknown;
+  seoScore?: unknown;
+  conversionScore?: unknown;
+  overallScore?: unknown;
+  dataCompletenessScore?: unknown;
+  summary?: unknown;
+  dataSource?: unknown;
+  createdAt?: unknown;
   extractedData?: unknown;
   derivedMetrics?: unknown;
   coverage?: unknown;
@@ -6,6 +20,7 @@ type StoredReportLike = {
   accessState?: unknown;
   suggestions?: unknown;
   priorityActions?: unknown;
+  analysisTrace?: unknown;
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -44,6 +59,26 @@ function getPlanLimits(plan: "guest" | "free" | "pro" | "enterprise") {
     maxSuggestions: 5,
     maxPriorityActions: 5,
   };
+}
+
+function getNumberOrNull(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function getStringOrNull(value: unknown) {
+  return typeof value === "string" ? value : null;
+}
+
+function getCreatedAtValue(value: unknown) {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return new Date(0).toISOString();
 }
 
 export function sanitizeStoredReportForAccess<T extends StoredReportLike>(report: T): T {
@@ -143,5 +178,50 @@ export function sanitizeStoredReportForAccess<T extends StoredReportLike>(report
     );
   }
 
+  if (report.analysisTrace && typeof report.analysisTrace === "object") {
+    nextReport.analysisTrace = sanitizeAnalysisTraceForAccess(
+      report.analysisTrace as never,
+      plan
+    );
+  }
+
   return nextReport;
+}
+
+export function prepareStoredReportForClient<T extends StoredReportLike>(
+  report: T
+): T {
+  return JSON.parse(
+    JSON.stringify(sanitizeStoredReportForAccess(report))
+  ) as T;
+}
+
+export function prepareSavedReportForClient<T extends StoredReportLike>(
+  report: T
+): SavedReport {
+  try {
+    return prepareStoredReportForClient(report) as unknown as SavedReport;
+  } catch {
+    return {
+      id: getStringOrNull(report.id) || `report-${Date.now()}`,
+      url: getStringOrNull(report.url) || "/reports",
+      platform: getStringOrNull(report.platform),
+      category: getStringOrNull(report.category),
+      seoScore: getNumberOrNull(report.seoScore),
+      conversionScore: getNumberOrNull(report.conversionScore),
+      overallScore: getNumberOrNull(report.overallScore),
+      dataCompletenessScore: getNumberOrNull(report.dataCompletenessScore),
+      priceCompetitiveness: getStringOrNull(report.priceCompetitiveness),
+      summary: getStringOrNull(report.summary),
+      dataSource: getStringOrNull(report.dataSource),
+      derivedMetrics: null,
+      coverage: null,
+      analysisTrace: null,
+      accessState: null,
+      extractedData: null,
+      suggestions: [],
+      priorityActions: [],
+      createdAt: getCreatedAtValue(report.createdAt),
+    };
+  }
 }

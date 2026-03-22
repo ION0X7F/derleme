@@ -2,108 +2,28 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { extractFieldsWithFallback } from "@/lib/extractors";
-import { fetchPageHtml } from "@/lib/fetch-page-html";
-import { fetchTrendyolApi } from "@/lib/fetch-trendyol-api";
-import { buildAnalysis } from "@/lib/build-analysis";
+import {
+  buildAnalysisAccessState,
+  resolveAccessPlan,
+} from "@/lib/analysis-access";
+import { sanitizeAnalysisTraceForAccess } from "@/lib/analysis-trace";
 import { getOrCreateGuestId } from "@/lib/guest";
 import { checkAnalyzeLimit } from "@/lib/check-analyze-limit";
 import { incrementAnalyzeUsage } from "@/lib/increment-analyze-usage";
 import { isUnlimitedUser } from "@/lib/is-unlimited-user";
-import { analyzeWithAi } from "@/lib/ai-analysis";
+import { recordLearningArtifacts } from "@/lib/learning-engine";
 import {
-  getLearningContext,
-  recordLearningArtifacts,
-} from "@/lib/learning-engine";
-import { completeMissingFields, getLearningStatus } from "@/lib/missing-data";
+  AnalysisPipelineError,
+  runAnalysisPipeline,
+} from "@/lib/run-analysis";
+import { getUserMembershipSnapshot } from "@/lib/user-membership";
+import { validateProductUrl } from "@/lib/url-validation";
 import type {
-  AccessPlan,
   AnalysisAccessState,
   AnalysisSectionLock,
   BuildAnalysisResult,
   ExtractedProductFields,
 } from "@/types/analysis";
-
-function hasText(value: string | null | undefined) {
-  return !!value && value.trim().length > 0;
-}
-
-function shouldUseAiScore(aiScore: number, fallbackScore: number) {
-  if (!Number.isFinite(aiScore)) return false;
-  if (aiScore <= 0 && fallbackScore > 0) return false;
-  return true;
-}
-
-function resolveAccessPlan(params: {
-  sessionUserId?: string | null;
-  userPlan?: string | null;
-  unlimited: boolean;
-}): AccessPlan {
-  if (!params.sessionUserId) return "guest";
-  if (params.unlimited) return "enterprise";
-  if (params.userPlan === "PREMIUM") return "pro";
-  return "free";
-}
-
-function buildAccessState(plan: AccessPlan): AnalysisAccessState {
-  const configs: Record<AccessPlan, AnalysisAccessState> = {
-    guest: {
-      plan: "guest",
-      lockedSections: [
-        "advancedOfferAnalysis",
-        "competitorAnalysis",
-        "premiumActionPlan",
-        "history",
-        "export",
-        "reanalysis",
-      ],
-      teaserSections: [
-        "advancedOfferAnalysis",
-        "competitorAnalysis",
-        "premiumActionPlan",
-      ],
-      maxFindings: 2,
-      maxSuggestions: 1,
-      maxPriorityActions: 1,
-    },
-    free: {
-      plan: "free",
-      lockedSections: [
-        "advancedOfferAnalysis",
-        "competitorAnalysis",
-        "premiumActionPlan",
-        "export",
-        "reanalysis",
-      ],
-      teaserSections: [
-        "advancedOfferAnalysis",
-        "competitorAnalysis",
-        "premiumActionPlan",
-      ],
-      maxFindings: 6,
-      maxSuggestions: 3,
-      maxPriorityActions: 3,
-    },
-    pro: {
-      plan: "pro",
-      lockedSections: [],
-      teaserSections: [],
-      maxFindings: 10,
-      maxSuggestions: 5,
-      maxPriorityActions: 5,
-    },
-    enterprise: {
-      plan: "enterprise",
-      lockedSections: [],
-      teaserSections: [],
-      maxFindings: 10,
-      maxSuggestions: 5,
-      maxPriorityActions: 5,
-    },
-  };
-
-  return configs[plan];
-}
 
 function trimArray<T>(items: T[], limit: number) {
   return items.slice(0, limit);
@@ -253,6 +173,7 @@ function shapeAnalysisForAccess(
       access,
       category
     ),
+    analysisTrace: sanitizeAnalysisTraceForAccess(analysis.analysisTrace, access.plan),
     strengths,
     weaknesses,
     suggestions,
@@ -262,79 +183,39 @@ function shapeAnalysisForAccess(
   };
 }
 
-function detectCategory(params: {
-  url: string;
-  title?: string | null;
-  h1?: string | null;
-  brand?: string | null;
-  product_name?: string | null;
-}) {
-  const text = `${params.url} ${params.title || ""} ${params.h1 || ""} ${
-    params.brand || ""
-  } ${params.product_name || ""}`.toLowerCase();
-
-  if (
-    text.includes("ayakkabi") ||
-    text.includes("sneaker") ||
-    text.includes("bot") ||
-    text.includes("terlik") ||
-    text.includes("cizme")
-  ) return "Ayakkabi";
-
-  if (
-    text.includes("tisort") ||
-    text.includes("gomlek") ||
-    text.includes("pantolon") ||
-    text.includes("ceket") ||
-    text.includes("elbise") ||
-    text.includes("mont")
-  ) return "Giyim";
-
-  if (text.includes("kitap") || text.includes("roman") || text.includes("yazar")) {
-    return "Kitap";
-  }
-
-  if (
-    text.includes("telefon") ||
-    text.includes("kulaklik") ||
-    text.includes("tablet") ||
-    text.includes("laptop") ||
-    text.includes("bilgisayar")
-  ) return "Elektronik";
-
-  return "General";
-}
-
 export async function POST(req: Request) {
   try {
     const session = await auth();
     const body = await req.json();
-    const url = body?.url?.trim();
+    const rawUrl = typeof body?.url === "string" ? body.url : "";
+    const validatedUrl = validateProductUrl(rawUrl, {
+      allowedPlatforms: ["trendyol"],
+      allowShortTrendyolLinks: false,
+    });
 
-    if (!url) {
-      return NextResponse.json(
-        { error: "URL_REQUIRED", message: "URL zorunlu." },
-        { status: 400 }
-      );
-    }
-
-    if (!url.toLowerCase().includes("trendyol.com")) {
+    if (!validatedUrl.ok) {
       return NextResponse.json(
         {
-          error: "PLATFORM_NOT_SUPPORTED",
-          message: "Bu surum yalnizca Trendyol urun URL'leri icin aktif.",
+          error: validatedUrl.code,
+          message: validatedUrl.message,
         },
         { status: 400 }
       );
     }
 
+    const url = validatedUrl.normalizedUrl;
     const unlimited = isUnlimitedUser(session?.user?.email);
+    const membership = session?.user?.id
+      ? await getUserMembershipSnapshot(session.user.id)
+      : null;
     const accessPlan = resolveAccessPlan({
       sessionUserId: session?.user?.id,
-      userPlan: session?.user && "plan" in session.user ? String(session.user.plan) : null,
+      userPlan:
+        membership?.planCode ??
+        (session?.user && "plan" in session.user ? String(session.user.plan) : null),
       unlimited,
     });
-    const access = buildAccessState(accessPlan);
+    const access = buildAnalysisAccessState(accessPlan);
 
     let limitInfo:
       | {
@@ -386,196 +267,118 @@ export async function POST(req: Request) {
       );
     }
 
-    let html = "";
-
     try {
-      html = await fetchPageHtml(url);
-    } catch (fetchError) {
-      const message = fetchError instanceof Error ? fetchError.message : "";
-      return NextResponse.json(
-        {
-          error: "FETCH_FAILED",
-          message: "Sayfa icerigi alinamadi. URL'yi kontrol edin.",
-          detail: message,
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!html || html.trim().length === 0) {
-      return NextResponse.json(
-        { error: "EMPTY_HTML", message: "Sayfa icerigi alinamadi." },
-        { status: 400 }
-      );
-    }
-
-    let trendyolApiData = null;
-    if (url.toLowerCase().includes("trendyol.com")) {
-      trendyolApiData = await fetchTrendyolApi(url);
-    }
-
-    const extraction = extractFieldsWithFallback({ url, html });
-    const completion = completeMissingFields({
-      platform: extraction.platform,
-      extracted: extraction.mergedFields,
-      genericFields: extraction.genericFields,
-      platformFields: extraction.platformFields,
-      trendyolApiData,
-    });
-    const extracted = completion.extracted;
-    const learningStatus = getLearningStatus({
-      extracted,
-      report: completion.report,
-      sourceType: "real",
-    });
-    const platform = extraction.platform;
-
-    const category =
-      extracted.category ||
-      detectCategory({
+      const pipeline = await runAnalysisPipeline({
         url,
-        title: extracted.title,
-        h1: extracted.h1,
-        brand: extracted.brand,
-        product_name: extracted.product_name,
-      }) ||
-      "General";
+        planContext: accessPlan,
+        learningSourceType: "real",
+      });
 
-    const analysis = buildAnalysis({
-      platform,
-      url,
-      extracted: { ...extracted, category: extracted.category || category },
-      planContext: accessPlan,
-    });
+      const { analysis, category, platform, learningStatus, missingDataReport } =
+        pipeline;
+      const shapedResult = shapeAnalysisForAccess(analysis, access, category);
 
-    const learningContext = await getLearningContext({
-      platform,
-      category: extracted.category || category,
-      brand: extracted.brand,
-      extracted: analysis.extractedData,
-    });
+      let savedReport = null;
 
-    const aiResult = await analyzeWithAi({
-      packet: analysis.decisionSupportPacket,
-      extracted: analysis.extractedData,
-      url,
-      learningContext,
-      missingDataReport: completion.report,
-    });
-
-    if (aiResult) {
-      if (hasText(aiResult.summary)) {
-        analysis.summary = aiResult.summary;
-      }
-
-      if (aiResult.strengths.length > 0) {
-        analysis.strengths = aiResult.strengths;
-      }
-
-      if (aiResult.weaknesses.length > 0) {
-        analysis.weaknesses = aiResult.weaknesses;
-      }
-
-      if (aiResult.suggestions.length > 0) {
-        analysis.suggestions = aiResult.suggestions;
-      }
-
-      if (shouldUseAiScore(aiResult.seo_score, analysis.seoScore)) {
-        analysis.seoScore = aiResult.seo_score;
-      }
-
-      if (shouldUseAiScore(aiResult.conversion_score, analysis.conversionScore)) {
-        analysis.conversionScore = aiResult.conversion_score;
-      }
-
-      if (shouldUseAiScore(aiResult.overall_score, analysis.overallScore)) {
-        analysis.overallScore = aiResult.overall_score;
-      }
-    }
-
-    const shapedResult = shapeAnalysisForAccess(analysis, access, category);
-
-    let savedReport = null;
-
-    if (usageTarget.type === "user") {
-      savedReport = await prisma.report.create({
-        data: {
-          guestId: null,
-          user: {
-            connect: {
-              id: usageTarget.userId,
+      if (usageTarget.type === "user") {
+        savedReport = await prisma.report.create({
+          data: {
+            guestId: null,
+            user: {
+              connect: {
+                id: usageTarget.userId,
+              },
             },
+            url,
+            platform,
+            category,
+            seoScore: shapedResult.seoScore,
+            dataCompletenessScore: shapedResult.dataCompletenessScore,
+            conversionScore: shapedResult.conversionScore,
+            overallScore: shapedResult.overallScore,
+            priceCompetitiveness: shapedResult.priceCompetitiveness,
+            summary: shapedResult.summary,
+            dataSource: shapedResult.dataSource,
+            extractedData: shapedResult.extractedData as Prisma.InputJsonValue,
+            derivedMetrics:
+              shapedResult.derivedMetrics === null
+                ? Prisma.JsonNull
+                : (shapedResult.derivedMetrics as Prisma.InputJsonValue),
+            coverage:
+              shapedResult.coverage === null
+                ? Prisma.JsonNull
+                : (shapedResult.coverage as Prisma.InputJsonValue),
+            accessState: access as Prisma.InputJsonValue,
+            suggestions: shapedResult.suggestions as Prisma.InputJsonValue,
+            priorityActions: shapedResult.priorityActions as Prisma.InputJsonValue,
+            analysisTrace:
+              shapedResult.analysisTrace === null
+                ? Prisma.JsonNull
+                : (shapedResult.analysisTrace as Prisma.InputJsonValue),
           },
-          url,
+        });
+      }
+
+      try {
+        await recordLearningArtifacts({
+          reportId: savedReport?.id ?? null,
           platform,
           category,
-          seoScore: shapedResult.seoScore,
-          dataCompletenessScore: shapedResult.dataCompletenessScore,
-          conversionScore: shapedResult.conversionScore,
-          overallScore: shapedResult.overallScore,
-          priceCompetitiveness: shapedResult.priceCompetitiveness,
-          summary: shapedResult.summary,
-          dataSource: shapedResult.dataSource,
-          extractedData: shapedResult.extractedData as Prisma.InputJsonValue,
-          derivedMetrics:
-            shapedResult.derivedMetrics === null
-              ? Prisma.JsonNull
-              : (shapedResult.derivedMetrics as Prisma.InputJsonValue),
-          coverage:
-            shapedResult.coverage === null
-              ? Prisma.JsonNull
-              : (shapedResult.coverage as Prisma.InputJsonValue),
-          accessState: access as Prisma.InputJsonValue,
-          suggestions: shapedResult.suggestions as Prisma.InputJsonValue,
-          priorityActions: shapedResult.priorityActions as Prisma.InputJsonValue,
-        },
-      });
+          extracted: analysis.extractedData,
+          summary: analysis.summary,
+          overallScore: analysis.overallScore,
+          sourceType: "real",
+          missingDataReport,
+          learningStatus,
+        });
+      } catch (learningError) {
+        console.error("Learning memory update failed:", learningError);
+      }
+
+      if (!unlimited) {
+        await incrementAnalyzeUsage(usageTarget);
+      }
+
+      const updatedUsage =
+        unlimited && usageTarget.type === "user"
+          ? {
+              allowed: true,
+              used: 0,
+              limit: 999999,
+              remaining: 999999,
+              periodKey: "unlimited",
+              periodType: "lifetime",
+            }
+          : await checkAnalyzeLimit(usageTarget);
+
+      return NextResponse.json(
+        {
+          success: true,
+          result: {
+            ...shapedResult,
+            missingDataReport,
+            learningStatus,
+            url,
+          },
+          report: savedReport,
+          usage: updatedUsage,
+          autoSaved: usageTarget.type === "user",
+        }
+      );
+    } catch (error) {
+      if (error instanceof AnalysisPipelineError) {
+        return NextResponse.json(
+          {
+            error: error.code,
+            message: error.message,
+            detail: error.detail,
+          },
+          { status: 400 }
+        );
+      }
+
+      throw error;
     }
-
-    try {
-      await recordLearningArtifacts({
-        reportId: savedReport?.id ?? null,
-        platform,
-        category: extracted.category || category,
-        extracted: analysis.extractedData,
-        summary: analysis.summary,
-        overallScore: analysis.overallScore,
-        sourceType: "real",
-        missingDataReport: completion.report,
-        learningStatus,
-      });
-    } catch (learningError) {
-      console.error("Learning memory update failed:", learningError);
-    }
-
-    if (!unlimited) {
-      await incrementAnalyzeUsage(usageTarget);
-    }
-
-    const updatedUsage =
-      unlimited && usageTarget.type === "user"
-        ? {
-            allowed: true,
-            used: 0,
-            limit: 999999,
-            remaining: 999999,
-            periodKey: "unlimited",
-            periodType: "lifetime",
-          }
-        : await checkAnalyzeLimit(usageTarget);
-
-    return NextResponse.json({
-      success: true,
-      result: {
-        ...shapedResult,
-        missingDataReport: completion.report,
-        learningStatus,
-        url,
-      },
-      report: savedReport,
-      usage: updatedUsage,
-      autoSaved: usageTarget.type === "user",
-    });
   } catch (error) {
     console.error("Analyze POST error:", error);
     return NextResponse.json(

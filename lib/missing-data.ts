@@ -6,6 +6,7 @@ import type {
   MissingFieldSnapshot,
   OtherSellerOffer,
   OtherSellersSummary,
+  ReviewRatingBreakdown,
   ReviewSummary,
 } from "@/types/analysis";
 import type { TrendyolApiResult } from "@/lib/fetch-trendyol-api";
@@ -143,6 +144,91 @@ function buildReviewSummaryFromSnippets(
     positive_count: positiveCount,
     negative_count: lowRatedCount,
   };
+}
+
+function buildReviewSummaryFromBreakdown(
+  breakdown: ReviewRatingBreakdown | null | undefined
+): ReviewSummary | null {
+  if (!breakdown) return null;
+
+  const oneStar = breakdown.one_star ?? 0;
+  const twoStar = breakdown.two_star ?? 0;
+  const threeStar = breakdown.three_star ?? 0;
+  const fourStar = breakdown.four_star ?? 0;
+  const fiveStar = breakdown.five_star ?? 0;
+  const total = breakdown.total ?? oneStar + twoStar + threeStar + fourStar + fiveStar;
+
+  if (total <= 0) return null;
+
+  return {
+    sampled_count: total,
+    low_rated_count: oneStar + twoStar,
+    positive_count: fourStar + fiveStar,
+    negative_count: oneStar + twoStar,
+  };
+}
+
+function deriveRatingValueFromSnippets(
+  snippets: ExtractedProductFields["review_snippets"]
+) {
+  if (!Array.isArray(snippets) || snippets.length === 0) return null;
+
+  const rated = snippets
+    .map((item) => item?.rating)
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+
+  if (rated.length < 3) return null;
+
+  return Number(
+    (rated.reduce((sum, value) => sum + value, 0) / rated.length).toFixed(1)
+  );
+}
+
+function deriveRatingValueFromBreakdown(
+  breakdown: ReviewRatingBreakdown | null | undefined
+) {
+  if (!breakdown) return null;
+
+  const oneStar = breakdown.one_star ?? 0;
+  const twoStar = breakdown.two_star ?? 0;
+  const threeStar = breakdown.three_star ?? 0;
+  const fourStar = breakdown.four_star ?? 0;
+  const fiveStar = breakdown.five_star ?? 0;
+  const total = breakdown.total ?? oneStar + twoStar + threeStar + fourStar + fiveStar;
+
+  if (total <= 0) return null;
+
+  const weightedTotal =
+    oneStar * 1 + twoStar * 2 + threeStar * 3 + fourStar * 4 + fiveStar * 5;
+
+  return Number((weightedTotal / total).toFixed(1));
+}
+
+function deriveDeliveryType(extracted: ExtractedProductFields) {
+  const badgeText = (extracted.seller_badges ?? [])
+    .join(" ")
+    .toLocaleLowerCase("tr-TR");
+
+  if (/ayni gun|aynigun|same day/.test(badgeText)) {
+    return "same_day";
+  }
+
+  if (/ertesi gun|next day/.test(badgeText)) {
+    return "next_day";
+  }
+
+  if (/hizli teslimat|hizli kargo|fast delivery/.test(badgeText)) {
+    return "fast_delivery";
+  }
+
+  if (typeof extracted.shipping_days === "number") {
+    if (extracted.shipping_days <= 1) return "same_day";
+    if (extracted.shipping_days <= 2) return "next_day";
+    if (extracted.shipping_days <= 3) return "fast_delivery";
+    return "standard";
+  }
+
+  return null;
 }
 
 function buildOtherSellersSummary(
@@ -819,6 +905,17 @@ export function completeMissingFields(params: CompleteMissingFieldsParams) {
     markField("question_count", "derived from qa snippets");
   }
 
+  strengthenBoolean(
+    "has_faq",
+    Boolean(
+      params.platformFields.has_faq ||
+        completed.has_faq ||
+        (Array.isArray(completed.qa_snippets) && completed.qa_snippets.length > 0) ||
+        (typeof completed.question_count === "number" && completed.question_count > 0)
+    ),
+    "qa visibility signals"
+  );
+
   fillNumber(
     "review_count",
     pickNumber(
@@ -835,6 +932,17 @@ export function completeMissingFields(params: CompleteMissingFieldsParams) {
     "rating_value",
     pickNumber(params.platformFields.rating_value, params.genericFields.rating_value),
     "html extractor"
+  );
+
+  fillNumber(
+    "rating_value",
+    pickNumber(
+      deriveRatingValueFromSnippets(completed.review_snippets),
+      deriveRatingValueFromBreakdown(completed.rating_breakdown)
+    ),
+    Array.isArray(completed.review_snippets) && completed.review_snippets.length > 0
+      ? "derived from real review snippets"
+      : "derived from rating breakdown"
   );
 
   fillNumber(
@@ -892,6 +1000,18 @@ export function completeMissingFields(params: CompleteMissingFieldsParams) {
       params.genericFields.seller_badges
     ),
     apiSeller?.seller_badges?.length ? "trendyol api seller badges" : "html extractor"
+  );
+
+  fillString(
+    "delivery_type",
+    pickString(
+      params.platformFields.delivery_type,
+      params.genericFields.delivery_type,
+      deriveDeliveryType(completed)
+    ),
+    hasText(params.platformFields.delivery_type) || hasText(params.genericFields.delivery_type)
+      ? "html extractor"
+      : "delivery signal inference"
   );
   fillNumber(
     "variant_count",
@@ -1054,8 +1174,11 @@ export function completeMissingFields(params: CompleteMissingFieldsParams) {
   fillObject(
     "review_summary",
     (completed.review_summary ||
-      buildReviewSummaryFromSnippets(completed.review_snippets)) as ExtractedProductFields["review_summary"],
-    "derived from real review snippets"
+      buildReviewSummaryFromSnippets(completed.review_snippets) ||
+      buildReviewSummaryFromBreakdown(completed.rating_breakdown)) as ExtractedProductFields["review_summary"],
+    Array.isArray(completed.review_snippets) && completed.review_snippets.length > 0
+      ? "derived from real review snippets"
+      : "derived from rating breakdown"
   );
 
   const after = buildMissingFieldSnapshot(completed);

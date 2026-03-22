@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { PlanCode, SubscriptionStatus } from "@prisma/client";
+import {
+  PlanCode,
+  SubscriptionPlanVariant,
+  SubscriptionStatus,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req: Request) {
   try {
@@ -17,9 +23,30 @@ export async function POST(req: Request) {
       );
     }
 
+    if (name.length < 2 || name.length > 60) {
+      return NextResponse.json(
+        { error: "Ad 2 ile 60 karakter arasinda olmali." },
+        { status: 400 }
+      );
+    }
+
+    if (!EMAIL_PATTERN.test(email)) {
+      return NextResponse.json(
+        { error: "Gecerli bir email adresi girin." },
+        { status: 400 }
+      );
+    }
+
     if (password.length < 6) {
       return NextResponse.json(
         { error: "Sifre en az 6 karakter olmali." },
+        { status: 400 }
+      );
+    }
+
+    if (password.length > 128) {
+      return NextResponse.json(
+        { error: "Sifre en fazla 128 karakter olabilir." },
         { status: 400 }
       );
     }
@@ -74,6 +101,7 @@ export async function POST(req: Request) {
           create: {
             planId: freePlan.id,
             status: SubscriptionStatus.ACTIVE,
+            variant: SubscriptionPlanVariant.FREE,
           },
         },
       },

@@ -56,6 +56,64 @@ type LearningStatusSummary = {
   reason: string;
 } | null;
 
+type AnalysisTraceSummary = {
+  version: number;
+  mode: "deterministic" | "ai_enriched";
+  primaryDiagnosis: string | null;
+  primaryTheme:
+    | "stock"
+    | "price"
+    | "delivery"
+    | "content"
+    | "visual"
+    | "trust"
+    | "reviews"
+    | "faq"
+    | "campaign"
+    | "mixed"
+    | null;
+  confidence: "high" | "medium" | "low";
+  scoreSummary: {
+    seo: number;
+    conversion: number;
+    overall: number;
+  };
+  metricSnapshot: {
+    key: string;
+    label: string;
+    score: number | null;
+    status: string;
+    evidence: string[];
+  }[];
+  topSignals: {
+    key: string;
+    label: string;
+    detail: string;
+    tone: "positive" | "warning" | "neutral";
+    source: "metric" | "market" | "benchmark" | "learning" | "coverage";
+    weight: number;
+    relatedFields: string[];
+  }[];
+  benchmarkSignals: {
+    key: string;
+    label: string;
+    detail: string;
+    tone: "positive" | "warning" | "neutral";
+    source: "metric" | "market" | "benchmark" | "learning" | "coverage";
+    weight: number;
+    relatedFields: string[];
+  }[];
+  learningSignals: string[];
+  recommendedFocus: string[];
+  blockedByData: string[];
+  decisionFlow: {
+    key: string;
+    title: string;
+    detail: string;
+    status: "selected" | "considered" | "limited";
+  }[];
+} | null;
+
 type ExtractedDataSummary = {
   title?: string;
   meta_description?: string;
@@ -184,6 +242,7 @@ export type AnalysisResult = {
   coverage?: AnalysisCoverageSummary;
   missingDataReport?: MissingDataReportSummary;
   learningStatus?: LearningStatusSummary;
+  analysisTrace?: AnalysisTraceSummary;
   access?: ReportAccessState;
   teaserSections?: {
     key: string;
@@ -216,6 +275,7 @@ export type SavedReport = {
   dataSource: string | null;
   derivedMetrics?: DerivedMetricsSummary;
   coverage?: AnalysisCoverageSummary;
+  analysisTrace?: AnalysisTraceSummary;
   accessState?: Partial<NonNullable<ReportAccessState>> | null;
   extractedData: ExtractedDataSummary;
   suggestions: {

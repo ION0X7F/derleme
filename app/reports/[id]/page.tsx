@@ -12,6 +12,7 @@ import { formatCoverageFields, getCoverageLabel } from "@/lib/coverage-utils";
 import { getPlanLabel } from "@/lib/plan-label";
 import { getPriceCompetitivenessLabel } from "@/lib/price-competitiveness";
 import { getReadableReportTitle } from "@/lib/report-title";
+import { getWorkspaceNav } from "@/lib/workspace-nav";
 import { AnalysisResult, SavedReport } from "@/types";
 
 function getReportTitle(report: SavedReport) {
@@ -60,6 +61,7 @@ function shapeAnalysisResult(report: SavedReport): AnalysisResult {
     dataSource: report.dataSource,
     derivedMetrics: report.derivedMetrics ?? null,
     coverage: report.coverage ?? null,
+    analysisTrace: report.analysisTrace ?? null,
     access,
     extractedData: report.extractedData,
     suggestions: report.suggestions ?? [],
@@ -108,15 +110,11 @@ export default function ReportDetailPage() {
 
   return (
     <AppChrome
-      currentPath={`/reports/${id}`}
+      currentPath={`/report/${id}`}
       eyebrow="Kaydedilmis rapor"
       title={reportTitle}
       description="Kaydedilen AI analizini premium karar paneli icinde tekrar ac, incele ve export akisina gec."
-      navItems={[
-        { href: "/dashboard", label: "Dashboard" },
-        { href: "/analyze", label: "Yeni Analiz" },
-        { href: `/reports/${id}`, label: "Rapor" },
-      ]}
+      navItems={getWorkspaceNav({ reportId: id })}
       headerMeta={
         <>
           {accessPlan && <span className="hero-point">{accessPlan}</span>}
@@ -134,11 +132,11 @@ export default function ReportDetailPage() {
             Yeni Analiz
           </Link>
           {report && !isExportLocked ? (
-            <Link href={`/reports/${report.id}/export`} className="btn btn-primary">
+            <Link href={`/report/${report.id}/export`} className="btn btn-primary">
               PDF / Yazdir
             </Link>
           ) : (
-            <Link href="/fiyatlandirma" className="btn btn-primary">
+            <Link href="/pricing" className="btn btn-primary">
               Premium Ac
             </Link>
           )}

@@ -2,8 +2,15 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import {
+  getEffectivePlanCodeFromRecord,
+  getUserMembershipSnapshot,
+} from "@/lib/user-membership";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   session: {
     strategy: "jwt",
   },
@@ -22,6 +29,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const password = String(credentials?.password || "");
 
         if (!email || !password) return null;
+        if (email.length > 160 || password.length > 128) return null;
+        if (!EMAIL_PATTERN.test(email)) return null;
 
         const user = await prisma.user.findUnique({
           where: { email },
@@ -44,7 +53,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           name: user.name,
           email: user.email,
           role: user.role,
-          plan: user.subscription?.plan?.code ?? "FREE",
+          plan: getEffectivePlanCodeFromRecord(user),
         };
       },
     }),
@@ -55,7 +64,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id = user.id;
         token.role = (user as { role?: string }).role ?? "USER";
         token.plan = (user as { plan?: string }).plan ?? "FREE";
+        return token;
       }
+
+      if (token.id) {
+        const membership = await getUserMembershipSnapshot(String(token.id));
+
+        if (membership) {
+          token.role = membership.role;
+          token.plan = membership.planCode;
+        } else {
+          token.role = "USER";
+          token.plan = "FREE";
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {

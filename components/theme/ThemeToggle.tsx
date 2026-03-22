@@ -13,10 +13,10 @@ function applyTheme(theme: ThemeMode) {
 export default function ThemeToggle() {
   const [theme, setTheme] = useState<ThemeMode>(() => {
     if (typeof document === "undefined") {
-      return "dark";
+      return "light";
     }
 
-    return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+    return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
   });
 
   const nextTheme: ThemeMode = theme === "dark" ? "light" : "dark";

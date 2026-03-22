@@ -1,4 +1,5 @@
 import type { CheerioAPI } from "cheerio";
+import type { AnyNode } from "domhandler";
 import type { PlatformExtractor } from "@/lib/extractors/types";
 
 function cleanText(value: string | undefined | null) {
@@ -435,7 +436,7 @@ function extractModelCodeFromTables($: CheerioAPI) {
       normalizeModelCode(
         cleanText(
           $('[class*="spec"], [class*="attribute"], [class*="detail"]')
-            .filter((_: number, el: unknown) => {
+            .filter((_: number, el: AnyNode) => {
               const text = cleanText($(el).text()) || "";
               return text.toLowerCase().includes(label.toLowerCase());
             })

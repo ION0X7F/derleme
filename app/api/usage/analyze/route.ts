@@ -1,29 +1,25 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { getPlanDisplayName } from "@/lib/plans";
 import { checkAnalyzeLimit } from "@/lib/check-analyze-limit";
 import { getOrCreateGuestId } from "@/lib/guest";
+import { getUserMembershipSnapshot } from "@/lib/user-membership";
 import { getNextMonthlyRenewalDate } from "@/lib/usage";
 import { getUsageStatus } from "@/lib/usage-status";
-
-function getPlanLabel(plan: string | undefined, type: "user" | "guest") {
-  if (type === "guest") return "Guest";
-  if (plan === "PREMIUM") return "Pro";
-  return "Free";
-}
 
 export async function GET() {
   try {
     const session = await auth();
 
     if (session?.user?.id) {
+      const membership = await getUserMembershipSnapshot(session.user.id);
       const result = await checkAnalyzeLimit({
         type: "user",
         userId: session.user.id,
       });
-      const planLabel = getPlanLabel(
-        "plan" in session.user ? String(session.user.plan) : undefined,
-        "user"
-      );
+      const planLabel = membership?.planId
+        ? getPlanDisplayName(membership.planId)
+        : "Ucretsiz";
 
       return NextResponse.json({
         type: "user",
@@ -33,6 +29,7 @@ export async function GET() {
           ...result,
           type: "user",
           planLabel,
+          planId: membership?.planId ?? "FREE",
         }),
         ...result,
       });
@@ -46,7 +43,7 @@ export async function GET() {
 
     return NextResponse.json({
       type: "guest",
-      planLabel: getPlanLabel(undefined, "guest"),
+      planLabel: "Guest",
       renewalDate: getNextMonthlyRenewalDate().toISOString(),
       usageStatus: getUsageStatus({
         ...result,

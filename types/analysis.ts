@@ -323,6 +323,72 @@ export type LearningContext = {
   systemLearning: string | null;
 };
 
+export type AnalysisTraceTheme =
+  | "stock"
+  | "price"
+  | "delivery"
+  | "content"
+  | "visual"
+  | "trust"
+  | "reviews"
+  | "faq"
+  | "campaign"
+  | "mixed";
+
+export type AnalysisTraceSignalTone = "positive" | "warning" | "neutral";
+
+export type AnalysisTraceSignalSource =
+  | "metric"
+  | "market"
+  | "benchmark"
+  | "learning"
+  | "coverage";
+
+export type AnalysisTraceSignal = {
+  key: string;
+  label: string;
+  detail: string;
+  tone: AnalysisTraceSignalTone;
+  source: AnalysisTraceSignalSource;
+  weight: number;
+  relatedFields: string[];
+};
+
+export type AnalysisTraceStep = {
+  key: string;
+  title: string;
+  detail: string;
+  status: "selected" | "considered" | "limited";
+};
+
+export type AnalysisTraceMetricSnapshot = {
+  key: keyof DerivedMetrics;
+  label: string;
+  score: number | null;
+  status: DerivedMetricLabel;
+  evidence: string[];
+};
+
+export type AnalysisTrace = {
+  version: number;
+  mode: "deterministic" | "ai_enriched";
+  primaryDiagnosis: string | null;
+  primaryTheme: AnalysisTraceTheme | null;
+  confidence: "high" | "medium" | "low";
+  scoreSummary: {
+    seo: number;
+    conversion: number;
+    overall: number;
+  };
+  metricSnapshot: AnalysisTraceMetricSnapshot[];
+  topSignals: AnalysisTraceSignal[];
+  benchmarkSignals: AnalysisTraceSignal[];
+  learningSignals: string[];
+  recommendedFocus: string[];
+  blockedByData: string[];
+  decisionFlow: AnalysisTraceStep[];
+};
+
 export type AnalysisSectionLock =
   | "advancedOfferAnalysis"
   | "competitorAnalysis"
@@ -355,6 +421,7 @@ export type BuildAnalysisResult = {
   weaknesses: string[];
   suggestions: AnalysisSuggestion[];
   priorityActions: PriorityAction[];
+  analysisTrace: AnalysisTrace | null;
 
   priceCompetitiveness: string | null;
   dataSource: string;

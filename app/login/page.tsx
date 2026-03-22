@@ -33,22 +33,26 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    const callbackUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/dashboard`
+        : "/dashboard";
 
     const result = await signIn("credentials", {
-      email,
+      email: email.trim().toLowerCase(),
       password,
       redirect: false,
-      callbackUrl: "/dashboard",
+      callbackUrl,
     });
 
     setLoading(false);
 
-    if (result?.error) {
+    if (result?.error || result?.ok === false) {
       setError("Email veya sifre hatali.");
       return;
     }
 
-    window.location.href = "/dashboard";
+    window.location.href = callbackUrl;
   }
 
   return (

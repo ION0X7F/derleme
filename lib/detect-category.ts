@@ -1,44 +1,60 @@
 type Params = {
-  title?: string;
-  h1?: string;
+  title?: string | null;
+  h1?: string | null;
+  brand?: string | null;
+  product_name?: string | null;
   url: string;
 };
 
-export function detectCategory({ title, h1, url }: Params): string {
-  const text = `${title || ""} ${h1 || ""} ${url}`.toLowerCase();
+function normalizeText(value: string) {
+  return value
+    .toLocaleLowerCase("tr-TR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+export function detectCategory({
+  title,
+  h1,
+  brand,
+  product_name,
+  url,
+}: Params): string {
+  const text = normalizeText(
+    `${title || ""} ${h1 || ""} ${brand || ""} ${product_name || ""} ${url}`
+  );
 
   if (
-    text.includes("ayakkabı") ||
+    text.includes("ayakkabi") ||
     text.includes("sneaker") ||
+    text.includes("bot") ||
     text.includes("terlik") ||
-    text.includes("bot")
+    text.includes("cizme")
   ) {
-    return "Ayakkabı";
+    return "Ayakkabi";
   }
 
   if (
-    text.includes("tişört") ||
-    text.includes("gömlek") ||
+    text.includes("tisort") ||
+    text.includes("gomlek") ||
     text.includes("pantolon") ||
     text.includes("ceket") ||
-    text.includes("elbise")
+    text.includes("elbise") ||
+    text.includes("mont")
   ) {
     return "Giyim";
   }
 
-  if (
-    text.includes("kitap") ||
-    text.includes("roman") ||
-    text.includes("yazar")
-  ) {
+  if (text.includes("kitap") || text.includes("roman") || text.includes("yazar")) {
     return "Kitap";
   }
 
   if (
     text.includes("telefon") ||
-    text.includes("kulaklık") ||
+    text.includes("kulaklik") ||
     text.includes("tablet") ||
-    text.includes("laptop")
+    text.includes("laptop") ||
+    text.includes("bilgisayar")
   ) {
     return "Elektronik";
   }

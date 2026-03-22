@@ -1,3 +1,5 @@
+import { getSuggestedUpgradeCopy, type AppPlanId } from "@/lib/plans";
+
 type UsageStatusParams = {
   used: number;
   limit: number;
@@ -5,6 +7,7 @@ type UsageStatusParams = {
   allowed: boolean;
   type?: "user" | "guest";
   planLabel?: string;
+  planId?: AppPlanId | null;
 };
 
 export type UsageStatus = {
@@ -23,8 +26,10 @@ export function getUsageStatus({
   allowed,
   type,
   planLabel,
+  planId,
 }: UsageStatusParams): UsageStatus {
   const percent = limit > 0 ? Math.min(Math.round((used / limit) * 100), 100) : 0;
+  const suggestedUpgrade = getSuggestedUpgradeCopy(planId);
 
   if (!allowed || remaining <= 0) {
     return {
@@ -36,9 +41,7 @@ export function getUsageStatus({
       upgradeMessage:
         type === "guest"
           ? "Giris yaparak daha fazla Trendyol raporu acabilirsin."
-          : planLabel === "Pro"
-            ? null
-            : "Pro pakete gecerek aylik limiti ve premium rapor derinligini artirabilirsin.",
+          : suggestedUpgrade?.note ?? (planLabel === "Pro" ? null : "Ust pakete gecerek aylik limiti ve premium rapor derinligini artirabilirsin."),
     };
   }
 
@@ -52,9 +55,7 @@ export function getUsageStatus({
       upgradeMessage:
         type === "guest"
           ? "Free uyelik ile daha fazla rapor ve kayit gecmisi acilir."
-          : planLabel === "Pro"
-            ? null
-            : "Pro pakete gecerek limit stresi olmadan daha fazla Trendyol analizi yapabilirsin.",
+          : suggestedUpgrade?.note ?? (planLabel === "Pro" ? null : "Ust pakete gecerek limit stresi olmadan daha fazla Trendyol analizi yapabilirsin."),
     };
   }
 
@@ -67,8 +68,6 @@ export function getUsageStatus({
     upgradeMessage:
       type === "guest"
         ? "Giris yaparsan daha uzun rapor gecmisi ve daha fazla analiz hakkina ulasirsin."
-        : planLabel === "Pro"
-          ? null
-          : "Pro pakette daha derin AI raporu, export ve daha yuksek aylik limit acilir.",
+        : suggestedUpgrade?.note ?? (planLabel === "Pro" ? null : "Ust pakette daha derin AI raporu, export ve daha yuksek aylik limit acilir."),
   };
 }

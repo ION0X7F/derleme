@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { parseAnalysisSummary } from "@/lib/analysis-summary";
 import type {
   CategoryBenchmarkSnapshot,
   ExtractedProductFields,
@@ -8,6 +9,19 @@ import type {
   LearnedRuleSnapshot,
   MissingDataReport,
 } from "@/types/analysis";
+
+type LearningMemoryRecord = Awaited<
+  ReturnType<typeof prisma.learningMemory.findMany>
+>[number];
+
+type RuleCandidate = {
+  ruleKey: string;
+  title: string;
+  insight: string;
+  confidence: number;
+  supportCount: number;
+  metadata: Prisma.InputJsonValue;
+};
 
 function round(value: number | null | undefined, digits = 2) {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
@@ -42,6 +56,26 @@ function toSafeCategory(value: string | null | undefined) {
   return cleanText(value) || "General";
 }
 
+function humanizeCategoryLabel(value: string | null | undefined) {
+  const cleaned = cleanText(value);
+
+  if (!cleaned) {
+    return "genel";
+  }
+
+  const normalized = cleaned.replace(/^__TEST[_-]*/i, "").replace(/_/g, " ").trim();
+
+  if (!normalized) {
+    return "genel";
+  }
+
+  if (normalized.toLocaleLowerCase("tr-TR") === "general") {
+    return "genel";
+  }
+
+  return normalized;
+}
+
 function toSafePlatform(value: string | null | undefined) {
   return cleanText(value) || "trendyol";
 }
@@ -52,22 +86,6 @@ function getPriceBand(price: number | null | undefined) {
   if (price < 1500) return "mid";
   if (price < 4000) return "premium";
   return "high";
-}
-
-function parseCriticalDiagnosis(summary: string | null | undefined) {
-  const text = summary?.replace(/\r/g, "").trim();
-  if (!text) return null;
-  const match = text.match(
-    /\[KRITIK TESHIS\]:\s*([\s\S]*?)(?=\n\[VERI CARPISTIRMA\]:|\n\[STRATEJIK RECETE\]:|\n\[SISTEM OGRENISI\]:|$)/i
-  );
-  return cleanText(match?.[1] || null);
-}
-
-function parseSystemLearning(summary: string | null | undefined) {
-  const text = summary?.replace(/\r/g, "").trim();
-  if (!text) return null;
-  const match = text.match(/\[SISTEM OGRENISI\]:\s*([\s\S]*?)$/i);
-  return cleanText(match?.[1] || null);
 }
 
 function inferOutcomeLabel(params: {
@@ -146,101 +164,12 @@ function mapBenchmarkRecord(
   };
 }
 
-function buildSystemLearning(params: {
-  extracted: ExtractedProductFields;
-  benchmark: CategoryBenchmarkSnapshot | null;
-  rules: LearnedRuleSnapshot[];
-}) {
-  const { extracted, benchmark, rules } = params;
-
-  if (!benchmark || benchmark.sampleSize < 5) {
-    return "Bu kategoride yeterli tarihsel veri henuz birikmedigi icin sistem benchmark setini buyutuyor.";
-  }
-
-  const insights: string[] = [];
-
-  if (
-    typeof extracted.shipping_days === "number" &&
-    typeof benchmark.avgShippingDays === "number"
-  ) {
-    if (extracted.shipping_days > benchmark.avgShippingDays * 1.4) {
-      insights.push(
-        `${benchmark.category} kategorisinde ortalama teslimat ${benchmark.avgShippingDays} gun civarindayken mevcut urun ${extracted.shipping_days} gun ile belirgin sekilde yavas kaliyor.`
-      );
-    } else if (
-      typeof benchmark.successfulAvgShippingDays === "number" &&
-      extracted.shipping_days <= benchmark.successfulAvgShippingDays
-    ) {
-      insights.push(
-        `Teslimat hizi bu kategoride basarili urun bandina yakin duruyor.`
-      );
-    }
-  }
-
-  if (
-    typeof extracted.image_count === "number" &&
-    typeof benchmark.avgImageCount === "number"
-  ) {
-    if (extracted.image_count < benchmark.avgImageCount * 0.7) {
-      insights.push(
-        `Gorsel cesitliligi kategori ortalamasinin gerisinde; lider urunler ortalama ${benchmark.avgImageCount} gorsel kullanirken mevcut urun ${extracted.image_count} gorselde kaliyor.`
-      );
-    } else if (
-      typeof benchmark.successfulAvgImageCount === "number" &&
-      extracted.image_count >= benchmark.successfulAvgImageCount
-    ) {
-      insights.push("Gorsel cesitliligi basarili urun seviyesine yaklasiyor.");
-    }
-  }
-
-  if (
-    typeof extracted.normalized_price === "number" &&
-    typeof benchmark.avgPrice === "number" &&
-    extracted.normalized_price > benchmark.avgPrice * 1.15 &&
-    (extracted.official_seller || (extracted.seller_score ?? 0) >= 8.8)
-  ) {
-    insights.push(
-      "Bu kategoride guclu guven sinyali olan urunler fiyat primini daha rahat tasiyabiliyor."
-    );
-  }
-
-  const topRule = rules[0];
-  if (topRule && topRule.confidence >= 0.55) {
-    insights.push(topRule.insight);
-  }
-
-  if (insights.length === 0) {
-    return `Bu kategoride son ${benchmark.sampleSize} incelemeye gore belirgin bir baskin kural cikmadi; sistem daha cok veri biriktiriyor.`;
-  }
-
-  return `Bu kategoride yaptigim son incelemelere dayanarak; ${insights
-    .slice(0, 2)
-    .join(" ")}`.trim();
-}
-
-async function rebuildCategoryKnowledge(platform: string, category: string) {
-  const memories = await prisma.learningMemory.findMany({
-    where: {
-      platform,
-      category,
-      sourceType: "real",
-      learningEligible: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: 150,
-  });
-
-  if (memories.length === 0) {
-    return;
-  }
-
+function buildBenchmarkPayloadFromMemories(memories: LearningMemoryRecord[]) {
   const successful = memories.filter((item) =>
     item.outcomeLabel === "leader" || item.outcomeLabel === "strong"
   );
 
-  const benchmarkPayload = {
+  return {
     sampleSize: memories.length,
     successfulSampleSize: successful.length,
     avgShippingDays: average(memories.map((item) => item.shippingDays), 1),
@@ -280,30 +209,50 @@ async function rebuildCategoryKnowledge(platform: string, category: string) {
         .slice(0, 5),
     } as Prisma.InputJsonValue,
   };
+}
 
-  await prisma.categoryBenchmark.upsert({
-    where: {
-      platform_category: {
-        platform,
-        category,
-      },
-    },
-    update: benchmarkPayload,
-    create: {
-      platform,
-      category,
-      ...benchmarkPayload,
-    },
-  });
+function mapComputedBenchmark(params: {
+  platform: string;
+  category: string;
+  benchmarkPayload: ReturnType<typeof buildBenchmarkPayloadFromMemories>;
+}): CategoryBenchmarkSnapshot {
+  const { platform, category, benchmarkPayload } = params;
 
-  const rules: Array<{
-    ruleKey: string;
-    title: string;
-    insight: string;
-    confidence: number;
-    supportCount: number;
-    metadata: Prisma.InputJsonValue;
-  }> = [];
+  return {
+    platform,
+    category,
+    sampleSize: benchmarkPayload.sampleSize,
+    successfulSampleSize: benchmarkPayload.successfulSampleSize,
+    avgShippingDays: benchmarkPayload.avgShippingDays,
+    avgImageCount: benchmarkPayload.avgImageCount,
+    avgDescriptionLength: benchmarkPayload.avgDescriptionLength,
+    avgRatingValue: benchmarkPayload.avgRatingValue,
+    avgSellerScore: benchmarkPayload.avgSellerScore,
+    avgPrice: benchmarkPayload.avgPrice,
+    avgReviewCount: benchmarkPayload.avgReviewCount,
+    avgFavoriteCount: benchmarkPayload.avgFavoriteCount,
+    avgOtherSellersCount: benchmarkPayload.avgOtherSellersCount,
+    fastDeliveryRate: benchmarkPayload.fastDeliveryRate,
+    freeShippingRate: benchmarkPayload.freeShippingRate,
+    hasVideoRate: benchmarkPayload.hasVideoRate,
+    officialSellerRate: benchmarkPayload.officialSellerRate,
+    campaignRate: benchmarkPayload.campaignRate,
+    bestSellerRate: benchmarkPayload.bestSellerRate,
+    successfulAvgShippingDays: benchmarkPayload.successfulAvgShippingDays,
+    successfulAvgImageCount: benchmarkPayload.successfulAvgImageCount,
+    successfulAvgRatingValue: benchmarkPayload.successfulAvgRatingValue,
+    successfulAvgSellerScore: benchmarkPayload.successfulAvgSellerScore,
+    successfulAvgPrice: benchmarkPayload.successfulAvgPrice,
+    successfulFastDeliveryRate: benchmarkPayload.successfulFastDeliveryRate,
+    successfulVideoRate: benchmarkPayload.successfulVideoRate,
+    successfulOfficialSellerRate: benchmarkPayload.successfulOfficialSellerRate,
+  };
+}
+
+function buildRuleCandidatesFromBenchmark(
+  benchmarkPayload: ReturnType<typeof buildBenchmarkPayloadFromMemories>
+) {
+  const rules: RuleCandidate[] = [];
 
   if (
     benchmarkPayload.successfulSampleSize >= 4 &&
@@ -385,6 +334,117 @@ async function rebuildCategoryKnowledge(platform: string, category: string) {
     });
   }
 
+  return rules;
+}
+
+function buildSystemLearning(params: {
+  extracted: ExtractedProductFields;
+  benchmark: CategoryBenchmarkSnapshot | null;
+  rules: LearnedRuleSnapshot[];
+}) {
+  const { extracted, benchmark, rules } = params;
+
+  if (!benchmark || benchmark.sampleSize < 5) {
+    return "Bu kategoride yeterli tarihsel veri henuz birikmedigi icin sistem benchmark setini buyutuyor.";
+  }
+
+  const insights: string[] = [];
+
+  if (
+    typeof extracted.shipping_days === "number" &&
+    typeof benchmark.avgShippingDays === "number"
+  ) {
+    if (extracted.shipping_days > benchmark.avgShippingDays * 1.4) {
+      insights.push(
+        `${humanizeCategoryLabel(benchmark.category)} kategorisinde ortalama teslimat ${benchmark.avgShippingDays} gun civarindayken mevcut urun ${extracted.shipping_days} gun ile belirgin sekilde yavas kaliyor.`
+      );
+    } else if (
+      typeof benchmark.successfulAvgShippingDays === "number" &&
+      extracted.shipping_days <= benchmark.successfulAvgShippingDays
+    ) {
+      insights.push(
+        `Teslimat hizi bu kategoride basarili urun bandina yakin duruyor.`
+      );
+    }
+  }
+
+  if (
+    typeof extracted.image_count === "number" &&
+    typeof benchmark.avgImageCount === "number"
+  ) {
+    if (extracted.image_count < benchmark.avgImageCount * 0.7) {
+      insights.push(
+        `Gorsel cesitliligi kategori ortalamasinin gerisinde; lider urunler ortalama ${benchmark.avgImageCount} gorsel kullanirken mevcut urun ${extracted.image_count} gorselde kaliyor.`
+      );
+    } else if (
+      typeof benchmark.successfulAvgImageCount === "number" &&
+      extracted.image_count >= benchmark.successfulAvgImageCount
+    ) {
+      insights.push("Gorsel cesitliligi basarili urun seviyesine yaklasiyor.");
+    }
+  }
+
+  if (
+    typeof extracted.normalized_price === "number" &&
+    typeof benchmark.avgPrice === "number" &&
+    extracted.normalized_price > benchmark.avgPrice * 1.15 &&
+    (extracted.official_seller || (extracted.seller_score ?? 0) >= 8.8)
+  ) {
+    insights.push(
+      "Bu kategoride guclu guven sinyali olan urunler fiyat primini daha rahat tasiyabiliyor."
+    );
+  }
+
+  const topRule = rules[0];
+  if (topRule && topRule.confidence >= 0.55) {
+    insights.push(topRule.insight);
+  }
+
+  if (insights.length === 0) {
+    return `Bu kategoride son ${benchmark.sampleSize} incelemeye gore belirgin bir baskin kural cikmadi; sistem daha cok veri biriktiriyor.`;
+  }
+
+  return `Bu kategoride yaptigim son incelemelere dayanarak; ${insights
+    .slice(0, 2)
+    .join(" ")}`.trim();
+}
+
+async function rebuildCategoryKnowledge(platform: string, category: string) {
+  const memories = await prisma.learningMemory.findMany({
+    where: {
+      platform,
+      category,
+      sourceType: "real",
+      learningEligible: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 150,
+  });
+
+  if (memories.length === 0) {
+    return;
+  }
+  const benchmarkPayload = buildBenchmarkPayloadFromMemories(memories);
+
+  await prisma.categoryBenchmark.upsert({
+    where: {
+      platform_category: {
+        platform,
+        category,
+      },
+    },
+    update: benchmarkPayload,
+    create: {
+      platform,
+      category,
+      ...benchmarkPayload,
+    },
+  });
+
+  const rules = buildRuleCandidatesFromBenchmark(benchmarkPayload);
+
   for (const rule of rules) {
     await prisma.learnedRule.upsert({
       where: {
@@ -438,7 +498,7 @@ export async function getLearningContext(params: {
         learningEligible: true,
       };
 
-  const [benchmarkRecord, ruleRecords, memoryRecords] = await Promise.all([
+  const [benchmarkRecord, ruleRecords, memoryRecords, knowledgeMemoryRecords] = await Promise.all([
     prisma.categoryBenchmark.findUnique({
       where: {
         platform_category: {
@@ -465,16 +525,49 @@ export async function getLearningContext(params: {
       },
       take: 3,
     }),
+    params.includeSynthetic
+      ? prisma.learningMemory.findMany({
+          where: {
+            ...baseWhere,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 150,
+        })
+      : Promise.resolve([] as LearningMemoryRecord[]),
   ]);
 
-  const benchmark = mapBenchmarkRecord(benchmarkRecord);
-  const rules: LearnedRuleSnapshot[] = ruleRecords.map((item) => ({
+  let benchmark = mapBenchmarkRecord(benchmarkRecord);
+  let rules: LearnedRuleSnapshot[] = ruleRecords.map((item) => ({
     ruleKey: item.ruleKey,
     title: item.title,
     insight: item.insight,
     confidence: item.confidence,
     supportCount: item.supportCount,
   }));
+
+  if (params.includeSynthetic && knowledgeMemoryRecords.length > 0) {
+    const computedBenchmarkPayload = buildBenchmarkPayloadFromMemories(knowledgeMemoryRecords);
+
+    if (!benchmark) {
+      benchmark = mapComputedBenchmark({
+        platform,
+        category,
+        benchmarkPayload: computedBenchmarkPayload,
+      });
+    }
+
+    if (rules.length === 0) {
+      rules = buildRuleCandidatesFromBenchmark(computedBenchmarkPayload).map((item) => ({
+        ruleKey: item.ruleKey,
+        title: item.title,
+        insight: item.insight,
+        confidence: item.confidence,
+        supportCount: item.supportCount,
+      }));
+    }
+  }
   const memorySnippets = memoryRecords
     .map((item) => cleanText(item.criticalDiagnosis) || cleanText(item.summarySnippet))
     .filter((item): item is string => !!item)
@@ -518,6 +611,7 @@ export async function recordLearningArtifacts(params: {
     extracted: params.extracted,
     overallScore: params.overallScore,
   });
+  const parsedSummary = parseAnalysisSummary(params.summary);
 
   await prisma.learningMemory.create({
     data: {
@@ -557,9 +651,9 @@ export async function recordLearningArtifacts(params: {
       hasFreeShipping: params.extracted.has_free_shipping,
       officialSeller: params.extracted.official_seller,
       hasCampaign: params.extracted.has_campaign,
-      criticalDiagnosis: parseCriticalDiagnosis(params.summary),
-      systemLearning: parseSystemLearning(params.summary),
-      summarySnippet: cleanText(params.summary),
+      criticalDiagnosis: cleanText(parsedSummary.criticalDiagnosis),
+      systemLearning: cleanText(parsedSummary.systemLearning),
+      summarySnippet: cleanText(parsedSummary.raw),
       signalSnapshot: buildSignalSnapshot(params.extracted) as Prisma.InputJsonValue,
     },
   });

@@ -2,6 +2,14 @@
 
 import Link from "next/link";
 import { AnalysisResult } from "@/types";
+import {
+  getAccessAwareDataCollisionText,
+  getAccessAwareDiagnosisText,
+  getAccessAwareRecipeItems,
+  shouldHideBlockedByDataNotice,
+  shouldHideCoverageSignalsForAccess,
+} from "@/lib/access-copy";
+import { parseAnalysisSummary } from "@/lib/analysis-summary";
 import { formatCoverageFields } from "@/lib/coverage-utils";
 import { getPlanLabel } from "@/lib/plan-label";
 import { getPriceCompetitivenessLabel } from "@/lib/price-competitiveness";
@@ -59,6 +67,64 @@ type CoverageShape = {
   availableFields?: string[];
   missingFields?: string[];
   confidence?: "high" | "medium" | "low";
+} | null;
+
+type AnalysisTraceShape = {
+  version?: number;
+  mode?: "deterministic" | "ai_enriched";
+  primaryDiagnosis?: string | null;
+  primaryTheme?:
+    | "stock"
+    | "price"
+    | "delivery"
+    | "content"
+    | "visual"
+    | "trust"
+    | "reviews"
+    | "faq"
+    | "campaign"
+    | "mixed"
+    | null;
+  confidence?: "high" | "medium" | "low";
+  scoreSummary?: {
+    seo?: number;
+    conversion?: number;
+    overall?: number;
+  } | null;
+  metricSnapshot?: Array<{
+    key?: string;
+    label?: string;
+    score?: number | null;
+    status?: string;
+    evidence?: string[];
+  }> | null;
+  topSignals?: Array<{
+    key?: string;
+    label?: string;
+    detail?: string;
+    tone?: "positive" | "warning" | "neutral";
+    source?: "metric" | "market" | "benchmark" | "learning" | "coverage";
+    weight?: number;
+    relatedFields?: string[];
+  }> | null;
+  benchmarkSignals?: Array<{
+    key?: string;
+    label?: string;
+    detail?: string;
+    tone?: "positive" | "warning" | "neutral";
+    source?: "metric" | "market" | "benchmark" | "learning" | "coverage";
+    weight?: number;
+    relatedFields?: string[];
+  }> | null;
+  learningSignals?: string[] | null;
+  recommendedFocus?: string[] | null;
+  blockedByData?: string[] | null;
+  decisionFlow?: Array<{
+    key?: string;
+    title?: string;
+    detail?: string;
+    status?: "selected" | "considered" | "limited";
+  }> | null;
 } | null;
 
 type ExtractedDataShape = {
@@ -179,6 +245,46 @@ type QualityCard = {
   detail: string;
   tone: "positive" | "warning" | "neutral";
 };
+
+type ChartBarItem = {
+  label: string;
+  value: number;
+  color: string;
+  hint?: string;
+};
+
+type ChartSegmentItem = {
+  label: string;
+  value: number;
+  color: string;
+  detail: string;
+};
+
+type ChartMarkerItem = {
+  label: string;
+  value: number;
+  color: string;
+  detail: string;
+};
+
+function clampChartValue(value?: number | null) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
+function getChartToneColor(
+  tone: "positive" | "warning" | "neutral" = "neutral"
+) {
+  if (tone === "positive") return "var(--success)";
+  if (tone === "warning") return "var(--danger)";
+  return "var(--warning)";
+}
+
+function getRangeMarkerPosition(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return 50;
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return 50;
+  return ((value - min) / (max - min)) * 100;
+}
 
 function getMetricLabelMeta(label?: string) {
   if (label === "strong") {
@@ -327,6 +433,46 @@ function getCoverageTone(confidence?: "high" | "medium" | "low") {
     border: "rgba(248,113,113,0.22)",
     background: "rgba(248,113,113,0.10)",
   };
+}
+
+function getTraceThemeLabel(
+  theme?:
+    | "stock"
+    | "price"
+    | "delivery"
+    | "content"
+    | "visual"
+    | "trust"
+    | "reviews"
+    | "faq"
+    | "campaign"
+    | "mixed"
+    | null
+) {
+  switch (theme) {
+    case "stock":
+      return "Stok bariyeri";
+    case "price":
+      return "Fiyat baskisi";
+    case "delivery":
+      return "Teslimat bariyeri";
+    case "content":
+      return "Icerik iknasi";
+    case "visual":
+      return "Gorsel vitrin";
+    case "trust":
+      return "Guven bariyeri";
+    case "reviews":
+      return "Yorum surtunmesi";
+    case "faq":
+      return "Soru-cevap bariyeri";
+    case "campaign":
+      return "Kampanya farki";
+    case "mixed":
+      return "Karma tema";
+    default:
+      return "Tema sinirli";
+  }
 }
 
 function formatCurrency(value?: number | null) {
@@ -1047,6 +1193,66 @@ export default function AnalysisResultBox({ result, autoSaved }: Props) {
     : [];
   const lockedSections = access?.lockedSections ?? [];
   const upgradeCopy = getUpgradeCopy(access?.plan);
+  const parsedSummary = parseAnalysisSummary(result.summary);
+  const analysisTrace = (result.analysisTrace || null) as AnalysisTraceShape;
+  const shouldMaskLimitedAccessCopy = shouldHideBlockedByDataNotice({
+    plan: access?.plan,
+    lockedSections,
+    dataCompletenessScore: result.dataCompletenessScore,
+    coverageConfidence: coverage?.confidence ?? analysisTrace?.confidence ?? null,
+  });
+  const summaryDiagnosisText =
+    getAccessAwareDiagnosisText({
+      plan: access?.plan,
+      lockedSections,
+      dataCompletenessScore: result.dataCompletenessScore,
+      coverageConfidence: coverage?.confidence ?? analysisTrace?.confidence ?? null,
+      diagnosis: parsedSummary.criticalDiagnosis,
+      summary: result.summary,
+    }) || "Bu analiz icin henuz ozet metni uretilmedi.";
+  const summaryDataCollisionText = getAccessAwareDataCollisionText({
+    plan: access?.plan,
+    lockedSections,
+    dataCompletenessScore: result.dataCompletenessScore,
+    coverageConfidence: coverage?.confidence ?? analysisTrace?.confidence ?? null,
+    diagnosis: parsedSummary.dataCollision,
+  });
+  const summaryRecipeItems = getAccessAwareRecipeItems({
+    plan: access?.plan,
+    lockedSections,
+    dataCompletenessScore: result.dataCompletenessScore,
+    coverageConfidence: coverage?.confidence ?? analysisTrace?.confidence ?? null,
+    items: parsedSummary.strategicRecipe,
+  });
+  const visibleTopSignals =
+    shouldHideCoverageSignalsForAccess({
+      plan: access?.plan,
+      lockedSections,
+      dataCompletenessScore: result.dataCompletenessScore,
+      coverageConfidence: coverage?.confidence ?? analysisTrace?.confidence ?? null,
+    }) && analysisTrace?.topSignals
+      ? analysisTrace.topSignals.filter((signal) => signal.source !== "coverage")
+      : analysisTrace?.topSignals ?? [];
+  const visibleBenchmarkSignals =
+    shouldHideCoverageSignalsForAccess({
+      plan: access?.plan,
+      lockedSections,
+      dataCompletenessScore: result.dataCompletenessScore,
+      coverageConfidence: coverage?.confidence ?? analysisTrace?.confidence ?? null,
+    }) && analysisTrace?.benchmarkSignals
+      ? analysisTrace.benchmarkSignals.filter(
+          (signal) => signal.source !== "coverage"
+        )
+      : analysisTrace?.benchmarkSignals ?? [];
+  const analysisTraceDiagnosisText =
+    getAccessAwareDiagnosisText({
+      plan: access?.plan,
+      lockedSections,
+      dataCompletenessScore: result.dataCompletenessScore,
+      coverageConfidence: coverage?.confidence ?? analysisTrace?.confidence ?? null,
+      diagnosis: analysisTrace?.primaryDiagnosis,
+      summary: parsedSummary.criticalDiagnosis,
+    }) || "Bu analiz icin acik bir kritik teshis izi bulunamadi.";
 
   const derivedMetricCards = [
     {
@@ -1074,6 +1280,208 @@ export default function AnalysisResultBox({ result, autoSaved }: Props) {
       metric: derivedMetrics?.reviewRisk,
     },
   ].filter((item) => item.metric);
+
+  const scoreChartItems: ChartBarItem[] = [
+    {
+      label: "SEO",
+      value: clampChartValue(result.seoScore),
+      color: "var(--accent)",
+      hint: seoTone.label,
+    },
+    {
+      label: "Donusum",
+      value: clampChartValue(result.conversionScore),
+      color: "var(--brand)",
+      hint: conversionTone.label,
+    },
+    {
+      label: "Veri",
+      value: clampChartValue(result.dataCompletenessScore),
+      color: "var(--warning)",
+      hint: completenessTone.label,
+    },
+    {
+      label: "Genel",
+      value: clampChartValue(result.overallScore),
+      color: "var(--success)",
+      hint: overallTone.label,
+    },
+  ].filter((item) => item.value > 0);
+
+  const metricChartItems: ChartBarItem[] = derivedMetricCards.map((item) => ({
+    label: item.title,
+    value: clampChartValue(item.metric?.score),
+    color: getChartToneColor(getMetricLabelMeta(item.metric?.label).tone),
+    hint: getMetricLabelMeta(item.metric?.label).text,
+  }));
+
+  const ratingBreakdown = extracted.rating_breakdown;
+  const ratingTotal =
+    typeof ratingBreakdown?.total === "number" && ratingBreakdown.total > 0
+      ? ratingBreakdown.total
+      : [
+          ratingBreakdown?.five_star,
+          ratingBreakdown?.four_star,
+          ratingBreakdown?.three_star,
+          ratingBreakdown?.two_star,
+          ratingBreakdown?.one_star,
+        ].reduce<number>((sum, current) => {
+          if (typeof current !== "number" || !Number.isFinite(current)) return sum;
+          return sum + current;
+        }, 0);
+
+  const ratingChartItems: ChartBarItem[] =
+    ratingTotal > 0
+      ? [
+          {
+            label: "5 Yildiz",
+            value: ((ratingBreakdown?.five_star ?? 0) / ratingTotal) * 100,
+            color: "var(--success)",
+            hint: `${ratingBreakdown?.five_star ?? 0} yorum`,
+          },
+          {
+            label: "4 Yildiz",
+            value: ((ratingBreakdown?.four_star ?? 0) / ratingTotal) * 100,
+            color: "var(--accent)",
+            hint: `${ratingBreakdown?.four_star ?? 0} yorum`,
+          },
+          {
+            label: "3 Yildiz",
+            value: ((ratingBreakdown?.three_star ?? 0) / ratingTotal) * 100,
+            color: "var(--warning)",
+            hint: `${ratingBreakdown?.three_star ?? 0} yorum`,
+          },
+          {
+            label: "2 Yildiz",
+            value: ((ratingBreakdown?.two_star ?? 0) / ratingTotal) * 100,
+            color: "var(--brand)",
+            hint: `${ratingBreakdown?.two_star ?? 0} yorum`,
+          },
+          {
+            label: "1 Yildiz",
+            value: ((ratingBreakdown?.one_star ?? 0) / ratingTotal) * 100,
+            color: "var(--danger)",
+            hint: `${ratingBreakdown?.one_star ?? 0} yorum`,
+          },
+        ].filter((item) => item.value > 0)
+      : [];
+
+  const reviewSummary = extracted.review_summary;
+  const reviewMixItems: ChartSegmentItem[] =
+    reviewSummary && reviewSummary.sampled_count > 0
+      ? [
+          {
+            label: "Olumlu",
+            value: reviewSummary.positive_count,
+            color: "var(--success)",
+            detail: `${reviewSummary.positive_count} yorum`,
+          },
+          {
+            label: "Negatif",
+            value: reviewSummary.negative_count,
+            color: "var(--danger)",
+            detail: `${reviewSummary.negative_count} yorum`,
+          },
+          {
+            label: "Diger",
+            value: Math.max(
+              reviewSummary.sampled_count -
+                reviewSummary.positive_count -
+                reviewSummary.negative_count,
+              0
+            ),
+            color: "var(--warning)",
+            detail: "Nötr veya karisik",
+          },
+        ].filter((item) => item.value > 0)
+      : [];
+
+  const actionChartItems: ChartBarItem[] = priorityActions
+    .slice(0, 4)
+    .map((item, index) => {
+      const rank = item.priority ?? index + 1;
+      return {
+        label: `P${rank}`,
+        value: Math.max(32, 100 - (rank - 1) * 18),
+        color:
+          rank === 1
+            ? "var(--brand)"
+            : rank === 2
+              ? "var(--warning)"
+              : "var(--accent)",
+        hint: item.title || `Aksiyon ${index + 1}`,
+      };
+    });
+
+  const competitorMixItems: ChartSegmentItem[] = [
+    {
+      label: "Daha ucuz",
+      value: cheaperCompetitorOffers.length,
+      color: "var(--danger)",
+      detail: `${cheaperCompetitorOffers.length} rakip`,
+    },
+    {
+      label: "Ayni fiyat",
+      value: samePriceCompetitorOffers.length,
+      color: "var(--warning)",
+      detail: `${samePriceCompetitorOffers.length} rakip`,
+    },
+    {
+      label: "Daha pahali",
+      value: moreExpensiveCompetitorOffers.length,
+      color: "var(--success)",
+      detail: `${moreExpensiveCompetitorOffers.length} rakip`,
+    },
+  ].filter((item) => item.value > 0);
+
+  const competitorPriceReferenceValues = [
+    ownNormalizedPrice,
+    extracted.other_sellers_summary?.min_price ?? null,
+    extracted.other_sellers_summary?.avg_price ?? null,
+    extracted.other_sellers_summary?.max_price ?? null,
+  ].filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+
+  const competitorPriceMin = competitorPriceReferenceValues.length
+    ? Math.min(...competitorPriceReferenceValues)
+    : 0;
+  const competitorPriceMax = competitorPriceReferenceValues.length
+    ? Math.max(...competitorPriceReferenceValues)
+    : 0;
+
+  const competitorPriceMarkers = [
+    typeof extracted.other_sellers_summary?.min_price === "number"
+      ? {
+          label: "En dusuk",
+          value: extracted.other_sellers_summary.min_price,
+          color: "var(--success)",
+          detail: formatCurrency(extracted.other_sellers_summary.min_price) || "-",
+        }
+      : null,
+    typeof extracted.other_sellers_summary?.avg_price === "number"
+      ? {
+          label: "Ortalama",
+          value: extracted.other_sellers_summary.avg_price,
+          color: "var(--warning)",
+          detail: formatCurrency(extracted.other_sellers_summary.avg_price) || "-",
+        }
+      : null,
+    typeof ownNormalizedPrice === "number"
+      ? {
+          label: "Sen",
+          value: ownNormalizedPrice,
+          color: "var(--brand)",
+          detail: formatCurrency(ownNormalizedPrice) || "-",
+        }
+      : null,
+    typeof extracted.other_sellers_summary?.max_price === "number"
+      ? {
+          label: "En yuksek",
+          value: extracted.other_sellers_summary.max_price,
+          color: "var(--accent)",
+          detail: formatCurrency(extracted.other_sellers_summary.max_price) || "-",
+        }
+      : null,
+  ].filter((item): item is ChartMarkerItem => item !== null);
 
   const signalItems: SignalItem[] = [
     {
@@ -1449,9 +1857,9 @@ export default function AnalysisResultBox({ result, autoSaved }: Props) {
         .ar-title {
           font-family: var(--font-space-grotesk), sans-serif;
           font-size: 30px;
-          font-weight: 800;
-          line-height: 1.08;
-          letter-spacing: -0.05em;
+          font-weight: 700;
+          line-height: 1.12;
+          letter-spacing: -0.035em;
           color: var(--text);
           margin-bottom: 10px;
         }
@@ -1502,8 +1910,8 @@ export default function AnalysisResultBox({ result, autoSaved }: Props) {
 
         .ar-score-value {
           font-size: 34px;
-          font-weight: 800;
-          letter-spacing: -0.06em;
+          font-weight: 700;
+          letter-spacing: -0.04em;
           margin-bottom: 6px;
         }
 
@@ -1552,7 +1960,8 @@ export default function AnalysisResultBox({ result, autoSaved }: Props) {
         .ar-metric-score,
         .ar-offer-summary-value {
           font-family: var(--font-space-grotesk), sans-serif;
-          font-weight: 800;
+          font-weight: 700;
+          letter-spacing: -0.03em;
           color: var(--text);
         }
 
@@ -1585,6 +1994,150 @@ export default function AnalysisResultBox({ result, autoSaved }: Props) {
           margin-top: 14px;
           padding: 20px;
           border-radius: 22px;
+        }
+
+        .ar-chart-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .ar-chart-card {
+          padding: 18px;
+          border-radius: 20px;
+          border: 1px solid var(--line);
+          background: color-mix(in srgb, var(--surface-soft) 100%, transparent);
+          display: grid;
+          gap: 14px;
+        }
+
+        .ar-chart-card--full {
+          grid-column: 1 / -1;
+        }
+
+        .ar-chart-head {
+          display: grid;
+          gap: 6px;
+        }
+
+        .ar-chart-title {
+          font-size: 15px;
+          font-weight: 800;
+          letter-spacing: -0.02em;
+          color: var(--text);
+        }
+
+        .ar-chart-copy {
+          color: var(--text-muted);
+          font-size: 13px;
+          line-height: 1.7;
+        }
+
+        .ar-chart-list {
+          display: grid;
+          gap: 10px;
+        }
+
+        .ar-chart-row {
+          display: grid;
+          gap: 8px;
+        }
+
+        .ar-chart-row-head,
+        .ar-chart-segment-item,
+        .ar-chart-range-legend {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .ar-chart-row-label,
+        .ar-chart-segment-label,
+        .ar-chart-range-label {
+          color: var(--text-soft);
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .ar-chart-row-meta,
+        .ar-chart-segment-detail,
+        .ar-chart-range-detail {
+          color: var(--text-faint);
+          font-size: 12px;
+        }
+
+        .ar-chart-track,
+        .ar-chart-segment-track {
+          height: 10px;
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--surface-strong) 100%, transparent);
+          overflow: hidden;
+        }
+
+        .ar-chart-fill {
+          height: 100%;
+          border-radius: inherit;
+          min-width: 10px;
+        }
+
+        .ar-chart-segment-track {
+          display: flex;
+          height: 14px;
+        }
+
+        .ar-chart-segment {
+          height: 100%;
+        }
+
+        .ar-chart-segment-list,
+        .ar-chart-range-list {
+          display: grid;
+          gap: 10px;
+        }
+
+        .ar-chart-swatch {
+          width: 10px;
+          height: 10px;
+          border-radius: 999px;
+          flex-shrink: 0;
+        }
+
+        .ar-chart-segment-main,
+        .ar-chart-range-main {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          min-width: 0;
+        }
+
+        .ar-chart-range {
+          position: relative;
+          padding: 6px 2px 0;
+        }
+
+        .ar-chart-range-track {
+          position: relative;
+          height: 6px;
+          border-radius: 999px;
+          background: linear-gradient(
+            90deg,
+            color-mix(in srgb, var(--success) 32%, transparent),
+            color-mix(in srgb, var(--warning) 42%, transparent),
+            color-mix(in srgb, var(--brand) 52%, transparent),
+            color-mix(in srgb, var(--accent) 42%, transparent)
+          );
+        }
+
+        .ar-chart-range-marker {
+          position: absolute;
+          top: -5px;
+          width: 12px;
+          height: 12px;
+          border-radius: 999px;
+          border: 2px solid var(--page-bg-elevated);
+          transform: translateX(-50%);
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--surface-strong) 100%, transparent);
         }
 
         .ar-block-title,
@@ -1877,6 +2430,10 @@ export default function AnalysisResultBox({ result, autoSaved }: Props) {
           .ar-grid {
             grid-template-columns: 1fr;
           }
+
+          .ar-chart-grid {
+            grid-template-columns: 1fr;
+          }
         }
 
         @media (max-width: 760px) {
@@ -1898,7 +2455,8 @@ export default function AnalysisResultBox({ result, autoSaved }: Props) {
           .ar-quality-grid,
           .ar-lock-grid,
           .ar-metric-grid,
-          .ar-offer-summary-grid {
+          .ar-offer-summary-grid,
+          .ar-chart-grid {
             grid-template-columns: 1fr;
           }
         }
@@ -2011,13 +2569,237 @@ export default function AnalysisResultBox({ result, autoSaved }: Props) {
               </div>
             </div>
 
+            {(scoreChartItems.length > 0 ||
+              metricChartItems.length > 0 ||
+              ratingChartItems.length > 0 ||
+              reviewMixItems.length > 0 ||
+              actionChartItems.length > 0) && (
+              <div className="ar-block">
+                <div className="ar-block-title">Grafikli karar ozeti</div>
+                <div className="ar-chart-grid">
+                  {scoreChartItems.length > 0 && (
+                    <div className="ar-chart-card">
+                      <div className="ar-chart-head">
+                        <div className="ar-chart-title">Skor dengesi</div>
+                        <div className="ar-chart-copy">
+                          SEO, donusum, veri ve genel skorun birbirini nasil
+                          besledigini hizli gor.
+                        </div>
+                      </div>
+
+                      <div className="ar-chart-list">
+                        {scoreChartItems.map((item) => (
+                          <div key={item.label} className="ar-chart-row">
+                            <div className="ar-chart-row-head">
+                              <div className="ar-chart-row-label">{item.label}</div>
+                              <div className="ar-chart-row-meta">
+                                {Math.round(item.value)}/100
+                                {item.hint ? ` · ${item.hint}` : ""}
+                              </div>
+                            </div>
+                            <div className="ar-chart-track">
+                              <div
+                                className="ar-chart-fill"
+                                style={{
+                                  width: `${item.value}%`,
+                                  background: item.color,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {metricChartItems.length > 0 && (
+                    <div className="ar-chart-card">
+                      <div className="ar-chart-head">
+                        <div className="ar-chart-title">Karar destek metrikleri</div>
+                        <div className="ar-chart-copy">
+                          Icerik, guven, teklif ve vitrin taraflarinda hangi katmanin
+                          satisi daha cok etkiledigi bu grafikte aciga cikar.
+                        </div>
+                      </div>
+
+                      <div className="ar-chart-list">
+                        {metricChartItems.map((item) => (
+                          <div key={item.label} className="ar-chart-row">
+                            <div className="ar-chart-row-head">
+                              <div className="ar-chart-row-label">{item.label}</div>
+                              <div className="ar-chart-row-meta">
+                                {Math.round(item.value)}/100
+                                {item.hint ? ` · ${item.hint}` : ""}
+                              </div>
+                            </div>
+                            <div className="ar-chart-track">
+                              <div
+                                className="ar-chart-fill"
+                                style={{
+                                  width: `${item.value}%`,
+                                  background: item.color,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(ratingChartItems.length > 0 ||
+                    reviewMixItems.length > 0 ||
+                    actionChartItems.length > 0) && (
+                    <div className="ar-chart-card">
+                      <div className="ar-chart-head">
+                        <div className="ar-chart-title">
+                          {ratingChartItems.length > 0 || reviewMixItems.length > 0
+                            ? "Yorum grafikleri"
+                            : "Aksiyon rotasi"}
+                        </div>
+                        <div className="ar-chart-copy">
+                          {ratingChartItems.length > 0 || reviewMixItems.length > 0
+                            ? "Yildiz dagilimi ve yorum tonu, kullanicinin urunu nasil algiladigini gorsel olarak aciklar."
+                            : "Oncelikli hamleler once hangi aksiyonun gelir etkisi yaratacagini siralar."}
+                        </div>
+                      </div>
+
+                      {ratingChartItems.length > 0 ? (
+                        <div className="ar-chart-list">
+                          {ratingChartItems.map((item) => (
+                            <div key={item.label} className="ar-chart-row">
+                              <div className="ar-chart-row-head">
+                                <div className="ar-chart-row-label">{item.label}</div>
+                                <div className="ar-chart-row-meta">
+                                  %{Math.round(item.value)}
+                                  {item.hint ? ` · ${item.hint}` : ""}
+                                </div>
+                              </div>
+                              <div className="ar-chart-track">
+                                <div
+                                  className="ar-chart-fill"
+                                  style={{
+                                    width: `${item.value}%`,
+                                    background: item.color,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {reviewMixItems.length > 0 ? (
+                        <>
+                          <div className="ar-chart-segment-track">
+                            {reviewMixItems.map((item) => {
+                              const total = reviewMixItems.reduce(
+                                (sum, current) => sum + current.value,
+                                0
+                              );
+
+                              return (
+                                <div
+                                  key={item.label}
+                                  className="ar-chart-segment"
+                                  style={{
+                                    width: `${(item.value / total) * 100}%`,
+                                    background: item.color,
+                                  }}
+                                />
+                              );
+                            })}
+                          </div>
+
+                          <div className="ar-chart-segment-list">
+                            {reviewMixItems.map((item) => (
+                              <div key={item.label} className="ar-chart-segment-item">
+                                <div className="ar-chart-segment-main">
+                                  <span
+                                    className="ar-chart-swatch"
+                                    style={{ background: item.color }}
+                                  />
+                                  <span className="ar-chart-segment-label">
+                                    {item.label}
+                                  </span>
+                                </div>
+                                <div className="ar-chart-segment-detail">
+                                  {item.detail}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      ) : null}
+
+                      {!ratingChartItems.length &&
+                        !reviewMixItems.length &&
+                        actionChartItems.length > 0 && (
+                          <div className="ar-chart-list">
+                            {actionChartItems.map((item) => (
+                              <div key={`${item.label}-${item.hint}`} className="ar-chart-row">
+                                <div className="ar-chart-row-head">
+                                  <div className="ar-chart-row-label">{item.label}</div>
+                                  <div className="ar-chart-row-meta">{item.hint}</div>
+                                </div>
+                                <div className="ar-chart-track">
+                                  <div
+                                    className="ar-chart-fill"
+                                    style={{
+                                      width: `${item.value}%`,
+                                      background: item.color,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="ar-block">
               <div className="ar-block-title">Genel ozet</div>
-              <div className="ar-summary">
-                {result.summary?.trim()
-                  ? result.summary
-                  : "Bu analiz icin henuz ozet metni uretilmedi."}
-              </div>
+              {parsedSummary.hasStructuredSummary || shouldMaskLimitedAccessCopy ? (
+                <div className="ar-quality-grid" style={{ marginBottom: 14 }}>
+                  <div className="ar-quality-card ar-quality-card--warning">
+                    <div className="ar-quality-title">Kritik teshis</div>
+                    <div className="ar-quality-detail">
+                      {summaryDiagnosisText}
+                    </div>
+                  </div>
+                  <div className="ar-quality-card ar-quality-card--neutral">
+                    <div className="ar-quality-title">Veri carpistirma</div>
+                    <div className="ar-quality-detail">
+                      {summaryDataCollisionText ||
+                        "Bu analiz icin ek carpistirma notu uretilmedi."}
+                    </div>
+                  </div>
+                  <div className="ar-quality-card ar-quality-card--positive">
+                    <div className="ar-quality-title">Stratejik recete</div>
+                    <div className="ar-quality-detail">
+                      {summaryRecipeItems.map((item, index) => (
+                        <div key={`${item}-${index}`}>{`${index + 1}. ${item}`}</div>
+                      ))}
+                    </div>
+                  </div>
+                  {parsedSummary.systemLearning && (
+                    <div className="ar-quality-card ar-quality-card--neutral">
+                      <div className="ar-quality-title">Sistem ogrenisi</div>
+                      <div className="ar-quality-detail">
+                        {parsedSummary.systemLearning}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="ar-summary">
+                  {summaryDiagnosisText}
+                </div>
+              )}
               {quickDiagnosis && (
                 <div className="ar-diagnosis">{quickDiagnosis}</div>
               )}
@@ -2041,6 +2823,139 @@ export default function AnalysisResultBox({ result, autoSaved }: Props) {
                 </div>
               )}
             </div>
+
+            {analysisTrace && (
+              <div className="ar-block">
+                <div className="ar-block-title">Karar izi</div>
+                <div className="ar-quality-grid" style={{ marginBottom: 14 }}>
+                  <div className="ar-quality-card ar-quality-card--warning">
+                    <div className="ar-quality-title">Ana tema</div>
+                    <div className="ar-quality-value">
+                      {getTraceThemeLabel(analysisTrace.primaryTheme)}
+                    </div>
+                    <div className="ar-quality-detail">
+                      {analysisTraceDiagnosisText}
+                    </div>
+                  </div>
+
+                  <div className="ar-quality-card ar-quality-card--neutral">
+                    <div className="ar-quality-title">Karar modu</div>
+                    <div className="ar-quality-value">
+                      {analysisTrace.mode === "ai_enriched"
+                        ? "AI destekli"
+                        : "Deterministik"}
+                    </div>
+                    <div className="ar-quality-detail">
+                      Kapsam: {getCoverageTone(analysisTrace.confidence).label}
+                    </div>
+                  </div>
+
+                  <div className="ar-quality-card ar-quality-card--positive">
+                    <div className="ar-quality-title">Odak rotasi</div>
+                    <div className="ar-quality-detail">
+                      {analysisTrace.recommendedFocus?.length
+                        ? analysisTrace.recommendedFocus.map((item, index) => (
+                            <div key={`${item}-${index}`}>{`${index + 1}. ${item}`}</div>
+                          ))
+                        : "Net bir odak rotasi uretilmedi."}
+                    </div>
+                  </div>
+                </div>
+
+                {visibleTopSignals.length ? (
+                  <div className="ar-signals" style={{ marginBottom: 14 }}>
+                    <div className="ar-signal-group">
+                      <div className="ar-signal-group-title">Tetikleyici sinyaller</div>
+                      <div className="ar-signal-group-list">
+                        {visibleTopSignals.map((signal, index) => (
+                          <div
+                            key={`${signal.key || signal.label || "signal"}-${index}`}
+                            className={`ar-signal ar-signal--${signal.tone || "neutral"}`}
+                          >
+                            <div className="ar-signal-label">
+                              {signal.label || "Sinyal"}
+                            </div>
+                            <div className="ar-signal-value">
+                              {signal.detail || "Detay bulunmuyor."}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {(visibleBenchmarkSignals.length ||
+                      analysisTrace.learningSignals?.length) && (
+                      <div className="ar-signal-group">
+                        <div className="ar-signal-group-title">Benchmark ve ogrenim</div>
+                        <div className="ar-signal-group-list">
+                          {visibleBenchmarkSignals.map((signal, index) => (
+                            <div
+                              key={`${signal.key || signal.label || "benchmark"}-${index}`}
+                              className={`ar-signal ar-signal--${signal.tone || "neutral"}`}
+                            >
+                              <div className="ar-signal-label">
+                                {signal.label || "Benchmark"}
+                              </div>
+                              <div className="ar-signal-value">
+                                {signal.detail || "Detay bulunmuyor."}
+                              </div>
+                            </div>
+                          ))}
+                          {analysisTrace.learningSignals?.map((item, index) => (
+                            <div
+                              key={`${item}-${index}`}
+                              className="ar-signal ar-signal--neutral"
+                            >
+                              <div className="ar-signal-label">Ogrenilmis icgoru</div>
+                              <div className="ar-signal-value">{item}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                {analysisTrace.decisionFlow?.length ? (
+                  <div className="ar-list">
+                    {analysisTrace.decisionFlow.map((step, index) => (
+                      <div
+                        key={`${step.key || step.title || "trace-step"}-${index}`}
+                        className={`ar-item ar-item--${
+                          step.status === "selected"
+                            ? "high"
+                            : step.status === "limited"
+                              ? "low"
+                              : "medium"
+                        }`}
+                      >
+                        <div className="ar-item-head">
+                          <div className="ar-item-icon">
+                            {step.status === "selected"
+                              ? "OK"
+                              : step.status === "limited"
+                                ? "!"
+                                : "i"}
+                          </div>
+                          <div className="ar-item-title">
+                            {step.title || `Karar adimi ${index + 1}`}
+                          </div>
+                        </div>
+                        <div className="ar-item-detail">
+                          {step.detail || "Bu adim icin detay bulunmuyor."}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {analysisTrace.blockedByData?.length && !shouldMaskLimitedAccessCopy ? (
+                  <div className="ar-diagnosis" style={{ marginTop: 14 }}>
+                    Eksik veri siniri: {analysisTrace.blockedByData.join(", ")}
+                  </div>
+                ) : null}
+              </div>
+            )}
 
             {coverage?.confidence && (
               <div className="ar-block">
@@ -2124,6 +3039,108 @@ export default function AnalysisResultBox({ result, autoSaved }: Props) {
                 >
                   {competitorHeadline}
                 </div>
+
+                {(competitorMixItems.length > 0 ||
+                  competitorPriceMarkers.length > 1) && (
+                  <div className="ar-chart-grid" style={{ marginBottom: 14 }}>
+                    {competitorMixItems.length > 0 && (
+                      <div className="ar-chart-card">
+                        <div className="ar-chart-head">
+                          <div className="ar-chart-title">Rakip fiyat dagilimi</div>
+                          <div className="ar-chart-copy">
+                            Fiyat konumun rakiplere gore hangi tarafta kaldigini
+                            bu dagilim hemen gosterir.
+                          </div>
+                        </div>
+
+                        <div className="ar-chart-segment-track">
+                          {competitorMixItems.map((item) => {
+                            const total = competitorMixItems.reduce(
+                              (sum, current) => sum + current.value,
+                              0
+                            );
+
+                            return (
+                              <div
+                                key={item.label}
+                                className="ar-chart-segment"
+                                style={{
+                                  width: `${(item.value / total) * 100}%`,
+                                  background: item.color,
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+
+                        <div className="ar-chart-segment-list">
+                          {competitorMixItems.map((item) => (
+                            <div key={item.label} className="ar-chart-segment-item">
+                              <div className="ar-chart-segment-main">
+                                <span
+                                  className="ar-chart-swatch"
+                                  style={{ background: item.color }}
+                                />
+                                <span className="ar-chart-segment-label">
+                                  {item.label}
+                                </span>
+                              </div>
+                              <div className="ar-chart-segment-detail">
+                                {item.detail}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {competitorPriceMarkers.length > 1 && (
+                      <div className="ar-chart-card">
+                        <div className="ar-chart-head">
+                          <div className="ar-chart-title">Fiyat konumu</div>
+                          <div className="ar-chart-copy">
+                            Kendi teklifin, gorunen en dusuk ve ortalama rakip fiyatla
+                            birlikte ayni eksende konumlanir.
+                          </div>
+                        </div>
+
+                        <div className="ar-chart-range">
+                          <div className="ar-chart-range-track">
+                            {competitorPriceMarkers.map((item) => (
+                              <div
+                                key={`${item.label}-${item.value}`}
+                                className="ar-chart-range-marker"
+                                style={{
+                                  left: `${getRangeMarkerPosition(
+                                    item.value,
+                                    competitorPriceMin,
+                                    competitorPriceMax
+                                  )}%`,
+                                  background: item.color,
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="ar-chart-range-list">
+                          {competitorPriceMarkers.map((item) => (
+                            <div key={`${item.label}-${item.value}`} className="ar-chart-range-legend">
+                              <div className="ar-chart-range-main">
+                                <span
+                                  className="ar-chart-swatch"
+                                  style={{ background: item.color }}
+                                />
+                                <span className="ar-chart-range-label">{item.label}</span>
+                              </div>
+                              <div className="ar-chart-range-detail">{item.detail}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {extracted.other_sellers_summary && (
                   <div className="ar-offer-summary-grid">
