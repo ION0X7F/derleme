@@ -146,9 +146,9 @@ export function sanitizeStoredReportForAccess<T extends StoredReportLike>(report
 
   if (plan === "free" && isObject(report.derivedMetrics)) {
     nextReport.derivedMetrics = {
-      contentQuality: report.derivedMetrics.contentQuality,
-      trustStrength: report.derivedMetrics.trustStrength,
-      decisionClarity: report.derivedMetrics.decisionClarity,
+      productQuality: report.derivedMetrics.productQuality,
+      sellerTrust: report.derivedMetrics.sellerTrust,
+      marketPosition: report.derivedMetrics.marketPosition,
     };
   }
 

@@ -1,5 +1,6 @@
 import type {
   ExtractedProductFields,
+  ExtractedFieldMetadata,
   LearningStatus,
   MissingDataReport,
   MissingFieldReason,
@@ -1199,5 +1200,71 @@ export function completeMissingFields(params: CompleteMissingFieldsParams) {
       unresolvedCriticalFields: after.criticalMissingFields,
       unresolvedReasons,
     } satisfies MissingDataReport,
+  };
+}
+
+/**
+ * Extended version: completeMissingFields + field metadata tracking.
+ * Phase 1: Augments missing data report with per-field source/derivation info.
+ * @internal Used by build-analysis.ts in new pipeline
+ */
+export function completeMissingFieldsWithMetadata(
+  params: CompleteMissingFieldsParams,
+  baseMetadata: Record<string, ExtractedFieldMetadata>
+): {
+  extracted: ExtractedProductFields;
+  report: MissingDataReport;
+  fieldMetadata: Record<string, ExtractedFieldMetadata>;
+} {
+  const result = completeMissingFields(params);
+  const fieldMetadata = { ...baseMetadata };
+
+  // Update metadata for filled/derived fields
+  for (const filledField of result.report.filledFields) {
+    const rule = result.report.appliedRules.find((r) => r.startsWith(filledField + " <-"));
+    if (rule) {
+      // Extract reason from appliedRule (format: "field <- reason")
+      const reason = rule.substring(filledField.length + 4);
+      const isApiDerived = reason.includes("trendyol api");
+
+      fieldMetadata[filledField] = {
+        source: isApiDerived ? "api" : "derived",
+        confidence: isApiDerived ? "high" : "medium",
+        reason,
+        timestamp: Date.now(),
+      };
+    }
+  }
+
+  // Update metadata for strengthened fields
+  for (const strengthenedField of result.report.strengthenedFields) {
+    const rule = result.report.appliedRules.find((r) => r.startsWith(strengthenedField + " <-"));
+    if (rule) {
+      const reason = rule.substring(strengthenedField.length + 4);
+      fieldMetadata[strengthenedField] = {
+        source: reason.includes("trendyol") ? "api" : "derived",
+        confidence: "medium",
+        reason,
+        timestamp: Date.now(),
+      };
+    }
+  }
+
+  // Mark still-unresolved critical fields as blocked
+  for (const blockedField of result.report.unresolvedCriticalFields) {
+    if (!fieldMetadata[blockedField]) {
+      fieldMetadata[blockedField] = {
+        source: "null",
+        confidence: "low",
+        reason: "unresolved critical field",
+        timestamp: Date.now(),
+      };
+    }
+  }
+
+  return {
+    extracted: result.extracted,
+    report: result.report,
+    fieldMetadata,
   };
 }

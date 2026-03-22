@@ -3,6 +3,7 @@ import type {
   AccessPlan,
   AnalysisSuggestion,
   BuildAnalysisResult,
+  ConsolidatedAnalysisInput,
   DecisionSupportPacket,
   DerivedMetric,
   DerivedMetrics,
@@ -10,9 +11,22 @@ import type {
   PriorityAction,
 } from "@/types/analysis";
 
+const SCORING_CONFIG = {
+  thresholds: {
+    strong: 75,
+    medium: 45,
+  },
+  weights: {
+    seo: 0.35,
+    completeness: 0.35,
+    conversion: 0.3,
+  },
+} as const;
+
 type BuildAnalysisParams = {
   platform: string | null;
   url: string;
+  consolidatedInput: ConsolidatedAnalysisInput;
   extracted: ExtractedProductFields;
   planContext?: AccessPlan;
 };
@@ -187,30 +201,32 @@ function getLowRatedSampleRatio(extracted: ExtractedProductFields) {
   );
 }
 
-function getReviewRiskSummary(extracted: ExtractedProductFields) {
+function getReviewRiskSummary(extracted: ExtractedProductFields): string | null {
   const themes = extractReviewThemes(extracted);
   const lowRatedRatio = getLowRatedSampleRatio(extracted);
 
   if (!themes && lowRatedRatio == null) return null;
 
-  if (
-    lowRatedRatio != null &&
-    lowRatedRatio >= 0.5 &&
-    themes?.negative?.length
-  ) {
-    return `Yorum riski yuksek: dusuk yildizli ornekler agirlikta ve su temalar tekrar ediyor: ${themes.negative.join(", ")}.`;
+  if (lowRatedRatio != null && lowRatedRatio >= 0.5 && themes?.negative?.length) {
+    return `Yüksek yorum riski: Hem düşük puanlı yorumların oranı yüksek hem de yorumlarda tekrar eden şikayetler (${themes.negative.join(
+      ", "
+    )}) mevcut.`;
   }
 
   if (lowRatedRatio != null && lowRatedRatio >= 0.4) {
-    return "Yorum riski orta-yuksek: dusuk yildizli ornekler belirgin gorunuyor.";
+    return "Yorum riski: Düşük puanlı yorumların yoğunluğu, müşteri memnuniyetinde bir soruna işaret ediyor olabilir.";
   }
 
   if (themes?.negative?.length) {
-    return `Yorumlarda dikkat ceken sikayet temalari var: ${themes.negative.join(", ")}.`;
+    return `Tekrarlayan şikayetler: Yorumlarda ${themes.negative.join(
+      ", "
+    )} gibi konulara odaklanan olumsuz geri bildirimler var.`;
   }
 
   if (themes?.positive?.length) {
-    return `Yorumlarda olumlu sinyaller baskin: ${themes.positive.join(", ")}.`;
+    return `Olumlu sinyaller: Yorumlarda ${themes.positive.join(
+      ", "
+    )} gibi konularda memnuniyet öne çıkıyor.`;
   }
 
   return null;
@@ -260,13 +276,13 @@ function hasStrongCompetitorDelivery(extracted: ExtractedProductFields) {
 function formatDeliveryType(value: string | null | undefined) {
   switch (value) {
     case "same_day":
-      return "Ayni gun kargo";
+      return "Aynı Gün Teslimat";
     case "next_day":
-      return "Ertesi gun kargo";
+      return "Ertesi Gün Teslimat";
     case "fast_delivery":
-      return "Hizli teslimat";
+      return "Hızlı Teslimat";
     case "standard":
-      return "Standart teslimat";
+      return "Standart Teslimat";
     default:
       return value;
   }
@@ -274,8 +290,8 @@ function formatDeliveryType(value: string | null | undefined) {
 
 function metricLabel(score: number | null): DerivedMetric["label"] {
   if (score == null) return "not_enough_data";
-  if (score >= 75) return "strong";
-  if (score >= 45) return "medium";
+  if (score >= SCORING_CONFIG.thresholds.strong) return "strong";
+  if (score >= SCORING_CONFIG.thresholds.medium) return "medium";
   return "weak";
 }
 
@@ -287,37 +303,68 @@ function buildMetric(score: number | null, evidence: string[]): DerivedMetric {
   };
 }
 
-function getCompletenessScore(extracted: ExtractedProductFields) {
+function getCompletenessScore(input: ConsolidatedAnalysisInput) {
   let score = 0;
+  const extracted = input._raw; // for fields not yet in ConsolidatedAnalysisInput
 
-  if (hasText(extracted.title)) score += 8;
+  score += hasText(input.title.value) ? 8 * input.title.confidence : 0;
+  score += hasText(input.brand.value) ? 8 * input.brand.confidence : 0;
+  score += hasText(input.productName.value)
+    ? 10 * input.productName.confidence
+    : 0;
+  score += hasText(input.modelCode.value) ? 4 * input.modelCode.confidence : 0;
+  score +=
+    typeof input.price.value === "number" ? 10 * input.price.confidence : 0;
+  score +=
+    (input.imageCount.value || 0) >= 1 ? 6 * input.imageCount.confidence : 0;
+  score +=
+    (input.imageCount.value || 0) >= 4 ? 4 * input.imageCount.confidence : 0;
+  score +=
+    typeof input.ratingValue.value === "number"
+      ? 5 * input.ratingValue.confidence
+      : 0;
+  score +=
+    typeof input.reviewCount.value === "number"
+      ? 5 * input.reviewCount.confidence
+      : 0;
+  score +=
+    (input.descriptionLength.value || 0) >= 120
+      ? 4 * input.descriptionLength.confidence
+      : 0;
+  score +=
+    (input.descriptionLength.value || 0) >= 300
+      ? 4 * input.descriptionLength.confidence
+      : 0;
+  score +=
+    (input.bulletPointCount.value || 0) >= 3
+      ? 2 * input.bulletPointCount.confidence
+      : 0;
+  score +=
+    input.hasFreeShipping.value === true
+      ? 2 * input.hasFreeShipping.confidence
+      : 0;
+  score += hasText(input.sellerName.value)
+    ? 4 * input.sellerName.confidence
+    : 0;
+
+  // Fields still using raw extracted data
   if (hasText(extracted.meta_description)) score += 6;
   if (hasText(extracted.h1)) score += 6;
-  if (hasText(extracted.brand)) score += 8;
-  if (hasText(extracted.product_name)) score += 10;
-  if (hasText(extracted.model_code)) score += 4;
   if (hasText(extracted.sku)) score += 4;
   if (hasText(extracted.mpn)) score += 4;
   if (hasText(extracted.gtin)) score += 5;
-  if (typeof extracted.normalized_price === "number") score += 10;
-  if ((extracted.image_count || 0) >= 1) score += 6;
-  if ((extracted.image_count || 0) >= 4) score += 4;
-  if (typeof extracted.rating_value === "number") score += 5;
-  if (typeof extracted.review_count === "number") score += 5;
   if (typeof extracted.question_count === "number") score += 2;
   if (typeof extracted.favorite_count === "number") score += 2;
-  if ((extracted.description_length || 0) >= 120) score += 4;
-  if ((extracted.description_length || 0) >= 300) score += 4;
-  if ((extracted.bullet_point_count || 0) >= 3) score += 2;
   if (extracted.has_add_to_cart) score += 5;
   if (extracted.has_shipping_info) score += 4;
-  if (extracted.has_free_shipping) score += 2;
   if (extracted.has_return_info) score += 4;
   if (extracted.has_specs) score += 6;
   if (extracted.has_faq) score += 2;
   if (extracted.has_video) score += 2;
-  if (hasText(extracted.seller_name)) score += 4;
-  if (Array.isArray(extracted.other_seller_offers) && extracted.other_seller_offers.length > 0) {
+  if (
+    Array.isArray(extracted.other_seller_offers) &&
+    extracted.other_seller_offers.length > 0
+  ) {
     score += 4;
   }
   if (hasText(extracted.stock_status)) score += 2;
@@ -328,38 +375,64 @@ function getCompletenessScore(extracted: ExtractedProductFields) {
   return clampScore(score);
 }
 
-function getSeoScore(extracted: ExtractedProductFields) {
+function getSeoScore(input: ConsolidatedAnalysisInput) {
   let score = 0;
+  const extracted = input._raw; // for fields not yet in ConsolidatedAnalysisInput
 
-  if (hasText(extracted.title)) score += 25;
+  score += hasText(input.title.value) ? 25 * input.title.confidence : 0;
+  score += hasText(input.brand.value) ? 10 * input.brand.confidence : 0;
+  score += hasText(input.productName.value)
+    ? 10 * input.productName.confidence
+    : 0;
+  score += hasText(input.modelCode.value) ? 5 * input.modelCode.confidence : 0;
+  score +=
+    (input.imageCount.value || 0) >= 3 ? 10 * input.imageCount.confidence : 0;
+  score +=
+    (input.descriptionLength.value || 0) >= 120
+      ? 5 * input.descriptionLength.confidence
+      : 0;
+
+  // Fields still using raw extracted data during transition
   if (hasText(extracted.meta_description)) score += 15;
   if (hasText(extracted.h1)) score += 15;
-  if (hasText(extracted.brand)) score += 10;
-  if (hasText(extracted.product_name)) score += 10;
-  if (hasText(extracted.model_code)) score += 5;
-  if ((extracted.image_count || 0) >= 3) score += 10;
-  if ((extracted.description_length || 0) >= 120) score += 5;
   if (extracted.has_specs) score += 5;
 
   return clampScore(score);
 }
 
-function getConversionScore(extracted: ExtractedProductFields) {
+function getConversionScore(input: ConsolidatedAnalysisInput) {
   let score = 0;
+  const extracted = input._raw; // for complex logic not yet refactored
   const reviewThemes = extractReviewThemes(extracted);
   const lowRatedRatio = getLowRatedSampleRatio(extracted);
   const sampledReviewCount = extracted.review_summary?.sampled_count ?? 0;
 
-  if (typeof extracted.normalized_price === "number") score += 15;
+  score +=
+    typeof input.price.value === "number" ? 15 * input.price.confidence : 0;
+  score +=
+    (input.imageCount.value || 0) >= 3 ? 10 * input.imageCount.confidence : 0;
+  score +=
+    (input.descriptionLength.value || 0) >= 120
+      ? 10 * input.descriptionLength.confidence
+      : 0;
+  score +=
+    typeof input.ratingValue.value === "number"
+      ? 10 * input.ratingValue.confidence
+      : 0;
+  score +=
+    (input.reviewCount.value || 0) > 0
+      ? 10 * input.reviewCount.confidence
+      : 0;
+  score +=
+    input.hasFreeShipping.value === true
+      ? 5 * input.hasFreeShipping.confidence
+      : 0;
+
+  // Logic still dependent on old structure
   if (extracted.has_add_to_cart) score += 20;
-  if ((extracted.image_count || 0) >= 3) score += 10;
-  if ((extracted.description_length || 0) >= 120) score += 10;
-  if (typeof extracted.rating_value === "number") score += 10;
-  if ((extracted.review_count || 0) > 0) score += 10;
   if ((extracted.favorite_count || 0) > 0) score += 5;
   if (extracted.has_shipping_info) score += 10;
   if (extracted.has_return_info) score += 10;
-  if (extracted.has_free_shipping) score += 5;
 
   if (lowRatedRatio != null) {
     if (lowRatedRatio >= 0.5) {
@@ -382,102 +455,142 @@ function getConversionScore(extracted: ExtractedProductFields) {
   return clampScore(score);
 }
 
-function buildContentQualityMetric(extracted: ExtractedProductFields): DerivedMetric {
+function buildProductQualityMetric(extracted: ExtractedProductFields): DerivedMetric {
   let score = 0;
   const evidence: string[] = [];
 
+  // Content quality elements
   if (hasText(extracted.title) && hasText(extracted.h1)) {
-    score += 25;
-    evidence.push("Title ve H1 alanlari mevcut.");
+    score += 20;
+    evidence.push("Başlık ve H1 etiketleri mevcut.");
   } else if (hasText(extracted.title) || hasText(extracted.h1)) {
-    score += 12;
-    evidence.push("Baslik alanlarinin bir kismi mevcut.");
+    score += 10;
+    evidence.push("Sayfa başlıklarından biri eksik.");
   }
 
   if (hasText(extracted.meta_description)) {
-    score += 15;
-    evidence.push("Meta aciklama tespit edildi.");
+    score += 12;
+    evidence.push("Meta açıklaması (description) mevcut.");
   }
 
   if ((extracted.description_length || 0) >= 300) {
-    score += 25;
-    evidence.push("Aciklama uzunlugu guclu.");
+    score += 20;
+    evidence.push("Açıklama metni uzun ve detaylı.");
   } else if ((extracted.description_length || 0) >= 120) {
-    score += 12;
-    evidence.push("Aciklama temel karar destegi sagliyor.");
+    score += 10;
+    evidence.push("Açıklama metni yeterli uzunlukta.");
   }
 
   if ((extracted.bullet_point_count || 0) >= 3) {
-    score += 10;
-    evidence.push("Maddeli icerik yapisi mevcut.");
+    score += 8;
+    evidence.push("Maddeli anlatım (bullet points) kullanılıyor.");
   }
 
   if (extracted.has_specs) {
-    score += 15;
-    evidence.push("Teknik ozellik alani mevcut.");
-  }
-
-  if (extracted.has_faq) {
-    score += 5;
-    evidence.push("SSS alani mevcut.");
+    score += 12;
+    evidence.push("Teknik özellikler tablosu bulunuyor.");
   }
 
   if (hasText(extracted.brand) && hasText(extracted.model_code)) {
-    score += 5;
-    evidence.push("Marka ve model bilgisi ayrisiyor.");
+    score += 4;
+    evidence.push("Marka ve model kodu bilgisi ayrıştırılmış.");
+  }
+
+  // Visual strength elements
+  if ((extracted.image_count || 0) >= 6) {
+    score += 40;
+    evidence.push("Görsel sayısı (6+) zengin.");
+  } else if ((extracted.image_count || 0) >= 3) {
+    score += 25;
+    evidence.push("Yeterli sayıda (3+) ürün görseli mevcut.");
+  } else if ((extracted.image_count || 0) > 0) {
+    score += 10;
+    evidence.push("Görsel sayısı (1-2) sınırlı.");
+  }
+
+  if (extracted.has_video) {
+    score += 20;
+    evidence.push("Ürün videosu mevcut.");
+  }
+
+  if (typeof extracted.variant_count === "number" && extracted.variant_count >= 2) {
+    score += 8;
+    evidence.push("Ürün varyantları (renk/beden vb.) bulunuyor.");
+  }
+
+  // Decision clarity elements
+  if (extracted.has_faq) {
+    score += 8;
+    evidence.push("Sıkça Sorulan Sorular (SSS) bölümü mevcut.");
+  }
+
+  if (typeof extracted.question_count === "number" && extracted.question_count > 0) {
+    score += 8;
+    evidence.push("Soru-Cevap bölümü aktif.");
+  }
+
+  if (typeof extracted.shipping_days === "number") {
+    score += 8;
+    evidence.push("Teslimat süresi belirtilmiş.");
+  }
+
+  if (extracted.has_return_info) {
+    score += 8;
+    evidence.push("İade politikası bilgisi mevcut.");
   }
 
   return buildMetric(clampScore(score), evidence);
 }
 
-function buildTrustStrengthMetric(extracted: ExtractedProductFields): DerivedMetric {
-  let score = 0;
+function buildSellerTrustMetric(extracted: ExtractedProductFields): DerivedMetric {
+  let score = 70; // Start from neutral for review risk
   const evidence: string[] = [];
   const reviewThemes = extractReviewThemes(extracted);
   const lowRatedRatio = getLowRatedSampleRatio(extracted);
   const sampledReviewCount = extracted.review_summary?.sampled_count ?? 0;
 
+  // Trust strength elements
   if (
     typeof extracted.rating_value === "number" &&
     extracted.rating_value >= 4.3 &&
     (extracted.review_count || 0) >= 20
   ) {
-    score += 35;
-    evidence.push("Puan ve yorum hacmi guven sinyali uretiyor.");
+    score += 20;
+    evidence.push("Puan ve yorum hacmi güven algısını destekliyor.");
   } else if (
     typeof extracted.rating_value === "number" &&
     typeof extracted.review_count === "number"
   ) {
-    score += 18;
-    evidence.push("Temel sosyal kanit verisi mevcut.");
+    score += 10;
+    evidence.push("Temel sosyal kanıt (puan/yorum) verisi mevcut.");
   }
 
   if (hasText(extracted.seller_name)) {
-    score += 10;
-    evidence.push("Satici bilgisi gorunur.");
+    score += 8;
+    evidence.push("Satıcı bilgisi görünür durumda.");
   }
 
   if (Array.isArray(extracted.seller_badges) && extracted.seller_badges.length > 0) {
-    score += 8;
-    evidence.push(`Satici rozetleri mevcut: ${extracted.seller_badges.join(", ")}.`);
+    score += 6;
+    evidence.push(`Satıcı rozetleri mevcut: ${extracted.seller_badges.join(", ")}.`);
   }
 
   if (typeof extracted.seller_score === "number") {
     if (extracted.seller_score >= 8.5) {
-      score += 10;
-      evidence.push("Satici puani guclu gorunuyor.");
+      score += 8;
+      evidence.push("Satıcı puanı güçlü.");
     } else if (extracted.seller_score >= 7.5) {
-      score += 5;
-      evidence.push("Satici puani orta seviyede.");
+      score += 4;
+      evidence.push("Satıcı puanı orta seviyede.");
     } else {
-      score -= 5;
-      evidence.push("Satici puani guven tarafinda risk olusturabilir.");
+      score -= 6;
+      evidence.push("Satıcı puanı güven konusunda risk oluşturabilir.");
     }
   }
 
   if (typeof extracted.follower_count === "number") {
-    score += extracted.follower_count >= 10000 ? 8 : extracted.follower_count >= 1000 ? 4 : 2;
-    evidence.push("Magaza takipci verisi mevcut.");
+    score += extracted.follower_count >= 10000 ? 6 : extracted.follower_count >= 1000 ? 3 : 1;
+    evidence.push("Mağaza takipçi verisi mevcut.");
   }
 
   if (
@@ -487,76 +600,77 @@ function buildTrustStrengthMetric(extracted: ExtractedProductFields): DerivedMet
     extracted.seller_score > 0 &&
     extracted.seller_score < 7.5
   ) {
-    score -= 8;
-    evidence.push("Yuksek rekabette satici guven sinyali zayif kalabilir.");
+    score -= 6;
+    evidence.push("Yüksek rekabette satıcı güven sinyali zayıf kalabilir.");
   }
 
   if (
     typeof getOtherSellerScoreGap(extracted) === "number" &&
     (getOtherSellerScoreGap(extracted) as number) >= 0.5
   ) {
-    score -= 8;
-    evidence.push("Diger saticilarin guven seviyesi daha guclu olabilir.");
+    score -= 6;
+    evidence.push("Diğer satıcıların güven seviyesi daha güçlü olabilir.");
   }
 
   if (typeof extracted.question_count === "number" && extracted.question_count >= 5) {
-    score += 10;
-    evidence.push("Soru-cevap hacmi guven sinyali uretiyor.");
+    score += 8;
+    evidence.push("Soru-cevap hacmi güven sinyali oluşturuyor.");
   } else if (typeof extracted.question_count === "number" && extracted.question_count > 0) {
-    score += 5;
+    score += 4;
     evidence.push("Temel soru-cevap sinyali mevcut.");
   }
 
   if (extracted.official_seller) {
-    score += 10;
-    evidence.push("Resmi satici sinyali mevcut.");
+    score += 8;
+    evidence.push("Resmi satıcı sinyali mevcut.");
   }
 
   if (extracted.has_brand_page) {
-    score += 10;
-    evidence.push("Marka sayfasi sinyali mevcut.");
+    score += 8;
+    evidence.push("Marka sayfası sinyali mevcut.");
   }
 
   if (extracted.has_return_info) {
-    score += 15;
-    evidence.push("Iade bilgisi gorunur.");
+    score += 12;
+    evidence.push("İade bilgisi görünür durumda.");
   }
 
   if (extracted.has_shipping_info) {
-    score += 10;
-    evidence.push("Kargo bilgisi gorunur.");
+    score += 8;
+    evidence.push("Kargo bilgisi görünür durumda.");
   }
 
   if (hasText(extracted.stock_status)) {
-    score += 5;
-    evidence.push("Stok durumu belirtilmis.");
+    score += 4;
+    evidence.push("Stok durumu belirtilmiş.");
   }
 
+  // Review risk elements (negative impact)
   if (lowRatedRatio != null) {
     if (lowRatedRatio >= 0.5) {
-      score -= 18;
-      evidence.push("Dusuk yildizli yorum orani guven tarafinda risk olusturuyor.");
+      score -= 25;
+      evidence.push("Düşük yıldızlı yorum oranı güven konusunda risk oluşturuyor.");
     } else if (lowRatedRatio >= 0.4) {
-      score -= 10;
-      evidence.push("Yorumlardaki dusuk yildiz yogunlugu guven algisini zayiflatabilir.");
+      score -= 15;
+      evidence.push("Yorumlardaki düşük yıldız yoğunluğu güven algısını zayıflatabilir.");
     } else if (lowRatedRatio <= 0.2 && sampledReviewCount >= 3) {
-      score += 6;
-      evidence.push("Ornek yorumlarda dusuk yildizli geri bildirim sinirli.");
+      score += 8;
+      evidence.push("Örnek yorumlarda düşük yıldızlı geri bildirim oranı sınırlı.");
     }
   }
 
   if (reviewThemes?.negative?.length) {
-    score -= Math.min(12, reviewThemes.negative.length * 4);
-      evidence.push(`Yorumlarda tekrar eden sikayetler var: ${reviewThemes.negative.join(", ")}.`);
+    score -= Math.min(15, reviewThemes.negative.length * 5);
+    evidence.push(`Yorumlarda tekrar eden şikayetler var: ${reviewThemes.negative.join(", ")}.`);
   } else if (reviewThemes?.positive?.length) {
-    score += Math.min(8, reviewThemes.positive.length * 2);
-    evidence.push(`Yorumlarda olumlu temalar gorunuyor: ${reviewThemes.positive.join(", ")}.`);
+    score += Math.min(10, reviewThemes.positive.length * 3);
+    evidence.push(`Yorumlarda olumlu temalar öne çıkıyor: ${reviewThemes.positive.join(", ")}.`);
   }
 
   return buildMetric(clampScore(score), evidence);
 }
 
-function buildOfferStrengthMetric(extracted: ExtractedProductFields): DerivedMetric {
+function buildMarketPositionMetric(extracted: ExtractedProductFields): DerivedMetric {
   let score = 0;
   const evidence: string[] = [];
 
@@ -570,17 +684,17 @@ function buildOfferStrengthMetric(extracted: ExtractedProductFields): DerivedMet
     typeof extracted.discount_rate === "number"
   ) {
     score += 25;
-    evidence.push("Indirim sinyali hesaplanabiliyor.");
+    evidence.push("İndirim sinyali hesaplanabiliyor.");
   }
 
   if (extracted.has_free_shipping) {
     score += 20;
-    evidence.push("Ucretsiz kargo avantaji var.");
+    evidence.push("Ücretsiz kargo avantajı sunuluyor.");
   }
 
   if (isCheapestOffer(extracted) && extracted.other_sellers_summary?.count) {
     score += 25;
-    evidence.push("Rakip saticilar icinde en dusuk fiyat sinyali gorunuyor.");
+    evidence.push("Rakip satıcılar içinde en düşük fiyata sahip.");
   } else if (
     extracted.other_sellers_summary &&
     typeof extracted.other_sellers_summary.cheaper_count === "number" &&
@@ -588,7 +702,7 @@ function buildOfferStrengthMetric(extracted: ExtractedProductFields): DerivedMet
   ) {
     score -= Math.min(20, extracted.other_sellers_summary.cheaper_count * 6);
     evidence.push(
-      `${extracted.other_sellers_summary.cheaper_count} rakip satici daha dusuk fiyatla gorunuyor.`
+      `${extracted.other_sellers_summary.cheaper_count} rakip satıcı daha düşük fiyat sunuyor.`
     );
   }
 
@@ -596,8 +710,8 @@ function buildOfferStrengthMetric(extracted: ExtractedProductFields): DerivedMet
     score += 10;
     evidence.push(
       extracted.campaign_label
-        ? `Kampanya sinyali gorunuyor: ${extracted.campaign_label}.`
-        : "Kampanya veya kupon sinyali gorunuyor."
+        ? `Kampanya sinyali mevcut: ${extracted.campaign_label}.`
+        : "Kampanya veya kupon sinyali mevcut."
     );
   }
 
@@ -606,24 +720,24 @@ function buildOfferStrengthMetric(extracted: ExtractedProductFields): DerivedMet
     extracted.seller_badges.some((badge) => /hizli teslimat/i.test(badge))
   ) {
     score += 10;
-    evidence.push("Hizli teslimat rozeti teklif gucunu destekliyor.");
+    evidence.push("Hızlı teslimat rozeti teklif gücünü destekliyor.");
   }
 
   if (typeof extracted.shipping_days === "number") {
     if (extracted.shipping_days <= 3) {
       score += 20;
-      evidence.push("Teslim suresi guclu gorunuyor.");
+      evidence.push("Teslim süresi hızlı görünüyor.");
     } else if (extracted.shipping_days <= 5) {
       score += 10;
-      evidence.push("Teslim suresi orta seviyede.");
+      evidence.push("Teslim süresi makul seviyede.");
     } else {
-      evidence.push("Teslim suresi uzun olabilir.");
+      evidence.push("Teslim süresi uzun olabilir.");
     }
   }
 
   if (typeof extracted.variant_count === "number" && extracted.variant_count >= 2) {
     score += 10;
-    evidence.push("Teklif varyant secenegi destekliyor.");
+    evidence.push("Teklif, varyant seçeneğiyle zenginleştirilmiş.");
   }
 
   if (typeof extracted.other_sellers_count === "number") {
@@ -631,12 +745,12 @@ function buildOfferStrengthMetric(extracted: ExtractedProductFields): DerivedMet
       if (!extracted.has_free_shipping && typeof extracted.discount_rate !== "number") {
         score -= 10;
       }
-      evidence.push("Ayni urunde rekabet baskisi yuksek gorunuyor.");
+      evidence.push("Aynı üründe rekabet baskısı yüksek.");
     } else if (extracted.other_sellers_count >= 2) {
       if (!extracted.has_free_shipping && typeof extracted.discount_rate !== "number") {
         score -= 5;
       }
-      evidence.push("Ayni urunde birden fazla satici gorunuyor.");
+      evidence.push("Aynı üründe birden fazla satıcı bulunuyor.");
     }
   }
 
@@ -646,155 +760,27 @@ function buildOfferStrengthMetric(extracted: ExtractedProductFields): DerivedMet
     (!hasText(extracted.delivery_type) || extracted.delivery_type === "standard")
   ) {
     score -= 8;
-    evidence.push("Rakip tarafta teslimat avantaji daha guclu olabilir.");
+    evidence.push("Rakiplerin teslimat avantajı daha güçlü olabilir.");
   }
 
   if (hasText(extracted.delivery_type)) {
     score += 5;
     evidence.push(
-      `${formatDeliveryType(extracted.delivery_type) || "Teslimat tipi"} belirtilmis.`
+      `${formatDeliveryType(extracted.delivery_type) || "Teslimat tipi"} belirtilmiş.`
     );
   }
 
   return buildMetric(clampScore(score), evidence);
 }
 
-function buildVisualStrengthMetric(extracted: ExtractedProductFields): DerivedMetric {
-  let score = 0;
-  const evidence: string[] = [];
 
-  if ((extracted.image_count || 0) >= 6) {
-    score += 50;
-    evidence.push("Gorsel sayisi guclu.");
-  } else if ((extracted.image_count || 0) >= 3) {
-    score += 30;
-    evidence.push("Gorsel sayisi temel seviyede.");
-  } else if ((extracted.image_count || 0) > 0) {
-    score += 12;
-    evidence.push("Gorsel sayisi sinirli.");
-  }
 
-  if (extracted.has_video) {
-    score += 25;
-    evidence.push("Urun videosu mevcut.");
-  }
-
-  if (typeof extracted.variant_count === "number" && extracted.variant_count >= 2) {
-    score += 10;
-    evidence.push("Varyant secenekleri vitrini zenginlestiriyor.");
-  }
-
-  if ((extracted.bullet_point_count || 0) >= 3) {
-    score += 10;
-    evidence.push("Gorseli destekleyen maddeli anlatim var.");
-  }
-
-  return buildMetric(clampScore(score), evidence);
-}
-
-function buildDecisionClarityMetric(extracted: ExtractedProductFields): DerivedMetric {
-  let score = 0;
-  const evidence: string[] = [];
-
-  if ((extracted.description_length || 0) >= 120) {
-    score += 20;
-    evidence.push("Aciklama karar destegi sagliyor.");
-  }
-
-  if ((extracted.bullet_point_count || 0) >= 3) {
-    score += 15;
-    evidence.push("Bilgi maddeli sekilde sunuluyor.");
-  }
-
-  if (extracted.has_specs) {
-    score += 20;
-    evidence.push("Teknik detaylar mevcut.");
-  }
-
-  if (extracted.has_faq) {
-    score += 10;
-    evidence.push("Sik sorulan sorular alani mevcut.");
-  }
-
-  if (typeof extracted.variant_count === "number" && extracted.variant_count >= 2) {
-    score += 10;
-    evidence.push("Varyant secimi destekleniyor.");
-  }
-
-  if (typeof extracted.question_count === "number" && extracted.question_count > 0) {
-    score += 10;
-    evidence.push("Soru-cevap alani karar oncesi bariyerleri azaltabilir.");
-  }
-
-  if (typeof extracted.shipping_days === "number") {
-    score += 10;
-    evidence.push("Teslimat beklentisi gorunur.");
-  }
-
-  if (extracted.has_return_info) {
-    score += 10;
-    evidence.push("Iade bilgisi karar engelini azaltir.");
-  }
-
-  if (hasText(extracted.stock_status)) {
-    score += 5;
-    evidence.push("Stok durumu gorunur.");
-  }
-
-  return buildMetric(clampScore(score), evidence);
-}
-
-function buildReviewRiskMetric(extracted: ExtractedProductFields): DerivedMetric {
-  const snippets = Array.isArray(extracted.review_snippets) ? extracted.review_snippets : [];
-  const reviewThemes = extractReviewThemes(extracted);
-  const lowRatedRatio = getLowRatedSampleRatio(extracted);
-  const riskSummary = getReviewRiskSummary(extracted);
-
-  if (snippets.length === 0 && lowRatedRatio == null && !reviewThemes) {
-    return buildMetric(null, ["Yorum ornegi bulunamadigi icin yorum riski olculemedi."]);
-  }
-
-  let score = 70;
-  const evidence: string[] = [];
-
-  if (lowRatedRatio != null) {
-    if (lowRatedRatio >= 0.5) {
-      score -= 35;
-      evidence.push("Dusuk yildizli yorum orani yuksek.");
-    } else if (lowRatedRatio >= 0.4) {
-      score -= 22;
-      evidence.push("Dusuk yildizli yorumlar dikkat cekiyor.");
-    } else if (lowRatedRatio <= 0.2 && (extracted.review_summary?.sampled_count ?? 0) >= 3) {
-      score += 10;
-      evidence.push("Dusuk yildizli yorum yogunlugu sinirli.");
-    }
-  }
-
-  if (reviewThemes?.negative?.length) {
-    score -= Math.min(24, reviewThemes.negative.length * 8);
-    evidence.push(`Negatif yorum temalari: ${reviewThemes.negative.join(", ")}.`);
-  }
-
-  if (reviewThemes?.positive?.length && !reviewThemes?.negative?.length) {
-    score += Math.min(12, reviewThemes.positive.length * 4);
-    evidence.push(`Olumlu yorum temalari: ${reviewThemes.positive.join(", ")}.`);
-  }
-
-  if (riskSummary && evidence.length < 4) {
-    evidence.push(riskSummary);
-  }
-
-  return buildMetric(clampScore(score), evidence);
-}
 
 function buildDerivedMetrics(extracted: ExtractedProductFields): DerivedMetrics {
   return {
-    contentQuality: buildContentQualityMetric(extracted),
-    trustStrength: buildTrustStrengthMetric(extracted),
-    offerStrength: buildOfferStrengthMetric(extracted),
-    visualStrength: buildVisualStrengthMetric(extracted),
-    decisionClarity: buildDecisionClarityMetric(extracted),
-    reviewRisk: buildReviewRiskMetric(extracted),
+    productQuality: buildProductQualityMetric(extracted),
+    sellerTrust: buildSellerTrustMetric(extracted),
+    marketPosition: buildMarketPositionMetric(extracted),
   };
 }
 
@@ -984,79 +970,50 @@ function getStrengths(extracted: ExtractedProductFields, metrics: DerivedMetrics
   const reviewThemes = extractReviewThemes(extracted);
   const lowRatedRatio = getLowRatedSampleRatio(extracted);
 
-  if (metrics.contentQuality.label === "strong") {
-    strengths.push("Icerik kalitesi temel satis kararini destekliyor.");
+  if (metrics.productQuality.label === "strong") {
+    strengths.push("Güçlü ve detaylı ürün içeriği");
   }
 
-  if (metrics.trustStrength.label === "strong") {
-    strengths.push("Guven sinyalleri guclu gorunuyor.");
+  if (metrics.sellerTrust.label === "strong") {
+    strengths.push("Yüksek satıcı güveni ve itibarı");
   }
 
-  if (metrics.visualStrength.label === "strong") {
-    strengths.push("Vitrin gucu gorsel acidan yeterli.");
-  }
-
-  if (metrics.offerStrength.label === "strong") {
-    strengths.push("Teklif gucu rekabeti destekleyebilir.");
+  if (metrics.marketPosition.label === "strong") {
+    strengths.push("Net ve rekabetçi pazar konumu");
   }
 
   if (isCheapestOffer(extracted) && extracted.other_sellers_summary?.count) {
-    strengths.push("Rakip saticilar arasinda en dusuk fiyat sinyali gorunuyor.");
+    strengths.push("Rakipler arasında en iyi fiyata sahip");
   }
 
   if (extracted.official_seller) {
-    strengths.push("Resmi satici sinyali guveni destekliyor.");
+    strengths.push("Resmi veya yetkili satıcı sinyali");
   }
 
   if (Array.isArray(extracted.seller_badges) && extracted.seller_badges.length > 0) {
-    strengths.push(`Satici rozetleri gorunur: ${extracted.seller_badges.join(", ")}.`);
-  }
-
-  if (
-    Array.isArray(extracted.seller_badges) &&
-    extracted.seller_badges.some((badge) => /hizli teslimat/i.test(badge))
-  ) {
-    strengths.push("Hizli teslimat rozeti teklif hizini destekliyor.");
+    strengths.push(`Satıcı rozetleri (${extracted.seller_badges.join(", ")})`);
   }
 
   if (typeof extracted.seller_score === "number" && extracted.seller_score >= 8.5) {
-    strengths.push("Satici puani guven tarafini destekliyor.");
+    strengths.push(`Yüksek satıcı puanı (${extracted.seller_score})`);
   }
 
-  if (typeof extracted.follower_count === "number" && extracted.follower_count >= 1000) {
-    strengths.push("Magaza takipci tabani guven sinyali uretiyor.");
-  }
-
-  if (
-    extracted.other_sellers_summary &&
-    extracted.other_sellers_summary.count >= 2 &&
-    typeof extracted.seller_score === "number" &&
-    typeof extracted.other_sellers_summary.avg_score === "number" &&
-    extracted.seller_score >= extracted.other_sellers_summary.avg_score
-  ) {
-    strengths.push("Satici guven seviyesi rekabete gore zayif degil.");
+  if (typeof extracted.follower_count === "number" && extracted.follower_count >= 5000) {
+    strengths.push("Yüksek mağaza takipçi sayısı");
   }
 
   if (hasText(extracted.campaign_label)) {
-    strengths.push(`Kampanya gorunurlugu mevcut: ${extracted.campaign_label}.`);
+    strengths.push(`Belirgin kampanya (${extracted.campaign_label})`);
   } else if (extracted.has_campaign) {
-    strengths.push("Kampanya veya kupon sinyali teklif gucunu destekliyor.");
+    strengths.push("Teklifi güçlendiren kampanya varlığı");
   }
 
   if (extracted.has_free_shipping) {
-    strengths.push("Ucretsiz kargo teklif gucunu destekliyor.");
-  }
-
-  if (typeof extracted.question_count === "number" && extracted.question_count >= 5) {
-    strengths.push("Soru-cevap hacmi satin alma guvenini destekleyebilir.");
-  }
-
-  if (hasText(extracted.model_code)) {
-    strengths.push("Model kodu ayrismis.");
+    strengths.push("Ücretsiz kargo avantajı");
   }
 
   if (reviewThemes?.positive.length) {
-    strengths.push(`Yorumlarda olumlu tema sinyali var: ${reviewThemes.positive.join(", ")}.`);
+    strengths.push(`Olumlu yorum temaları (${reviewThemes.positive.join(", ")})`);
   }
 
   if (
@@ -1065,10 +1022,15 @@ function getStrengths(extracted: ExtractedProductFields, metrics: DerivedMetrics
     extracted.review_summary &&
     extracted.review_summary.sampled_count >= 3
   ) {
-    strengths.push("Ornek yorumlarda dusuk yildizli geri bildirim orani sinirli.");
+    strengths.push("Düşük oranda negatif geri bildirim");
   }
 
-  return strengths.slice(0, 5);
+  if ((extracted.image_count || 0) >= 5) {
+    strengths.push("Zengin ürün görseli sayısı");
+  }
+
+  // Remove duplicates and limit
+  return [...new Set(strengths)].slice(0, 5);
 }
 
 function getWeaknesses(extracted: ExtractedProductFields, metrics: DerivedMetrics): string[] {
@@ -1076,76 +1038,47 @@ function getWeaknesses(extracted: ExtractedProductFields, metrics: DerivedMetric
   const reviewThemes = extractReviewThemes(extracted);
   const lowRatedRatio = getLowRatedSampleRatio(extracted);
 
-  if (metrics.contentQuality.label === "weak") {
-    weaknesses.push("Icerik kalitesi satis kararini desteklemek icin zayif.");
+  if (metrics.productQuality.label === "weak") {
+    weaknesses.push("Zayıf veya eksik ürün içeriği");
   }
 
-  if (metrics.trustStrength.label === "weak") {
-    weaknesses.push("Guven sinyalleri yetersiz gorunuyor.");
+  if (metrics.sellerTrust.label === "weak") {
+    weaknesses.push("Düşük satıcı güven sinyalleri");
+  }
+
+  if (metrics.marketPosition.label === "weak") {
+    weaknesses.push("Belirsiz veya zayıf pazar konumu");
   }
 
   if (
     typeof extracted.seller_score === "number" &&
     extracted.seller_score > 0 &&
-    extracted.seller_score < 7.5
+    extracted.seller_score < 8.0
   ) {
-    weaknesses.push("Satici puani guven bariyeri olusturabilir.");
-  }
-
-  if (
-    typeof extracted.other_sellers_count === "number" &&
-    extracted.other_sellers_count >= 4 &&
-    typeof extracted.seller_score === "number" &&
-    extracted.seller_score > 0 &&
-    extracted.seller_score < 7.5
-  ) {
-    weaknesses.push("Yuksek rekabette satici guven farki zayif kalabilir.");
+    weaknesses.push(`Düşük satıcı puanı (${extracted.seller_score})`);
   }
 
   if (hasStrongCompetitorTrust(extracted) && typeof getOtherSellerScoreGap(extracted) === "number") {
     const scoreGap = getOtherSellerScoreGap(extracted) as number;
     if (scoreGap >= 0.5) {
-      weaknesses.push("Rakip saticilarin guven seviyesi daha guclu gorunebilir.");
+      weaknesses.push("Rakiplere göre daha düşük satıcı güveni");
     }
   }
 
   if (
     hasStrongCompetitorDelivery(extracted) &&
-    extracted.has_free_shipping !== true &&
+    !extracted.has_free_shipping &&
     (!hasText(extracted.delivery_type) || extracted.delivery_type === "standard")
   ) {
-    weaknesses.push("Rakip tarafta daha hizli teslimat sinyali bulunabilir.");
+    weaknesses.push("Rakiplere göre daha yavaş teslimat algısı");
   }
 
-  if (metrics.offerStrength.label === "weak") {
-    weaknesses.push("Fiyat ve teklif gucu yeterince net degil.");
-  }
-
-  if (metrics.visualStrength.label === "weak") {
-    weaknesses.push("Vitrin gucu zayif, gorsel destek sinirli olabilir.");
-  }
-
-  if (metrics.decisionClarity.label === "weak") {
-    weaknesses.push("Karar vermeyi kolaylastiran bilgi yapisi eksik gorunuyor.");
-  }
-
-  if (
-    typeof extracted.review_count === "number" &&
-    extracted.review_count < 5
-  ) {
-    weaknesses.push("Yorum hacmi dusuk oldugu icin sosyal kanit sinirli kalabilir.");
-  }
-
-  if (
-    typeof extracted.question_count === "number" &&
-    extracted.question_count >= 0 &&
-    extracted.question_count < 3
-  ) {
-    weaknesses.push("Soru-cevap hacmi dusuk oldugu icin karar oncesi guven zayif kalabilir.");
+  if (typeof extracted.review_count === "number" && extracted.review_count < 10) {
+    weaknesses.push("Yetersiz yorum sayısı (sosyal kanıt eksikliği)");
   }
 
   if (extracted.has_free_shipping === false) {
-    weaknesses.push("Ucretsiz kargo avantaji gorunmedigi icin teklif gucu zayiflayabilir.");
+    weaknesses.push("Ücretsiz kargo avantajının olmaması");
   }
 
   if (
@@ -1156,24 +1089,17 @@ function getWeaknesses(extracted: ExtractedProductFields, metrics: DerivedMetric
     const delta = getCompetitorPriceDelta(extracted);
     weaknesses.push(
       delta && delta > 0
-        ? `En dusuk rakip fiyat senden ${formatPriceNumber(delta)} daha avantajli gorunuyor.`
-        : "Daha ucuz rakip saticilar oldugu icin fiyat baskisi olusabilir."
+        ? `Rakipten ${formatPriceNumber(delta)} daha pahalı`
+        : "Fiyat rekabetinde dezavantajlı konum"
     );
   }
 
-  if (
-    typeof extracted.shipping_days === "number" &&
-    extracted.shipping_days >= 6
-  ) {
-    weaknesses.push("Teslimat suresi uzun oldugu icin donusum bariyeri olusabilir.");
-  }
-
-  if (extracted.extractor_status === "blocked") {
-    weaknesses.push("Bazi Trendyol verileri cekilemedigi icin analiz kapsami sinirli.");
+  if (typeof extracted.shipping_days === "number" && extracted.shipping_days >= 5) {
+    weaknesses.push(`Uzun teslimat süresi (${extracted.shipping_days} gün)`);
   }
 
   if (reviewThemes?.negative.length) {
-    weaknesses.push(`Yorumlarda tekrar eden sikayet sinyali var: ${reviewThemes.negative.join(", ")}.`);
+    weaknesses.push(`Tekrarlayan olumsuz yorumlar (${reviewThemes.negative.join(", ")})`);
   }
 
   if (
@@ -1182,10 +1108,15 @@ function getWeaknesses(extracted: ExtractedProductFields, metrics: DerivedMetric
     extracted.review_summary &&
     extracted.review_summary.sampled_count >= 3
   ) {
-    weaknesses.push("Ornek yorumlarda dusuk yildizli geri bildirim orani yuksek gorunuyor.");
+    weaknesses.push("Yüksek oranda düşük puanlı yorum");
   }
 
-  return weaknesses.slice(0, 5);
+  if (extracted.extractor_status === "blocked") {
+    weaknesses.push("Sınırlı veri (bazı alanlar okunamadı)");
+  }
+
+  // Remove duplicates and limit
+  return [...new Set(weaknesses)].slice(0, 5);
 }
 
 function getSuggestions(
@@ -1197,320 +1128,189 @@ function getSuggestions(
   const qaThemes = extractQaThemes(extracted);
   const lowRatedRatio = getLowRatedSampleRatio(extracted);
 
-  if (metrics.contentQuality.label === "weak") {
-    suggestions.push({
-      key: "improve-content-depth",
-      severity: "high",
-      title: "Icerik kalitesini guclendirin",
-      detail:
-        "Title, H1, meta aciklama ve aciklama derinligi birlikte guclendirilirse urun sayfasi daha ikna edici olur.",
-    });
-  }
-
-  if ((extracted.description_length || 0) < 120) {
+  // --- Product Quality Suggestions ---
+  if (metrics.productQuality.label === "weak" || (extracted.description_length || 0) < 120) {
     suggestions.push({
       key: "expand-description",
       severity: "high",
-      title: "Aciklamayi daha karar destekli hale getirin",
+      title: "Ürün açıklamasını zenginleştirin",
       detail:
-        "Kullanim senaryosu, fayda ve ayirt edici ozellikleri aciklamaya ekleyin.",
+        "Mevcut açıklama, müşteriyi ikna etmek için yetersiz. Ürünün faydalarını, kullanım senaryolarını ve neden doğru seçim olduğunu anlatan detaylı bir metin hazırlayarak müşterinin karar verme sürecini kolaylaştırın.",
     });
   }
-
-  if (!extracted.has_specs) {
+  if (metrics.productQuality.label === "weak" || !extracted.has_specs) {
     suggestions.push({
       key: "add-specs",
       severity: "medium",
-      title: "Teknik ozellik alanini guclendirin",
+      title: "Teknik özellikleri listeleyin",
       detail:
-        "Olcu, materyal, kapasite veya teknik ozellikler acik sekilde listelenmeli.",
+        "Teknik detaylar eksik veya belirsiz. Ölçü, materyal, uyumluluk, kapasite gibi kritik bilgileri net bir tablo veya liste halinde sunarak müşteri sorularını proaktif olarak yanıtlayın ve iade oranını düşürün.",
     });
   }
-
-  if ((extracted.image_count || 0) < 3) {
+  if (metrics.productQuality.label === "weak" || (extracted.image_count || 0) < 4) {
     suggestions.push({
       key: "increase-images",
       severity: "medium",
-      title: "Gorsel sayisini artirin",
+      title: "Daha fazla ürün görseli ekleyin",
       detail:
-        "Farkli acilar, kullanim goruntusu ve detay kareleri vitrin gucunu artirir.",
+        "Yetersiz görsel sayısı, müşterinin ürünü zihninde canlandırmasını zorlaştırır. Farklı açılardan çekilmiş, detayları gösteren, kullanım anını yansıtan ve mümkünse boyutlarını belli eden görseller ekleyin.",
     });
   }
-
   if (extracted.has_video === false) {
     suggestions.push({
       key: "add-video",
       severity: "low",
-      title: "Urun videosu sinyalini kontrol edin",
+      title: "Ürün videosu eklemeyi düşünün",
       detail:
-        "Sayfada video sinyali tespit edilemedigi icin urun videosu varsa gorunurlugunu kontrol edin; yoksa video eklemek kullanim algisini destekleyebilir.",
+        "Video, dönüşüm oranlarını en çok artıran içerik türlerinden biridir. Ürünün kullanımını veya temel özelliklerini gösteren 30-60 saniyelik kısa bir video, müşterinin satın alma kararını önemli ölçüde etkileyebilir.",
     });
   }
 
+  // --- Seller Trust Suggestions ---
   if (
-    typeof extracted.rating_value === "number" &&
-    extracted.rating_value < 4 &&
-    (extracted.review_count || 0) > 0
+    metrics.sellerTrust.label === "weak" ||
+    ((typeof extracted.rating_value === "number" &&
+      extracted.rating_value < 4.2 &&
+      (extracted.review_count || 0) >= 5) ||
+      (lowRatedRatio != null &&
+        lowRatedRatio >= 0.4 &&
+        extracted.review_summary &&
+        extracted.review_summary.sampled_count >= 3))
   ) {
     suggestions.push({
       key: "fix-low-rating",
       severity: "high",
-      title: "Dusuk puan nedenlerini inceleyin",
+      title: "Düşük puanların kök nedenini bulun",
       detail:
-        "Yorumlarda tekrar eden sorunlari tespit edip urun veya teslimat tarafinda duzeltin.",
+        "Ürün puanı veya yorumlardaki olumsuzluklar kritik seviyede. Yorumlarda tekrar eden sorunları (kalite, kargo, paketleme vb.) tespit edip operasyonel iyileştirmeler yaparak müşteri memnuniyetini artırın.",
     });
   }
-
-  if ((extracted.review_count || 0) < 5) {
-    suggestions.push({
-      key: "increase-social-proof",
-      severity: "medium",
-      title: "Sosyal kaniti guclendirin",
-      detail:
-        "Satis sonrasi yorum toplama akisi kurularak guven bariyeri azaltilabilir.",
-    });
-  }
-
-  if (
-    extracted.review_summary &&
-    extracted.review_summary.sampled_count > 0 &&
-    extracted.review_summary.low_rated_count >= 2
-  ) {
-    suggestions.push({
-      key: "inspect-low-rated-review-themes",
-      severity: "medium",
-      title: "Dusuk yildizli yorum temalarini inceleyin",
-      detail:
-        "Sayfadaki yorum orneklerinde birden fazla dusuk yildizli geri bildirim gorunuyor; tekrar eden sikayet basliklarini urun, paketleme veya teslimat tarafinda kapatmak faydali olabilir.",
-    });
-  }
-
   if (reviewThemes?.negative.length) {
     suggestions.push({
       key: "address-review-themes",
       severity: "medium",
-      title: "Yorumlarda gecen ana sikayetleri kapatin",
-      detail: `Ornek yorumlarda su basliklar tekrar ediyor: ${reviewThemes.negative.join(", ")}. Urun, paketleme veya teslimat tarafinda bunlari azaltacak iyilestirmeler planlanabilir.`,
+      title: "Tekrarlayan şikayet konularını giderin",
+      detail: `Yorumlarda sıkça tekrar eden şikayetler var: ${reviewThemes.negative.join(
+        ", "
+      )}. Bu sorunları çözmek, müşteri memnuniyetini ve puanınızı doğrudan etkileyecektir.`,
     });
   }
-
-  if (
-    lowRatedRatio != null &&
-    lowRatedRatio >= 0.5 &&
-    extracted.review_summary &&
-    extracted.review_summary.sampled_count >= 3
-  ) {
+  if (metrics.sellerTrust.label === "weak" || (extracted.review_count || 0) < 10) {
     suggestions.push({
-      key: "prioritize-review-risk",
-      severity: "high",
-      title: "Dusuk yildizli yorum riskini onceliklendirin",
+      key: "increase-social-proof",
+      severity: "medium",
+      title: "Sosyal kanıtı (yorum sayısı) artırın",
       detail:
-        "Ornek yorumlarda dusuk yildizli geri bildirim orani yuksek gorundugu icin urun kalitesi, paketleme veya teslimat kaynakli temel problemi hizla izole etmek faydali olur.",
+        "Yorum sayısı az olduğu için ürün yeterince güven vermiyor. Satış sonrası müşterilerden yorum bırakmalarını teşvik edecek (örn: kupon, puan) bir sistem kurarak sosyal kanıtı güçlendirin.",
     });
   }
-
   if (
-    typeof extracted.question_count === "number" &&
-    extracted.question_count >= 0 &&
-    extracted.question_count < 3
-  ) {
-    suggestions.push({
-      key: "increase-question-coverage",
-      severity: "low",
-      title: "Soru-cevap guvenini artirin",
-      detail:
-        "Potansiyel itirazlari cevaplayan soru-cevap birikimi, karar vermeyi kolaylastirabilir.",
-    });
-  }
-
-  if (qaThemes?.length) {
-    suggestions.push({
-      key: "answer-top-customer-questions",
-      severity: "low",
-      title: "En cok sorulan konulari daha gorunur cevaplayin",
-      detail: `Soru-cevap orneklerinde en cok su basliklar one cikiyor: ${qaThemes
-        .map((item) => item.label)
-        .join(", ")}. Bu konulari aciklama, gorsel veya SSS alaninda daha netlestirmek karar hizini artirabilir.`,
-    });
-  }
-
-  if (!extracted.official_seller && hasText(extracted.seller_name)) {
-    suggestions.push({
-      key: "strengthen-seller-trust",
-      severity: "low",
-      title: "Satici guven sinyallerini guclendirin",
-      detail:
-        "Magaza guvenini destekleyen rozet, resmi satici veya garanti sinyalleri daha gorunur sunulabilir.",
-    });
-  }
-
-  if (
-    typeof extracted.seller_score === "number" &&
-    extracted.seller_score > 0 &&
-    extracted.seller_score < 7.5
+    metrics.sellerTrust.label === "weak" ||
+    (typeof extracted.seller_score === "number" &&
+      extracted.seller_score > 0 &&
+      extracted.seller_score < 8.0)
   ) {
     suggestions.push({
       key: "improve-seller-trust-score",
       severity: "medium",
-      title: "Satici guven skorunu yukseltecek adimlari one cikarin",
+      title: "Satıcı puanını yükseltmeye odaklanın",
       detail:
-        "Satici puani sinirli gorundugu icin yorum memnuniyeti, teslimat deneyimi ve magaza guven sinyalleri birlikte guclendirilmeli.",
+        "Satıcı puanınız rekabette geride kalıyor. Puanı artırmak için sipariş karşılama hızı, paketleme doğruluğu ve müşteri iletişimi gibi temel operasyonel alanlara odaklanın.",
     });
   }
-
   if (
-    typeof extracted.other_sellers_count === "number" &&
-    extracted.other_sellers_count >= 2
+    hasStrongCompetitorTrust(extracted) &&
+    typeof getOtherSellerScoreGap(extracted) === "number" &&
+    (getOtherSellerScoreGap(extracted) as number) >= 0.5
   ) {
     suggestions.push({
-      key: "differentiate-against-other-sellers",
-      severity: "low",
-      title: "Diger saticilardan ayrismayi guclendirin",
+      key: "close-competitor-trust-gap",
+      severity: "medium",
+      title: "Rakiplerle aranızdaki güven farkını kapatın",
       detail:
-        "Ayni urunde birden fazla satici oldugu icin fiyat, kargo ve guven sinyallerini daha belirgin sunmak donusume yardimci olabilir.",
+        "Rakiplerin satıcı puanı ortalaması sizden daha yüksek. Müşteri memnuniyetini artırarak, yorumlara özen göstererek ve satıcı rozetleri kazanarak bu farkı kapatabilirsiniz.",
     });
   }
 
+  // --- Market Position Suggestions ---
   if (
-    extracted.other_sellers_summary &&
-    typeof extracted.other_sellers_summary.cheaper_count === "number" &&
-    extracted.other_sellers_summary.cheaper_count > 0
+    metrics.marketPosition.label === "weak" ||
+    (extracted.other_sellers_summary &&
+      typeof extracted.other_sellers_summary.cheaper_count === "number" &&
+      extracted.other_sellers_summary.cheaper_count > 0)
   ) {
     const delta = getCompetitorPriceDelta(extracted);
     suggestions.push({
       key: "respond-to-lower-priced-competitors",
       severity: "high",
-      title: "Rakip fiyat farkina cevap verin",
+      title: "Fiyat rekabetine cevap verin",
       detail:
         delta && delta > 0
-          ? `En dusuk rakip fiyat senden ${formatPriceNumber(delta)} daha dusuk gorunuyor; fiyat, kupon veya kargo avantajini netlestirerek farki kapatmayi dusunun.`
-          : "Daha ucuz rakip saticilar gorundugu icin fiyat, kupon veya kargo avantajini daha netlestirin.",
-    });
-  } else if (isCheapestOffer(extracted) && extracted.other_sellers_summary?.count) {
-    suggestions.push({
-      key: "protect-price-lead",
-      severity: "low",
-      title: "Fiyat liderligini gorunur kullanin",
-      detail:
-        "En dusuk fiyat sinyali gorunuyorsa bunu kargo, teslimat ve guven sinyalleriyle birlikte daha belirgin sunmak donusume yardimci olabilir.",
+          ? `En ucuz rakibiniz ${formatPriceNumber(
+              delta
+            )} daha avantajlı. Bu farkı kapatmak için fiyatınızı ayarlamayı veya kupon/kargo avantajı gibi ek faydalar sunmayı düşünün.`
+          : "Rakipler arasında daha ucuza satanlar var. Fiyatınızı gözden geçirin veya ek avantajlarla (ücretsiz kargo, kupon vb.) teklifinizi güçlendirin.",
     });
   }
-
-  if (
-    typeof extracted.other_sellers_count === "number" &&
-    extracted.other_sellers_count >= 4 &&
-    extracted.has_free_shipping !== true &&
-    typeof extracted.discount_rate !== "number"
-  ) {
+  if (metrics.marketPosition.label === "weak" || extracted.has_free_shipping === false) {
     suggestions.push({
-      key: "increase-offer-pressure-resistance",
+      key: "evaluate-shipping-advantage",
       severity: "medium",
-      title: "Rekabet baskisina karsi teklifi sertlestirin",
+      title: "Ücretsiz kargo avantajı sunmayı değerlendirin",
       detail:
-        "Birden fazla satici gorundugu halde belirgin indirim veya kargo avantaji yoksa teklif gucu zayif algilanabilir; fiyat, kargo veya kampanya sinyalini daha netlestirin.",
+        "Ücretsiz kargo, dönüşüm oranını en çok etkileyen faktörlerden biridir. Rakipleriniz sunuyorsa veya pazar standardı haline geldiyse, maliyetlerinizi analiz ederek bu seçeneği mutlaka değerlendirin.",
     });
   }
-
-  if (
-    typeof extracted.other_sellers_count === "number" &&
-    extracted.other_sellers_count >= 4 &&
-    typeof extracted.seller_score === "number" &&
-    extracted.seller_score > 0 &&
-    extracted.seller_score < 7.5
-  ) {
-    suggestions.push({
-      key: "strengthen-trust-under-competition",
-      severity: "medium",
-      title: "Rekabette guven farkini guclendirin",
-      detail:
-        "Yuksek satici rekabeti ve sinirli satici puani birlikte guven bariyeri olusturabilecegi icin yorum kalitesi, magaza guveni ve teslimat deneyimi daha net desteklenmeli.",
-    });
-  }
-
-  if (hasStrongCompetitorTrust(extracted) && typeof getOtherSellerScoreGap(extracted) === "number") {
-    const scoreGap = getOtherSellerScoreGap(extracted) as number;
-    if (scoreGap >= 0.5) {
-      suggestions.push({
-        key: "close-competitor-trust-gap",
-        severity: "medium",
-        title: "Rakip guven farkini kapatin",
-        detail:
-          "Diger saticilarda daha guclu magaza guveni sinyali olabilir; yorum memnuniyeti, satici puani ve resmi magaza guvenini daha belirgin hale getirerek farki daraltin.",
-      });
-    }
-  }
-
   if (
     hasStrongCompetitorDelivery(extracted) &&
-    extracted.has_free_shipping !== true &&
+    !extracted.has_free_shipping &&
     (!hasText(extracted.delivery_type) || extracted.delivery_type === "standard")
   ) {
     suggestions.push({
       key: "improve-delivery-competitiveness",
       severity: "medium",
-      title: "Teslimat rekabetini guclendirin",
+      title: "Teslimat hızında rekabet gücünüzü artırın",
       detail:
-        "Rakip saticilarda hizli teslimat sinyali gorunurken mevcut teklifte teslimat avantaji zayif kalabilir; kargo vaadini, hizli teslimati veya ucretsiz kargo faydasini daha netlestirin.",
+        "Rakipler daha hızlı teslimat sunuyor olabilir. Kargo süreçlerinizi optimize ederek veya 'Hızlı Teslimat' gibi seçenekler sunarak rekabette geri düşmeyin.",
+    });
+  }
+  if (typeof extracted.shipping_days === "number" && extracted.shipping_days >= 5) {
+    suggestions.push({
+      key: "improve-delivery-promise",
+      severity: "medium",
+      title: "Teslimat süresini kısaltın",
+      detail:
+        "Belirtilen teslimat süresi uzun. Müşteriler genellikle daha hızlı teslimat bekler. Operasyonel verimliliği artırarak kargoya verme süresini azaltmaya odaklanın.",
     });
   }
 
+  // --- General & Other Suggestions ---
+  if (qaThemes?.length) {
+    suggestions.push({
+      key: "answer-top-customer-questions",
+      severity: "low",
+      title: "Sık sorulan soruları proaktif olarak yanıtlayın",
+      detail: `Müşteriler en çok şu konuları merak ediyor: ${qaThemes
+        .map((item) => item.label)
+        .join(", ")}. Bu konuları ürün açıklamasında veya görsellerde netleştirmek, karar sürecini hızlandırır.`,
+    });
+  }
   if (!extracted.has_return_info) {
     suggestions.push({
       key: "show-return-policy",
       severity: "medium",
-      title: "Iade bilgisini netlestirin",
+      title: "İade politikasını görünür ve net yapın",
       detail:
-        "Iade kosullari gorunur oldugunda satin alma riski daha dusuk algilanir.",
+        "İade koşullarının net olmaması müşteriyi satın almaktan caydırabilir. Kolay ve şeffaf bir iade politikası sunarak bu önemli güven engelini kaldırın.",
     });
   }
 
-  if (
-    typeof extracted.shipping_days === "number" &&
-    extracted.shipping_days >= 6
-  ) {
-    suggestions.push({
-      key: "improve-delivery-promise",
-      severity: "medium",
-      title: "Teslimat vaadini guclendirin",
-      detail:
-        "Uzun teslim suresi donusum bariyeri olusturabilir; daha hizli kargo veya net teslim beklentisi sunun.",
-    });
-  }
+  // Remove duplicates by key
+  const uniqueSuggestions = suggestions.filter(
+    (v, i, a) => a.findIndex((t) => t.key === v.key) === i
+  );
 
-  if (
-    extracted.delivery_type === "standard" &&
-    typeof extracted.shipping_days !== "number"
-  ) {
-    suggestions.push({
-      key: "clarify-delivery-type",
-      severity: "low",
-      title: "Teslimat tipini daha net anlatin",
-      detail:
-        "Standart teslimat kullaniyorsaniz teslim beklentisini ve kargo vaadini daha gorunur hale getirin.",
-    });
-  }
-
-  if (metrics.offerStrength.label === "weak") {
-    suggestions.push({
-      key: "improve-offer-clarity",
-      severity: "medium",
-      title: "Teklif gucunu daha gorunur yapin",
-      detail:
-        "Indirim, kargo avantaji ve stok sinyalleri varsa sayfada daha belirgin sunulmasi gerekir.",
-    });
-  }
-
-  if (extracted.has_free_shipping === false) {
-    suggestions.push({
-      key: "evaluate-shipping-advantage",
-      severity: "low",
-      title: "Kargo avantajini guclendirin",
-      detail:
-        "Ucretsiz kargo veya daha net kargo avantaji, teklif gucunu daha cazip hale getirebilir.",
-    });
-  }
-
-  return suggestions.slice(0, 5);
+  return uniqueSuggestions.slice(0, 6);
 }
 
 export function buildPriorityActions(
@@ -1518,132 +1318,76 @@ export function buildPriorityActions(
   metrics: DerivedMetrics,
   suggestions: AnalysisSuggestion[]
 ): PriorityAction[] {
-  const base: Array<{ title: string; detail: string; weight: number }> = [];
+  const base: Array<{ title: string; detail: string; weight: number; key: string }> = [];
   const lowRatedRatio = getLowRatedSampleRatio(extracted);
 
-  const pushAction = (params: {
-    title: string;
-    detail: string;
-    weight: number;
-  }) => {
-    if (base.some((item) => item.title === params.title)) return;
+  const pushAction = (params: { title: string; detail: string; weight: number; key: string }) => {
+    if (base.some((item) => item.key === params.key)) return;
     base.push(params);
   };
 
-  if (metrics.offerStrength.label === "weak") {
-    const deliveryRisk =
-      typeof extracted.shipping_days === "number" && extracted.shipping_days >= 6;
-    const competitionRisk =
-      typeof extracted.other_sellers_count === "number" &&
-      extracted.other_sellers_count >= 4;
-
+  if (metrics.marketPosition.label === "weak") {
     pushAction({
-      title: "Teklif gucunu ilk sirada toparlayin",
+      key: "priority-market-position",
+      title: "Öncelik: Pazar Konumunu Netleştirin",
       detail:
-        competitionRisk || deliveryRisk
-          ? "Rekabet veya teslimat bariyeri varken fiyat, kargo ve kampanya farkini daha netlestirmek donusum uzerinde ilk etkiyi yaratir."
-          : "Fiyat, kargo ve kampanya sinyalleri netlestiginde urunun teklif algisi daha guclu hale gelir.",
+        "Fiyat, kargo ve kampanya avantajlarınız rakipler arasında belirgin değil. Bu sinyalleri güçlendirmek, dönüşüm oranını en hızlı etkileyecek adımdır.",
       weight: 100,
     });
   }
 
-  if (
-    metrics.trustStrength.label === "weak" ||
-    (typeof extracted.seller_score === "number" &&
-      extracted.seller_score > 0 &&
-      extracted.seller_score < 7.5)
-  ) {
+  if (metrics.sellerTrust.label === "weak") {
     pushAction({
-      title: "Guven bariyerini azaltin",
+      key: "priority-seller-trust",
+      title: "Öncelik: Satıcı Güvenini Artırın",
       detail:
-        hasStrongCompetitorTrust(extracted)
-          ? "Rakip saticilar daha guclu guven sinyali veriyorsa yorum memnuniyeti, satici puani ve resmi magaza guvenini birlikte belirginlestirmek gerekir."
-          : "Satici puani, yorum kalitesi ve iade guveni daha gorunur oldugunda satin alma bariyeri azalir.",
+        "Düşük satıcı puanı veya zayıf yorumlar müşteriyi caydırıyor. Güveni artırmak için yorum memnuniyetine, puanınıza ve hizmet kalitesine odaklanın.",
       weight: 95,
     });
   }
 
   if (
-    (extracted.favorite_count ?? 0) >= 500000 &&
-    ((typeof extracted.review_count === "number" && extracted.review_count < 50) ||
-      (lowRatedRatio != null && lowRatedRatio >= 0.4))
+    lowRatedRatio != null &&
+    lowRatedRatio >= 0.4 &&
+    (extracted.favorite_count ?? 0) >= 1000
   ) {
     pushAction({
-      title: "Sosyal kaniti hizla guclendirin",
+      key: "priority-review-crisis",
+      title: "Yüksek İlgi Varken Yorum Krizini Çözün",
       detail:
-        "Ilgi yuksek kalirken yorum hacmi veya yorum tonu guven tasimiyorsa sepet oncesi kayip artar; yorum, puan ve musteri memnuniyeti sinyallerini ilk ekranda daha net toplayin.",
+        "Ürüne yüksek bir ilgi varken, artan negatif yorum oranı satışları baltalıyor. Acilen şikayetlerin kök nedenini bulup çözmeniz gerekiyor.",
       weight: 94,
     });
   }
 
-  if (
-    metrics.contentQuality.label === "weak" ||
-    (extracted.description_length || 0) < 120 ||
-    extracted.has_specs === false
-  ) {
+  if (metrics.productQuality.label === "weak") {
     pushAction({
-      title: "Icerik karar kalitesini guclendirin",
+      key: "priority-product-content",
+      title: "Ürün İçeriğinin İkna Gücünü Artırın",
       detail:
-        "Aciklama, teknik ozellikler ve maddeli anlatim birlikte guclendiginde urun neden alinmali sorusu daha net cevaplanir.",
+        "Eksik veya zayıf içerik (açıklama, görsel, teknik bilgi) nedeniyle müşteri 'Neden almalıyım?' sorusuna net cevap bulamıyor.",
       weight: 88,
     });
   }
 
-  if (
-    extracted.has_video === false ||
-    (extracted.image_count || 0) < 3 ||
-    metrics.visualStrength.label === "weak"
-  ) {
-    pushAction({
-      title: "Vitrin anlatimini zenginlestirin",
-      detail:
-        "Video, kullanim senaryosu ve ek gorseller urunun algilanan kalitesini ve ikna hizini artirir.",
-      weight: 78,
+  // Add relevant high-severity suggestions as priority actions
+  suggestions
+    .filter((s) => s.severity === "high")
+    .forEach((s) => {
+      pushAction({
+        key: s.key,
+        title: s.title,
+        detail: s.detail,
+        weight: 80,
+      });
     });
-  }
 
-  if (
-    Array.isArray(extracted.qa_snippets) &&
-    extracted.qa_snippets.length > 0 &&
-    extracted.has_faq === false
-  ) {
-    pushAction({
-      title: "Tekrarlanan sorulari tek blokta kapatin",
-      detail:
-        "Musteri ayni konulari tekrar soruyorsa bu itirazlari aciklama ve SSS katmaninda daha gorunur cevaplamak karar hizini artirir.",
-      weight: 72,
-    });
-  }
+  // Remove duplicates by key
+  const uniqueActions = base.filter((v, i, a) => a.findIndex((t) => t.key === v.key) === i);
 
-  if (
-    hasStrongCompetitorDelivery(extracted) &&
-    extracted.has_free_shipping !== true &&
-    (!hasText(extracted.delivery_type) || extracted.delivery_type === "standard")
-  ) {
-    pushAction({
-      title: "Teslimat rekabetine cevap verin",
-      detail:
-        "Rakiplerde hizli teslimat gorunuyorsa kargo vaadini, ucretsiz kargo avantajini veya hizli teslimat secenegini daha belirgin sunmak gerekir.",
-      weight: 92,
-    });
-  }
-
-  for (const suggestion of suggestions) {
-    pushAction({
-      title: suggestion.title,
-      detail: suggestion.detail,
-      weight:
-        suggestion.severity === "high"
-          ? 80
-          : suggestion.severity === "medium"
-            ? 60
-            : 40,
-    });
-  }
-
-  return base
+  return uniqueActions
     .sort((a, b) => b.weight - a.weight)
-    .slice(0, 5)
+    .slice(0, 3)
     .map((item, index) => ({
       priority: index + 1,
       title: item.title,
@@ -1654,10 +1398,12 @@ export function buildPriorityActions(
 function getPriceCompetitiveness(
   extracted: ExtractedProductFields
 ): string | null {
+  // This function is intended to return a single, most prominent pricing signal.
   if (typeof extracted.normalized_price !== "number") {
     return null;
   }
 
+  // 1. Direct price comparison is the strongest signal
   if (
     extracted.other_sellers_summary &&
     typeof extracted.other_sellers_summary.cheaper_count === "number"
@@ -1665,54 +1411,92 @@ function getPriceCompetitiveness(
     if (extracted.other_sellers_summary.cheaper_count > 0) {
       const delta = getCompetitorPriceDelta(extracted);
       return delta && delta > 0
-        ? `En dusuk rakipten ${formatPriceNumber(delta)} daha pahali`
-        : "Daha ucuz rakip saticilar var";
+        ? `En düşük rakipten ${formatPriceNumber(delta)} daha pahalı`
+        : "Daha ucuz rakip satıcılar mevcut";
     }
 
     if (isCheapestOffer(extracted)) {
-      if (extracted.other_sellers_summary.same_price_count > 0) {
-        return "En dusuk fiyat bandinda, esit fiyatli rakipler var";
+      if ((extracted.other_sellers_summary.count ?? 0) > 0) {
+        return "Rakipler arasında en düşük fiyat";
       }
-      return "Rakipler arasinda en dusuk fiyat";
+      // If no other sellers, this isn't a competitive statement.
     }
   }
 
+  // 2. Strong offer signals (discount + free/fast shipping)
   if (
-    typeof extracted.original_price === "number" &&
     typeof extracted.discount_rate === "number" &&
     extracted.discount_rate >= 10 &&
-    extracted.has_free_shipping &&
-    typeof extracted.shipping_days === "number" &&
-    extracted.shipping_days <= 3
+    extracted.has_free_shipping
   ) {
-    return "Guclu teklif ve hizli teslimat sinyali";
+    return "İndirim ve ücretsiz kargo ile güçlü teklif";
   }
 
-  if (
-    typeof extracted.original_price === "number" &&
-    typeof extracted.discount_rate === "number" &&
-    extracted.discount_rate >= 10
-  ) {
-    return hasText(extracted.campaign_label)
-      ? `Indirim ve kampanya sinyali mevcut`
-      : "Indirim sinyali mevcut";
+  // 3. Standalone signals
+  if (typeof extracted.discount_rate === "number" && extracted.discount_rate >= 10) {
+    return `Belirgin indirim oranı (%${Math.round(extracted.discount_rate)})`;
   }
 
-  if (
-    extracted.has_free_shipping &&
-    typeof extracted.shipping_days === "number" &&
-    extracted.shipping_days <= 3
-  ) {
-    return "Ucretsiz kargo ve hizli teslimat avantaji";
+  if (extracted.has_free_shipping) {
+    return "Ücretsiz kargo avantajı sunuluyor";
   }
 
+  if (hasText(extracted.campaign_label)) {
+    return `Kampanya ile desteklenen teklif (${extracted.campaign_label})`;
+  }
+
+  // 4. Negative environmental signals
   if (
     typeof extracted.other_sellers_count === "number" &&
     extracted.other_sellers_count >= 4 &&
     !extracted.has_free_shipping &&
     typeof extracted.discount_rate !== "number"
   ) {
-    return "Rekabet baskisi var, teklif farki zayif gorunuyor";
+    return "Yüksek rekabette teklif yeterince farklılaşmıyor";
+  }
+
+  // 5. Default statement if a price exists but no other signals found
+  return "Temel fiyat bilgisi mevcut";
+}
+
+function buildSummary(params: {
+  platform: string | null;
+  extracted: ExtractedProductFields;
+  derivedMetrics: DerivedMetrics;
+}) {
+  const { extracted, derivedMetrics } = params;
+
+  const parts: string[] = [];
+  const reviewRiskSummary = getReviewRiskSummary(extracted);
+
+  const weakPoints = [];
+  if (derivedMetrics.productQuality.label === "weak") {
+    weakPoints.push("ürün içeriği");
+  }
+  if (derivedMetrics.sellerTrust.label === "weak") {
+    weakPoints.push("satıcı güvenilirliği");
+  }
+  if (derivedMetrics.marketPosition.label === "weak") {
+    weakPoints.push("pazar konumu");
+  }
+
+  let mainFinding = "Ürün sayfası genel olarak ortalama bir performans sergiliyor.";
+  if (weakPoints.length > 0) {
+    mainFinding = `Analiz, özellikle ${weakPoints.join(
+      " ve "
+    )} alanlarında önemli iyileştirme fırsatları olduğunu gösteriyor.`;
+  }
+  parts.push(mainFinding);
+
+  const competitionParts: string[] = [];
+  if (
+    extracted.other_sellers_summary &&
+    typeof extracted.other_sellers_summary.cheaper_count === "number" &&
+    extracted.other_sellers_summary.cheaper_count > 0
+  ) {
+    competitionParts.push("fiyat dezavantajı");
+  } else if (isCheapestOffer(extracted) && extracted.other_sellers_summary?.count) {
+    competitionParts.push("fiyat avantajı");
   }
 
   if (
@@ -1720,182 +1504,47 @@ function getPriceCompetitiveness(
     typeof getOtherSellerScoreGap(extracted) === "number" &&
     (getOtherSellerScoreGap(extracted) as number) >= 0.5
   ) {
-    return "Rakip guven seviyesi daha guclu gorunuyor";
+    competitionParts.push("daha güvenilir rakipler");
   }
 
-  if (
-    hasStrongCompetitorDelivery(extracted) &&
-    extracted.has_free_shipping !== true &&
-    (!hasText(extracted.delivery_type) || extracted.delivery_type === "standard")
-  ) {
-    return "Rakip teslimat gucu daha guclu gorunuyor";
-  }
-
-  if (
-    typeof extracted.other_sellers_count === "number" &&
-    extracted.other_sellers_count >= 2
-  ) {
-    return "Rekabet bulunan urunde fiyat konumu gorunuyor";
-  }
-
-  if (extracted.has_free_shipping) {
-    return "Kargo avantaji ile desteklenen teklif";
-  }
-
-  if (hasText(extracted.campaign_label) || extracted.has_campaign) {
-    return "Kampanya ile desteklenen teklif";
-  }
-
-  if (
-    typeof extracted.shipping_days === "number" &&
-    extracted.shipping_days >= 6
-  ) {
-    return "Fiyat var ama teslimat bariyeri olusabilir";
-  }
-
-  return "Temel fiyat sinyali mevcut";
-}
-
-function buildSummary(params: {
-  platform: string | null;
-  extracted: ExtractedProductFields;
-  seoScore: number;
-  completenessScore: number;
-  conversionScore: number;
-  derivedMetrics: DerivedMetrics;
-}) {
-  const { platform, extracted, seoScore, completenessScore, conversionScore, derivedMetrics } =
-    params;
-
-  const parts: string[] = [];
-  const reviewRiskSummary = getReviewRiskSummary(extracted);
-  const qaThemes = extractQaThemes(extracted);
-
-  parts.push(
-    `${platform || "Trendyol"} urun sayfasi icin veri odakli analiz olusturuldu.`
-  );
-
-  if (derivedMetrics.contentQuality.label === "weak") {
-    parts.push("Icerik kalitesi satis kararini desteklemekte zorlanabilir.");
-  }
-
-  if (derivedMetrics.trustStrength.label === "weak") {
-    parts.push("Guven sinyalleri zayif oldugu icin ikna gucu dusuyor olabilir.");
-  }
-
-  if (
-    typeof extracted.seller_score === "number" &&
-    extracted.seller_score > 0 &&
-    extracted.seller_score < 7.5
-  ) {
-    parts.push("Satici puani guven tarafinda ek bariyer olusturabilir.");
-  }
-
-  if (derivedMetrics.offerStrength.label === "weak") {
-    parts.push("Fiyat ve teklif gucu yeterince net gorunmuyor olabilir.");
-  }
-
-  if (
-    typeof extracted.other_sellers_count === "number" &&
-    extracted.other_sellers_count >= 2
-  ) {
-    parts.push(
-      extracted.other_sellers_count >= 4
-        ? "Ayni urunde yuksek satici sayisi gorunmesi rekabet baskisini artiriyor olabilir."
-        : "Ayni urunde birden fazla satici gorunmesi ayrisma ihtiyacini artiriyor olabilir."
-    );
-  }
-
-  if (
-    extracted.other_sellers_summary &&
-    typeof extracted.other_sellers_summary.cheaper_count === "number" &&
-    extracted.other_sellers_summary.cheaper_count > 0
-  ) {
-    const delta = getCompetitorPriceDelta(extracted);
-    parts.push(
-      delta && delta > 0
-        ? `En dusuk rakip fiyat senden ${formatPriceNumber(delta)} daha avantajli gorunuyor.`
-        : "Rakip tarafta daha dusuk fiyat sinyali gorunuyor."
-    );
-  } else if (isCheapestOffer(extracted) && extracted.other_sellers_summary?.count) {
-    parts.push("Rakip saticilar icinde en dusuk fiyat sinyali mevcut.");
-  }
-
-  if (hasStrongCompetitorTrust(extracted) && typeof getOtherSellerScoreGap(extracted) === "number") {
-    const scoreGap = getOtherSellerScoreGap(extracted) as number;
-    if (scoreGap >= 0.5) {
-      parts.push("Rakip saticilarin guven seviyesi daha yuksek gorunebilir.");
-    }
-  }
-
-  if (
-    hasStrongCompetitorDelivery(extracted) &&
-    extracted.has_free_shipping !== true &&
-    (!hasText(extracted.delivery_type) || extracted.delivery_type === "standard")
-  ) {
-    parts.push("Rakip tarafta teslimat avantaji daha guclu algilanabilir.");
-  }
-
-  if (extracted.official_seller) {
-    parts.push("Resmi satici sinyali guven tarafini destekliyor.");
-  }
-
-  if (hasText(extracted.campaign_label)) {
-    parts.push(`Kampanya gorunurlugu mevcut: ${extracted.campaign_label}.`);
+  if (competitionParts.length > 0) {
+    parts.push(`Rekabette ${competitionParts.join(" ve ")} gibi faktörler öne çıkıyor.`);
   }
 
   if (reviewRiskSummary) {
     parts.push(reviewRiskSummary);
   }
 
-  if (qaThemes?.length) {
-    parts.push(
-      `Soru-cevap tarafinda en cok ${qaThemes
-        .map((item) => item.label)
-        .join(", ")} konulari soruluyor.`
-    );
-  }
-
   if (
-    typeof extracted.follower_count === "number" &&
-    extracted.follower_count >= 1000
+    !extracted.official_seller &&
+    typeof extracted.seller_score === "number" &&
+    extracted.seller_score > 0 &&
+    extracted.seller_score < 7.5
   ) {
-    parts.push("Magaza takipci tabani guven sinyalini destekliyor.");
-  }
-
-  if (
-    Array.isArray(extracted.seller_badges) &&
-    extracted.seller_badges.some((badge) => /hizli teslimat/i.test(badge))
-  ) {
-    parts.push("Hizli teslimat rozeti teklif hizini destekliyor.");
-  }
-
-  if (derivedMetrics.visualStrength.label === "weak") {
-    parts.push("Vitrin gucu gorsel veya medya tarafinda sinirli olabilir.");
+    parts.push("Düşük satıcı puanı güveni olumsuz etkileyebilir.");
   }
 
   if (extracted.extractor_status === "blocked") {
-    parts.push("Bazi Trendyol alanlari cekilemedigi icin analiz kapsami sinirli kaldi.");
+    parts.push("Sayfa yapısı nedeniyle bazı kritik veriler okunamadı, bu nedenle analiz kapsamı sınırlıdır.");
   }
 
-  parts.push(
-    `SEO ${seoScore}/100, veri butunlugu ${completenessScore}/100, donusum sinyalleri ${conversionScore}/100.`
-  );
-
-  return parts.join(" ");
+  return parts.filter(Boolean).join(" ");
 }
 
 export function buildAnalysis({
   platform,
+  consolidatedInput,
   extracted,
   planContext = "free",
 }: BuildAnalysisParams): BuildAnalysisResult {
-  const seoScore = getSeoScore(extracted);
-  const dataCompletenessScore = getCompletenessScore(extracted);
-  const conversionScore = getConversionScore(extracted);
+    const seoScore = getSeoScore(consolidatedInput);
+  const dataCompletenessScore = getCompletenessScore(consolidatedInput);
+  const conversionScore = getConversionScore(consolidatedInput);
 
   const overallScore = clampScore(
-    seoScore * 0.35 + dataCompletenessScore * 0.35 + conversionScore * 0.3
+    seoScore * SCORING_CONFIG.weights.seo +
+      dataCompletenessScore * SCORING_CONFIG.weights.completeness +
+      conversionScore * SCORING_CONFIG.weights.conversion
   );
 
   const derivedMetrics = buildDerivedMetrics(extracted);
@@ -1907,9 +1556,6 @@ export function buildAnalysis({
   const summary = buildSummary({
     platform,
     extracted,
-    seoScore,
-    completenessScore: dataCompletenessScore,
-    conversionScore,
     derivedMetrics,
   });
   const decisionSupportPacket = buildDecisionSupportPacket({

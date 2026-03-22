@@ -2,10 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import {
-  getEffectivePlanCodeFromRecord,
-  getUserMembershipSnapshot,
-} from "@/lib/user-membership";
+import { resolvePlanForUser } from "@/lib/resolve-plan";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -48,12 +45,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const isValid = await bcrypt.compare(password, user.passwordHash);
         if (!isValid) return null;
 
+        // Resolve plan from subscription (single source of truth)
+        const planCode = await resolvePlanForUser(user.id, email);
+
         return {
           id: user.id,
           name: user.name,
           email: user.email,
           role: user.role,
-          plan: getEffectivePlanCodeFromRecord(user),
+          plan: planCode,
         };
       },
     }),
@@ -61,24 +61,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        // Sign-in: use plan from authorize() (already resolved from subscription)
         token.id = user.id;
         token.role = (user as { role?: string }).role ?? "USER";
         token.plan = (user as { plan?: string }).plan ?? "FREE";
         return token;
       }
 
-      if (token.id) {
-        const membership = await getUserMembershipSnapshot(String(token.id));
-
-        if (membership) {
-          token.role = membership.role;
-          token.plan = membership.planCode;
-        } else {
-          token.role = "USER";
-          token.plan = "FREE";
-        }
-      }
-
+      // Token refresh (not sign-in):
+      // Keep existing plan from token. Subscription changes require re-login to take effect.
+      // This avoids N+1 queries and potential race conditions during token refresh.
       return token;
     },
     async session({ session, token }) {

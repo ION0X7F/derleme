@@ -3,7 +3,9 @@ import { buildAnalysisTrace } from "../lib/analysis-trace";
 import { prisma } from "../lib/prisma";
 import { getLearningContext, recordLearningArtifacts } from "../lib/learning-engine";
 import { analyzeWithAi } from "../lib/ai-analysis";
+import { isAiAnalysisEligible } from "../lib/ai-eligibility";
 import { buildAnalysis } from "../lib/build-analysis";
+import { prepareAnalysisInput } from "../lib/prepare-analysis-input";
 import {
   createExtracted,
   TEST_CATEGORY,
@@ -63,6 +65,7 @@ async function main() {
 
   for (const extracted of trainingSet) {
     await recordLearningArtifacts({
+      reportId: null,
       platform,
       category,
       extracted,
@@ -95,19 +98,24 @@ async function main() {
     extracted: currentExtracted,
     includeSynthetic: true,
   });
+  const consolidatedInput = prepareAnalysisInput(currentExtracted, undefined);
 
   const analysis = buildAnalysis({
     platform,
     url: TEST_URL,
+    consolidatedInput,
     extracted: currentExtracted,
     planContext: "pro",
   });
+  const eligibility = isAiAnalysisEligible(consolidatedInput);
 
   const ai = await analyzeWithAi({
+    consolidatedInput,
     packet: analysis.decisionSupportPacket,
     extracted: currentExtracted,
     url: TEST_URL,
     learningContext,
+    eligibility,
   });
   const analysisTrace =
     ai

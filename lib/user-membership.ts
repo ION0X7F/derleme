@@ -7,6 +7,12 @@ import {
 import { resolveAppPlanId } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 
+/**
+ * @deprecated Use resolvePlanForUser() from lib/resolve-plan.ts instead.
+ * This module is being phased out in favor of single-source-of-truth plan resolution.
+ * Only kept for backward compatibility during transition period.
+ */
+
 const ENTITLED_SUBSCRIPTION_STATUSES = new Set<SubscriptionStatus>([
   SubscriptionStatus.ACTIVE,
   SubscriptionStatus.TRIALING,
@@ -30,6 +36,10 @@ export function hasEntitledSubscription(status?: SubscriptionStatus | null) {
 }
 
 export function getEffectivePlanCodeFromRecord(record: MembershipRecord): PlanCode {
+  /**
+   * @deprecated Use resolvePlanForUser() from lib/resolve-plan.ts instead.
+   * This function will be removed after migration to subscription-only plan determination.
+   */
   if (
     hasEntitledSubscription(record.subscription?.status) &&
     record.subscription?.plan?.code

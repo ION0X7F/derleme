@@ -15,12 +15,9 @@ import type {
 } from "@/types/analysis";
 
 const METRIC_LABELS: Record<keyof DerivedMetrics, string> = {
-  contentQuality: "Icerik",
-  trustStrength: "Guven",
-  offerStrength: "Teklif",
-  visualStrength: "Gorsel",
-  decisionClarity: "Karar netligi",
-  reviewRisk: "Yorum riski",
+  productQuality: "Urun Kalitesi",
+  sellerTrust: "Satici Guveni",
+  marketPosition: "Pazar Konumu",
 };
 
 function normalizeTraceText(value: string) {
@@ -147,25 +144,25 @@ function buildMetricSignals(
   const favoriteHigh = (extracted.favorite_count ?? 0) >= 500000;
   const cheaperCount = extracted.other_sellers_summary?.cheaper_count ?? 0;
 
-  if (metrics.contentQuality.label === "weak") {
+  if (metrics.productQuality.label === "weak") {
     items.push(
       createSignal({
         key: "content-weak",
-        label: "Icerik iknasi zayif",
-        detail: "Aciklama, ozellik veya urun detaylari karar vermeyi desteklemekte zorlanabilir.",
+        label: "Urun kalitesi zayif",
+        detail: "Aciklama, gorsel veya ozellik tarafinda karar vermeyi destekleyen unsurlar eksik.",
         tone: "warning",
         source: "metric",
         weight: 82,
-        relatedFields: ["description_length", "has_specs", "bullet_point_count"],
+        relatedFields: ["description_length", "has_specs", "bullet_point_count", "image_count"],
       })
     );
   }
 
-  if (metrics.offerStrength.label === "weak") {
+  if (metrics.marketPosition.label === "weak") {
     items.push(
       createSignal({
         key: "offer-weak",
-        label: "Teklif gucu baski altinda",
+        label: "Pazar konumu baski altinda",
         detail: "Fiyat, teslimat veya kampanya tarafi rakip karsisinda zayif kaliyor.",
         tone: "warning",
         source: "metric",
@@ -175,12 +172,12 @@ function buildMetricSignals(
     );
   }
 
-  if (metrics.trustStrength.label === "weak") {
+  if (metrics.sellerTrust.label === "weak") {
     items.push(
       createSignal({
         key: "trust-weak",
-        label: "Guven sinyali zayif",
-        detail: "Satici puani, iade veya sosyal kanit tarafinda tereddut yaratan alanlar var.",
+        label: "Satici guveni zayif",
+        detail: "Satici puani, yorumlar veya sosyal kanit tarafinda tereddut yaratan alanlar var.",
         tone: "warning",
         source: "metric",
         weight: 80,
@@ -189,22 +186,10 @@ function buildMetricSignals(
     );
   }
 
-  if (metrics.visualStrength.label === "weak") {
-    items.push(
-      createSignal({
-        key: "visual-weak",
-        label: "Vitrin gucu sinirli",
-        detail: "Gorsel veya medya anlatimi urunu ilk bakista tasimakta zorlanabilir.",
-        tone: "warning",
-        source: "metric",
-        weight: 76,
-        relatedFields: ["image_count", "has_video"],
-      })
-    );
-  }
+
 
   if (
-    metrics.reviewRisk.label === "weak" ||
+    metrics.sellerTrust.label === "weak" ||
     lowReviewVolume ||
     (lowRatedRatio != null && lowRatedRatio >= 0.4)
   ) {

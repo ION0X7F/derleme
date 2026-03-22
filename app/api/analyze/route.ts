@@ -6,6 +6,7 @@ import {
   buildAnalysisAccessState,
   resolveAccessPlan,
 } from "@/lib/analysis-access";
+import { resolvePlanForUser } from "@/lib/resolve-plan";
 import { sanitizeAnalysisTraceForAccess } from "@/lib/analysis-trace";
 import { getOrCreateGuestId } from "@/lib/guest";
 import { checkAnalyzeLimit } from "@/lib/check-analyze-limit";
@@ -16,7 +17,6 @@ import {
   AnalysisPipelineError,
   runAnalysisPipeline,
 } from "@/lib/run-analysis";
-import { getUserMembershipSnapshot } from "@/lib/user-membership";
 import { validateProductUrl } from "@/lib/url-validation";
 import type {
   AnalysisAccessState,
@@ -147,9 +147,9 @@ function shapeAnalysisForAccess(
         ? null
         : access.plan === "free"
           ? {
-              contentQuality: analysis.derivedMetrics.contentQuality,
-              trustStrength: analysis.derivedMetrics.trustStrength,
-              decisionClarity: analysis.derivedMetrics.decisionClarity,
+              productQuality: analysis.derivedMetrics.productQuality,
+              sellerTrust: analysis.derivedMetrics.sellerTrust,
+              marketPosition: analysis.derivedMetrics.marketPosition,
             }
           : analysis.derivedMetrics,
     coverage:
@@ -204,15 +204,19 @@ export async function POST(req: Request) {
     }
 
     const url = validatedUrl.normalizedUrl;
-    const unlimited = isUnlimitedUser(session?.user?.email);
-    const membership = session?.user?.id
-      ? await getUserMembershipSnapshot(session.user.id)
-      : null;
+    
+    // Single source of truth: subscription-based plan resolution
+    let planCode: string | null = null;
+    if (session?.user?.id) {
+      planCode = await resolvePlanForUser(session.user.id, session.user.email);
+    }
+    
+    // Unlimited override check (ENV based, no DB query)
+    const unlimited = session?.user?.email ? isUnlimitedUser(session.user.email) : false;
+    
     const accessPlan = resolveAccessPlan({
       sessionUserId: session?.user?.id,
-      userPlan:
-        membership?.planCode ??
-        (session?.user && "plan" in session.user ? String(session.user.plan) : null),
+      userPlan: planCode,
       unlimited,
     });
     const access = buildAnalysisAccessState(accessPlan);

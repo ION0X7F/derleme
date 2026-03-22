@@ -484,181 +484,33 @@ export async function getLearningContext(params: {
   extracted: ExtractedProductFields;
   includeSynthetic?: boolean;
 }): Promise<LearningContext> {
-  const platform = toSafePlatform(params.platform);
-  const category = toSafeCategory(params.category);
-  const baseWhere = params.includeSynthetic
-    ? {
-        platform,
-        category,
-      }
-    : {
-        platform,
-        category,
-        sourceType: "real",
-        learningEligible: true,
-      };
-
-  const [benchmarkRecord, ruleRecords, memoryRecords, knowledgeMemoryRecords] = await Promise.all([
-    prisma.categoryBenchmark.findUnique({
-      where: {
-        platform_category: {
-          platform,
-          category,
-        },
-      },
-    }),
-    prisma.learnedRule.findMany({
-      where: {
-        platform,
-        category,
-      },
-      orderBy: [{ confidence: "desc" }, { updatedAt: "desc" }],
-      take: 3,
-    }),
-    prisma.learningMemory.findMany({
-      where: {
-        ...baseWhere,
-        ...(cleanText(params.brand) ? { brand: cleanText(params.brand) } : {}),
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 3,
-    }),
-    params.includeSynthetic
-      ? prisma.learningMemory.findMany({
-          where: {
-            ...baseWhere,
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-          take: 150,
-        })
-      : Promise.resolve([] as LearningMemoryRecord[]),
-  ]);
-
-  let benchmark = mapBenchmarkRecord(benchmarkRecord);
-  let rules: LearnedRuleSnapshot[] = ruleRecords.map((item) => ({
-    ruleKey: item.ruleKey,
-    title: item.title,
-    insight: item.insight,
-    confidence: item.confidence,
-    supportCount: item.supportCount,
-  }));
-
-  if (params.includeSynthetic && knowledgeMemoryRecords.length > 0) {
-    const computedBenchmarkPayload = buildBenchmarkPayloadFromMemories(knowledgeMemoryRecords);
-
-    if (!benchmark) {
-      benchmark = mapComputedBenchmark({
-        platform,
-        category,
-        benchmarkPayload: computedBenchmarkPayload,
-      });
-    }
-
-    if (rules.length === 0) {
-      rules = buildRuleCandidatesFromBenchmark(computedBenchmarkPayload).map((item) => ({
-        ruleKey: item.ruleKey,
-        title: item.title,
-        insight: item.insight,
-        confidence: item.confidence,
-        supportCount: item.supportCount,
-      }));
-    }
-  }
-  const memorySnippets = memoryRecords
-    .map((item) => cleanText(item.criticalDiagnosis) || cleanText(item.summarySnippet))
-    .filter((item): item is string => !!item)
-    .slice(0, 3);
-
+  // MVP: Return minimal context without DB queries
+  // Full learning engine disabled to reduce analysis latency and complexity
+  // Can be re-enabled later for premium tiers
+  
   return {
-    benchmark,
-    rules,
-    memorySnippets,
-    systemLearning: buildSystemLearning({
-      extracted: params.extracted,
-      benchmark,
-      rules,
-    }),
+    benchmark: null,
+    rules: [],
+    memorySnippets: [],
+    systemLearning: null,
   };
 }
 
 export async function recordLearningArtifacts(params: {
-  reportId?: string | null;
-  platform: string | null | undefined;
-  category: string | null | undefined;
+  reportId: string | null;
+  platform: string | null;
+  category: string | null;
   extracted: ExtractedProductFields;
-  summary: string | null | undefined;
-  overallScore: number | null | undefined;
-  sourceType?: "real" | "synthetic";
-  missingDataReport?: MissingDataReport | null;
-  learningStatus?: LearningStatus | null;
-}) {
-  const platform = toSafePlatform(params.platform);
-  const category = toSafeCategory(params.category);
-  const sourceType = params.sourceType ?? "real";
-  const learningStatus = params.learningStatus ?? {
-    sourceType,
-    eligible: sourceType === "real",
-    reason:
-      sourceType === "real"
-        ? "Gercek analiz kaydi."
-        : "Sentetik veri benchmark ogrenimine dahil edilmez.",
-  };
-  const outcomeLabel = inferOutcomeLabel({
-    extracted: params.extracted,
-    overallScore: params.overallScore,
-  });
-  const parsedSummary = parseAnalysisSummary(params.summary);
-
-  await prisma.learningMemory.create({
-    data: {
-      reportId: params.reportId ?? null,
-      platform,
-      category,
-      sourceType,
-      learningEligible: learningStatus.eligible,
-      excludedReason: learningStatus.eligible ? null : learningStatus.reason,
-      coverageConfidence: params.missingDataReport
-        ? params.missingDataReport.after.criticalMissingFields.length === 0
-          ? "high"
-          : params.missingDataReport.after.criticalMissingFields.length <= 2
-            ? "medium"
-            : "low"
-        : null,
-      missingCriticalCount:
-        params.missingDataReport?.after.criticalMissingFields.length ?? 0,
-      brand: cleanText(params.extracted.brand),
-      sellerName: cleanText(params.extracted.seller_name),
-      productName: cleanText(params.extracted.product_name),
-      priceBand: getPriceBand(params.extracted.normalized_price),
-      outcomeLabel,
-      confidenceLabel: outcomeLabel === "weak" ? "low" : outcomeLabel === "average" ? "medium" : "high",
-      isBestSeller: params.extracted.is_best_seller,
-      bestSellerRank: params.extracted.best_seller_rank ?? null,
-      normalizedPrice: params.extracted.normalized_price ?? null,
-      shippingDays: params.extracted.shipping_days ?? null,
-      imageCount: params.extracted.image_count ?? null,
-      descriptionLength: params.extracted.description_length ?? null,
-      ratingValue: params.extracted.rating_value ?? null,
-      reviewCount: params.extracted.review_count ?? null,
-      sellerScore: params.extracted.seller_score ?? null,
-      favoriteCount: params.extracted.favorite_count ?? null,
-      otherSellersCount: params.extracted.other_sellers_count ?? null,
-      hasVideo: params.extracted.has_video,
-      hasFreeShipping: params.extracted.has_free_shipping,
-      officialSeller: params.extracted.official_seller,
-      hasCampaign: params.extracted.has_campaign,
-      criticalDiagnosis: cleanText(parsedSummary.criticalDiagnosis),
-      systemLearning: cleanText(parsedSummary.systemLearning),
-      summarySnippet: cleanText(parsedSummary.raw),
-      signalSnapshot: buildSignalSnapshot(params.extracted) as Prisma.InputJsonValue,
-    },
-  });
-
-  if (sourceType === "real") {
-    await rebuildCategoryKnowledge(platform, category);
-  }
+  summary: string;
+  overallScore: number;
+  sourceType: "real" | "synthetic";
+  missingDataReport?: MissingDataReport;
+  learningStatus?: LearningStatus;
+}): Promise<void> {
+  // MVP: Learning artifacts recording disabled
+  // This reduces post-analysis latency and DB pressure
+  // Can be re-enabled for future analytics/refinement
+  
+  // No-op for MVP
+  return;
 }

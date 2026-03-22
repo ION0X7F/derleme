@@ -5,12 +5,9 @@ type DerivedMetricSummary = {
 };
 
 type DerivedMetricsSummary = {
-  contentQuality?: DerivedMetricSummary;
-  trustStrength?: DerivedMetricSummary;
-  offerStrength?: DerivedMetricSummary;
-  visualStrength?: DerivedMetricSummary;
-  decisionClarity?: DerivedMetricSummary;
-  reviewRisk?: DerivedMetricSummary;
+  productQuality?: DerivedMetricSummary;
+  sellerTrust?: DerivedMetricSummary;
+  marketPosition?: DerivedMetricSummary;
 } | null;
 
 type ReportAccessState = {

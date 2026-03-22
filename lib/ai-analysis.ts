@@ -5,15 +5,19 @@ import {
 } from "@/lib/analysis-summary";
 import type {
   AnalysisSuggestion,
+  ConsolidatedAnalysisInput,
+  DataField,
   DecisionSupportPacket,
   ExtractedProductFields,
   LearningContext,
   MissingDataReport,
 } from "@/types/analysis";
+import type { AiEligibilityResult, AiEligibilityLevel } from "@/lib/ai-eligibility";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
+// ... (rest of the types and constants are the same)
 type SupportedDependency =
   | "title"
   | "h1"
@@ -442,18 +446,18 @@ function ensureStructuredSummary(params: {
   }`;
 }
 
-function getScoreGuardrail(confidence: DecisionSupportPacket["coverage"]["confidence"]) {
-  if (confidence === "high") return 18;
-  if (confidence === "medium") return 12;
+function getScoreGuardrail(level: AiEligibilityLevel) {
+  if (level === "high") return 18;
+  if (level === "medium") return 12;
   return 8;
 }
 
 function guardScore(params: {
   candidate: number;
   baseline: number;
-  confidence: DecisionSupportPacket["coverage"]["confidence"];
+  level: AiEligibilityLevel;
 }) {
-  const maxDrift = getScoreGuardrail(params.confidence);
+  const maxDrift = getScoreGuardrail(params.level);
   return Math.max(
     0,
     Math.min(
@@ -614,13 +618,62 @@ function buildSignalDigest(params: {
   };
 }
 
-function buildPrompt(
+function buildDataQualitySummary(
+  input: ConsolidatedAnalysisInput
+): string {
+  const quality_signals: string[] = [];
+
+  // Iterate over a curated list of important fields for brevity
+  const importantFields: Array<keyof ConsolidatedAnalysisInput> = [
+    "title",
+    "price",
+    "brand",
+    "reviewCount",
+    "ratingValue",
+    "imageCount",
+    "sellerScore",
+    "descriptionLength",
+  ];
+
+  for (const key of importantFields) {
+    const field = input[key] as DataField<string | number | boolean>;
+    if (!field) continue;
+
+    if (field.confidence >= 0.9) {
+      quality_signals.push(`${key}: yuksek guvenilirlik (${field.source})`);
+    } else if (field.confidence >= 0.5) {
+      quality_signals.push(`${key}: orta guvenilirlik (${field.source})`);
+    } else if (field.value !== null && field.confidence > 0) {
+      quality_signals.push(`${key}: dusuk guvenilirlik (${field.source})`);
+    }
+  }
+
+  if (quality_signals.length === 0) {
+    return "Veri kalitesi sinyalleri hesaplanamadi.";
+  }
+
+  return `Guvenilirlik Raporu: ${quality_signals.join(", ")}.`;
+}
+
+function buildPrompt(params: {
+  consolidatedInput: ConsolidatedAnalysisInput,
   packet: DecisionSupportPacket,
   extracted: ExtractedProductFields,
   url: string,
-  learningContext: LearningContext | null | undefined,
-  missingDataReport: MissingDataReport | null | undefined
-) {
+  learningContext?: LearningContext | null,
+  missingDataReport?: MissingDataReport | null,
+  eligibility: AiEligibilityResult,
+}) {
+  const {
+    consolidatedInput,
+    packet,
+    extracted,
+    url,
+    learningContext,
+    missingDataReport,
+    eligibility,
+  } = params;
+  
   const signalDigest = buildSignalDigest({
     packet,
     extracted,
@@ -636,9 +689,23 @@ function buildPrompt(
     missing_data_report: missingDataReport ?? null,
   };
 
+  const dataQualitySummary = buildDataQualitySummary(consolidatedInput);
+
+  const confidenceWarning = eligibility.level === 'medium'
+    ? `VERI KALITESI UYARISI:
+Sana saglanan verilerin bir kismi dusuk veya orta guvenilirlikli kaynaklardan geliyor (ortalama guven skoru: ${eligibility.score.toFixed(2)}).
+Bu nedenle, cikarimlarini yaparken daha temkinli ol. Sadece yuksek guvenilirlikli verilere dayanarak kesin ifadeler kullan, geri kalaninda 'mevcut veriler isiginda...' gibi daha yumusak bir dil kullan.`
+    : '';
+
   return `
 Sen Trendyol ekosisteminde uzmanlasmis veri odakli bir "Pazar Yeri Stratejistisin".
 Gorevin, sana saglanan karar destek paketini capraz sorgulama yontemiyle analiz edip "Neden satamiyorum?" sorusuna net cevap vermek.
+
+VERI KALITESI OZETI:
+${dataQualitySummary}
+Bu ozeti dikkate al. Yuksek guvenilirlikli verilere oncelik ver. Dusuk guvenilirlikli verilere dayali cikarimlar yapmaktan kacinin.
+
+${confidenceWarning}
 
 ANALIZ AKISI:
 1. Temel Varlik ve Erisilebilirlik:
@@ -927,11 +994,25 @@ function postProcessAiResult(
   result: RawAiAnalysisResult,
   extracted: ExtractedProductFields,
   fallback: AiAnalysisResult,
-  confidence: DecisionSupportPacket["coverage"]["confidence"],
+  eligibility: AiEligibilityResult,
   learningContext?: LearningContext | null
 ): AiAnalysisResult {
-  if (confidence === "low") {
-    return fallback;
+  // For medium confidence, we rely more on the deterministic fallback
+  if (eligibility.level === "medium") {
+     const mergedSuggestions = dedupeSuggestions(
+      [...fallback.suggestions, ...result.suggestions.map(s => ({...s, title: humanizeAiText(s.title), detail: humanizeAiText(s.detail)}))],
+      5
+    );
+    return {
+       ...fallback,
+       summary: syncStructuredSummaryWithSuggestions({
+          summary: fallback.summary, // prioritize deterministic summary
+          fallbackSummary: result.summary,
+          suggestions: mergedSuggestions,
+          systemLearning: learningContext?.systemLearning,
+       }) || fallback.summary,
+       suggestions: mergedSuggestions,
+    }
   }
 
   const validatedAiSuggestions = dedupeSuggestions(
@@ -1007,20 +1088,22 @@ function postProcessAiResult(
     seo_score: guardScore({
       candidate: result.seo_score,
       baseline: fallback.seo_score,
-      confidence,
+      level: eligibility.level,
     }),
     conversion_score: guardScore({
       candidate: result.conversion_score,
       baseline: fallback.conversion_score,
-      confidence,
+      level: eligibility.level,
     }),
     overall_score: guardScore({
       candidate: result.overall_score,
       baseline: fallback.overall_score,
-      confidence,
+      level: eligibility.level,
     }),
   };
 }
+
+// ... (buildStrategicSections and other functions remain the same)
 
 type StrategicCriticalCandidate = {
   theme: "delivery" | "visual" | "content" | "trust" | "price";
@@ -1496,34 +1579,40 @@ function buildDeterministicFallback(params: {
     suggestions,
     seo_score:
       scoreToRange(params.baseline?.seo_score) ??
-      scoreToRange(params.packet.metrics.contentQuality.score) ??
+      scoreToRange(params.packet.metrics.productQuality.score) ??
       0,
     conversion_score:
       scoreToRange(params.baseline?.conversion_score) ??
-      scoreToRange(params.packet.metrics.offerStrength.score) ??
+      scoreToRange(params.packet.metrics.marketPosition.score) ??
       0,
     overall_score:
       scoreToRange(params.baseline?.overall_score) ??
       scoreToRange(
-        ((params.packet.metrics.contentQuality.score ?? 0) +
-          (params.packet.metrics.trustStrength.score ?? 0) +
-          (params.packet.metrics.offerStrength.score ?? 0) +
-          (params.packet.metrics.decisionClarity.score ?? 0)) /
-          4
+        ((params.packet.metrics.productQuality.score ?? 0) +
+          (params.packet.metrics.sellerTrust.score ?? 0) +
+          (params.packet.metrics.marketPosition.score ?? 0)) /
+          3
       ) ?? 0,
   } satisfies AiAnalysisResult;
 }
 
 export async function analyzeWithAi(params: {
+  consolidatedInput: ConsolidatedAnalysisInput;
   packet: DecisionSupportPacket;
   extracted: ExtractedProductFields;
   url: string;
   learningContext?: LearningContext | null;
   missingDataReport?: MissingDataReport | null;
   baseline?: AiBaselineContext | null;
+  eligibility: AiEligibilityResult;
 }): Promise<AiAnalysisResult | null> {
   try {
     const fallback = buildDeterministicFallback(params);
+
+    // This case should be already handled by the caller, but as a safeguard:
+    if (!params.eligibility.eligible) {
+      return fallback;
+    }
 
     if (!genAI) {
       console.warn(
@@ -1533,23 +1622,14 @@ export async function analyzeWithAi(params: {
     }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.1,
-        thinkingConfig: {
-          thinkingBudget: 0,
-        },
-      } as never,
+      },
     });
 
-    const prompt = buildPrompt(
-      params.packet,
-      params.extracted,
-      params.url,
-      params.learningContext,
-      params.missingDataReport
-    );
+    const prompt = buildPrompt(params);
     const result = await model.generateContent(prompt);
     const text = cleanJsonText(result.response.text());
     const parsed = JSON.parse(text) as unknown;
@@ -1563,7 +1643,7 @@ export async function analyzeWithAi(params: {
       sanitized,
       params.extracted,
       fallback,
-      params.packet.coverage.confidence,
+      params.eligibility,
       params.learningContext
     );
   } catch (err) {

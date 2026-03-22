@@ -124,19 +124,25 @@ async function main() {
     requestedMode === "auto" && process.env.GEMINI_API_KEY ? "auto" : "fallback";
   const { buildAnalysis } = await import("../lib/build-analysis");
   const { analyzeWithAi } = await import("../lib/ai-analysis");
+  const { isAiAnalysisEligible } = await import("../lib/ai-eligibility");
   const { buildAnalysisTrace } = await import("../lib/analysis-trace");
+  const { prepareAnalysisInput } = await import("../lib/prepare-analysis-input");
 
   const scenarioReports: ScenarioRunReport[] = [];
 
   for (const scenario of getOfflineAnalysisScenarios()) {
+    const consolidatedInput = prepareAnalysisInput(scenario.extracted, undefined);
     const analysis = buildAnalysis({
       platform: scenario.extracted.platform ?? TEST_PLATFORM,
       url: TEST_URL,
+      consolidatedInput,
       extracted: scenario.extracted,
       planContext: "pro",
     });
+    const eligibility = isAiAnalysisEligible(consolidatedInput);
 
     const result = await analyzeWithAi({
+      consolidatedInput,
       packet: analysis.decisionSupportPacket,
       extracted: analysis.extractedData,
       url: TEST_URL,
@@ -150,6 +156,7 @@ async function main() {
         conversion_score: analysis.conversionScore,
         overall_score: analysis.overallScore,
       },
+      eligibility,
     });
 
     if (!result) {

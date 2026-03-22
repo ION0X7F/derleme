@@ -2099,19 +2099,16 @@ function looksLikeNaturalProductPhrase(value: string) {
   return false;
 }
 
-function chooseBestModelCode(values: Array<string | null>) {
-  const unique = Array.from(new Set(values.filter(Boolean))) as string[];
+function chooseBestModelCode(values: Array<string | null>): string | null {
+  for (const value of values) {
+    const candidate = normalizeModelCode(value);
+    if (!candidate) continue;
 
-  const filtered = unique.filter((value) => {
-    if (value.length < 3 || value.length > 60) return false;
-    if (!/[a-zA-Z0-9]/.test(value)) return false;
-    if (TRENDYOL_BLACKLIST.has(value)) return false;
-    if (TRENDYOL_BLACKLIST.has(value.toUpperCase())) return false;
-    if (isTrendyolCategoryCode(value)) return false;
-    // küçük harf ile başlayan kısa değerler — genellikle iç ID
-    if (/^[a-z]/.test(value) && value.length <= 12) return false;
+    if (candidate.length < 4 || candidate.length > 50) continue;
+    if (TRENDYOL_BLACKLIST.has(candidate) || TRENDYOL_BLACKLIST.has(candidate.toUpperCase())) continue;
+    if (isTrendyolCategoryCode(candidate)) continue;
 
-    const lower = value.toLowerCase();
+    const lower = candidate.toLowerCase();
     if (
       lower === "trendyol" ||
       lower.startsWith("ty") ||
@@ -2119,30 +2116,19 @@ function chooseBestModelCode(values: Array<string | null>) {
       lower.includes("teslimat") ||
       lower.includes("satıcı") ||
       lower.includes("değerlendirme") ||
-      lower.includes("yorum")
-    ) return false;
+      lower.includes("yorum") ||
+      lower.includes("model")
+    ) continue;
 
-    if (looksLikeNaturalProductPhrase(value)) return false;
-    return /[A-Za-z]/.test(value) && /\d/.test(value);
-  });
+    if (looksLikeNaturalProductPhrase(candidate)) continue;
+    if (/^\d+$/.test(candidate)) continue;
+    if (!/[a-zA-Z]/.test(candidate)) continue;
+    if (!/\d/.test(candidate)) continue;
 
-  if (filtered.length === 0) return null;
+    return candidate;
+  }
 
-  filtered.sort((a, b) => {
-    const score = (v: string) => {
-      let s = 0;
-      if (/[A-Z]/.test(v)) s += 2;
-      if (/\d/.test(v)) s += 2;
-      if (/[-_]/.test(v)) s += 2;
-      if (v.length >= 4 && v.length <= 20) s += 3;
-      if (/^[A-Z]{1,4}\d{2,}[A-Z0-9-]*$/i.test(v)) s += 4;
-      if (/^[A-Z0-9]+-[A-Z0-9]+$/i.test(v)) s += 3;
-      return s;
-    };
-    return score(b) - score(a);
-  });
-
-  return filtered[0] ?? null;
+  return null;
 }
 
 function extractSellerFromHtml($: CheerioAPI, decodedHtml: string) {
@@ -2183,183 +2169,138 @@ function extractSellerFromHtml($: CheerioAPI, decodedHtml: string) {
 }
 
 export const extractTrendyolFields: PlatformExtractor = ({ $, html }) => {
+  // 1. Tüm potansiyel veri kaynaklarını topla
   const decodedHtml = decodeUnicode(html);
   const jsonBlocks = collectJsonBlocks(decodedHtml);
   const stateObjects = collectProductObjectsFromState(decodedHtml);
   const envoyBlocks = collectTrendyolEnvoyProps(decodedHtml);
   const envoyProduct = getTrendyolEnvoyProductRecord(envoyBlocks);
 
-  const brandCandidates: Array<string | null> = [
-    extractBrandFromJson(jsonBlocks),
-    normalizeBrand(cleanText($('meta[property="og:brand"]').attr("content") || null)),
-    normalizeBrand(cleanText($('[data-testid="brand-name"]').first().text())),
-    normalizeBrand(cleanText($('a[href*="/marka/"]').first().text())),
-    normalizeBrand(
-      cleanText(
-        (decodedHtml.match(/"(?:brand|brandName)"\s*:\s*"([^"]+)"/i) || [])[1]
-      )
-    ),
-  ];
+  // 2. En güvenilir kaynak olan "envoy" verisinden öncelikli çıkarım yap
+  const currentPriceNumber =
+    toFiniteNumber(getNestedValue(envoyProduct, ["price", "discountedPrice", "value"])) ??
+    toFiniteNumber(getNestedValue(envoyProduct, ["price", "sellingPrice", "value"])) ??
+    extractCurrentPriceNumber(jsonBlocks, stateObjects, decodedHtml);
 
-  const sellerName = extractSellerFromHtml($, decodedHtml);
+  const envoySignals = parseOtherSellerOffers(envoyProduct, currentPriceNumber);
+
+  // 3. Veri önceliklendirme ve geri çekilme (fallback) mantığı ile nihai nesneyi oluştur
+  // Öncelik Sırası: Envoy Sinyalleri -> Diğer Gömülü JSON'lar -> HTML Kazıma
+
+  const brand =
+    normalizeBrand(cleanText(getNestedValue(envoyProduct, ["brand", "name"]) as string)) ??
+    extractBrandFromJson(jsonBlocks) ??
+    normalizeBrand(cleanText($('meta[property="og:brand"]').attr("content") || null)) ??
+    normalizeBrand(cleanText($('[data-testid="brand-name"]').first().text())) ??
+    normalizeBrand(cleanText($('a[href*="/marka/"]').first().text())) ??
+    normalizeBrand(
+      cleanText((decodedHtml.match(/"(?:brand|brandName)"\s*:\s*"([^"]+)"/i) || [])[1])
+    );
+
+  const price =
+    normalizePriceValue(currentPriceNumber) ??
+    extractPriceFromJson(jsonBlocks) ??
+    normalizePriceValue(cleanText($('[data-testid="price-current-price"]').first().text())) ??
+    normalizePriceValue(cleanText($('[class*="prc-dsc"]').first().text()));
+
+  const originalPrice =
+    toFiniteNumber(getNestedValue(envoyProduct, ["price", "originalPrice", "value"])) ??
+    extractOriginalPrice($, decodedHtml, jsonBlocks, stateObjects, currentPriceNumber);
 
   const imageCandidates = new Set<string>();
-  for (const image of extractImagesFromJson(jsonBlocks)) {
-    imageCandidates.add(image);
-  }
-  for (const image of extractImagesFromStateObjects(stateObjects)) {
-    imageCandidates.add(image);
-  }
+  (
+    (getNestedValue(envoyProduct, ["images"]) as string[]) ||
+    extractImagesFromStateObjects(stateObjects) ||
+    extractImagesFromJson(jsonBlocks)
+  ).forEach((img) => {
+    const normalized = normalizeImageUrl(img);
+    if (normalized) imageCandidates.add(normalized);
+  });
 
-  $(
-    ["img", '[class*="gallery"] img', '[class*="image"] img', '[class*="slider"] img', '[class*="carousel"] img'].join(",")
-  ).each((_: number, el: unknown) => {
-    const element = el as Element;
-    const attrs = [
-      $(element).attr("src"),
-      $(element).attr("data-src"),
-      $(element).attr("data-original"),
-      $(element).attr("data-image"),
-      $(element).attr("data-lazy-src"),
-    ];
-    for (const attr of attrs) {
-      const normalized = normalizeImageUrl(attr || null);
-      if (!normalized) continue;
-      if (/ty-display|boutique|banners?|logo|avatar/i.test(normalized)) continue;
-      imageCandidates.add(normalized);
-    }
-
-    const srcset = $(element).attr("srcset");
-    if (srcset) {
-      const parts = srcset
-        .split(",")
-        .map((item: string) => cleanText(item.split(" ")[0] || null))
-        .filter(Boolean) as string[];
-      for (const part of parts) {
-        const normalized = normalizeImageUrl(part);
+  if (imageCandidates.size < 1) {
+    $(
+      [
+        "img",
+        '[class*="gallery"] img',
+        '[class*="image"] img',
+        '[class*="slider"] img',
+        '[class*="carousel"] img',
+      ].join(",")
+    ).each((_, el) => {
+      const element = el as Element;
+      const attrs = [
+        $(element).attr("src"),
+        $(element).attr("data-src"),
+        $(element).attr("data-original"),
+        $(element).attr("data-image"),
+        $(element).attr("data-lazy-src"),
+      ];
+      for (const attr of attrs) {
+        const normalized = normalizeImageUrl(attr || null);
         if (!normalized) continue;
         if (/ty-display|boutique|banners?|logo|avatar/i.test(normalized)) continue;
         imageCandidates.add(normalized);
       }
-    }
-  });
+    });
+  }
 
-  const modelCodeCandidates: Array<string | null> = [
+  const modelCode = chooseBestModelCode([
+    getNestedValue(envoyProduct, ["productCode"]) as string,
+    getNestedValue(envoyProduct, ["merchantSku"]) as string,
     ...extractModelCodeFromStateObjects(stateObjects),
     ...extractModelCodeFromTables($),
-    normalizeModelCode(
-      cleanText(
-        (
-          decodedHtml.match(
-            /"(?:modelCode|productCode|merchantSku|stockCode)"\s*:\s*"([^"]{3,60})"/i
-          ) || []
-        )[1]
-      )
-    ),
-    normalizeModelCode(
-      cleanText($('meta[name="twitter:data1"]').attr("content") || null)
-    ),
-  ];
+  ]);
 
-  const priceCandidates: Array<string | null> = [
-    extractPriceFromJson(jsonBlocks),
-    normalizePriceValue(cleanText($('[data-testid="price-current-price"]').first().text())),
-    normalizePriceValue(cleanText($('[class*="prc-dsc"]').first().text())),
-    normalizePriceValue(cleanText($('[class*="price"]').first().text())),
-    normalizePriceValue(
-      cleanText(
-        (
-          decodedHtml.match(
-            /"(?:sellingPrice|price|discountedPrice|salePrice)"\s*:\s*"?([0-9.,]+)"?/i
-          ) || []
-        )[1]
-      )
-    ),
-  ];
-
-  const brand = pickFirstValid(
-    brandCandidates.filter((value) => {
-      if (!value) return false;
-      return value.toLowerCase() !== "trendyol";
-    })
-  );
-
-  const modelCode = chooseBestModelCode(modelCodeCandidates);
-  const imageCount = imageCandidates.size > 0 ? Math.min(imageCandidates.size, 20) : 0;
-  const price = pickFirstValid(priceCandidates);
-  const currentPriceNumber = extractCurrentPriceNumber(
-    jsonBlocks,
-    stateObjects,
-    decodedHtml
-  );
-  const envoySignals = parseOtherSellerOffers(envoyProduct, currentPriceNumber);
-  const stockStatus = extractStockStatus($, decodedHtml, stateObjects);
-  const originalPrice = extractOriginalPrice(
-    $,
-    decodedHtml,
-    jsonBlocks,
-    stateObjects,
-    currentPriceNumber
-  );
-  const discountRate = calculateDiscountRate(originalPrice, currentPriceNumber);
-  const hasFreeShipping = detectFreeShipping($, decodedHtml);
-  const shippingDays = extractShippingDaysFromJson(jsonBlocks);
-  const questionCount = extractQuestionCount($, decodedHtml, stateObjects);
-  const variantCount = extractVariantCount($, decodedHtml, stateObjects);
-  const hasVideo = detectVideo($, decodedHtml, stateObjects);
-  const hasBrandPage = detectBrandPage($, decodedHtml, brand);
-  const bulletPointCount = extractBulletPointCount($, decodedHtml, stateObjects);
-  const officialSeller = detectOfficialSeller($, decodedHtml);
-  const hasCampaign = detectCampaignSignal($, decodedHtml);
-  const campaignLabel = extractCampaignLabel($, decodedHtml);
-  const deliveryType = extractDeliveryType($, decodedHtml);
-  const category = extractCategory(jsonBlocks, decodedHtml);
+  const questionCount = envoySignals.question_count; // Sadece envoy'dan gelen, daha güvenilir.
 
   return {
-    brand,
-    category: envoySignals.category || category,
-    seller_name: envoySignals.seller_name || sellerName,
-    seller_badges: envoySignals.seller_badges,
+    // En güvenilir kaynaktan (envoy) gelenler
+    seller_name: envoySignals.seller_name ?? extractSellerFromHtml($, decodedHtml),
     seller_score: envoySignals.seller_score,
-    follower_count: envoySignals.follower_count,
-    image_count:
-      typeof envoySignals.image_count === "number" && envoySignals.image_count > imageCount
-        ? envoySignals.image_count
-        : imageCount,
-    model_code: modelCode,
-    price,
-    original_price: originalPrice,
-    discount_rate: discountRate,
-    has_free_shipping: hasFreeShipping || envoySignals.has_free_shipping,
-    shipping_days: shippingDays,
-    rating_value: envoySignals.rating_value ?? null,
+    seller_badges: envoySignals.seller_badges,
+    review_count: envoySignals.review_count,
+    rating_value: envoySignals.rating_value,
     rating_breakdown: envoySignals.rating_breakdown,
-    question_count: envoySignals.question_count ?? questionCount,
-    review_count: envoySignals.review_count ?? null,
-    review_snippets: envoySignals.review_snippets,
-    qa_snippets: envoySignals.qa_snippets,
-    review_summary: envoySignals.review_summary,
-    variant_count: envoySignals.variant_count ?? variantCount,
     stock_quantity: envoySignals.stock_quantity,
-    has_video: hasVideo || envoySignals.has_video,
-    has_brand_page: hasBrandPage,
-    bullet_point_count: bulletPointCount,
-    has_return_info: envoySignals.has_return_info || undefined,
-    has_specs: envoySignals.has_specs || undefined,
-    stock_status: envoySignals.stock_status || stockStatus,
-    merchant_id: envoySignals.merchant_id,
-    listing_id: envoySignals.listing_id,
-    official_seller: officialSeller || envoySignals.official_seller,
     favorite_count: envoySignals.favorite_count,
-    other_sellers_count: envoySignals.other_seller_offers?.length ?? null,
     other_seller_offers: envoySignals.other_seller_offers,
     other_sellers_summary: envoySignals.other_sellers_summary,
-    has_campaign: hasCampaign || envoySignals.has_campaign,
-    campaign_label: envoySignals.campaign_label || campaignLabel,
-    promotion_labels: envoySignals.promotion_labels,
-    delivery_type: deliveryType,
+    merchant_id: envoySignals.merchant_id,
+    listing_id: envoySignals.listing_id,
     is_best_seller: envoySignals.is_best_seller,
     best_seller_rank: envoySignals.best_seller_rank,
     best_seller_badge: envoySignals.best_seller_badge,
+    review_snippets: envoySignals.review_snippets,
+    qa_snippets: envoySignals.qa_snippets,
+    review_summary: envoySignals.review_summary,
+
+    // Birden çok kaynaktan, öncelik sırasına göre doldurulanlar
+    brand: brand,
+    price: price,
+    original_price: originalPrice,
+    discount_rate: calculateDiscountRate(originalPrice, currentPriceNumber),
+    image_count:
+      envoySignals.image_count ?? (imageCandidates.size > 0 ? Math.min(imageCandidates.size, 20) : 0),
+
+    // Güvenilirliği artırılmış veya sadeleştirilmiş alanlar
+    question_count: typeof questionCount === "number" && questionCount > 0 ? questionCount : null,
+    model_code: modelCode, // Daha tutucu `chooseBestModelCode` fonksiyonundan gelir.
+
+    // Fallback'li diğer alanlar
+    category: envoySignals.category ?? extractCategory(jsonBlocks, decodedHtml),
+    has_free_shipping: envoySignals.has_free_shipping || detectFreeShipping($, decodedHtml),
+    shipping_days: extractShippingDaysFromJson(jsonBlocks), // Genellikle sadece JSON-LD'de var.
+    variant_count: envoySignals.variant_count ?? extractVariantCount($, decodedHtml, stateObjects),
+    has_video: envoySignals.has_video || detectVideo($, decodedHtml, stateObjects),
+    has_brand_page: detectBrandPage($, decodedHtml, brand),
+    bullet_point_count: extractBulletPointCount($, decodedHtml, stateObjects),
+    has_return_info: envoySignals.has_return_info || undefined,
+    has_specs: envoySignals.has_specs || undefined,
+    stock_status: envoySignals.stock_status ?? extractStockStatus($, decodedHtml, stateObjects),
+    official_seller: envoySignals.official_seller || detectOfficialSeller($, decodedHtml),
+    has_campaign: envoySignals.has_campaign || detectCampaignSignal($, decodedHtml),
+    campaign_label: envoySignals.campaign_label ?? extractCampaignLabel($, decodedHtml),
+    promotion_labels: envoySignals.promotion_labels,
+    delivery_type: extractDeliveryType($, decodedHtml),
   };
 };

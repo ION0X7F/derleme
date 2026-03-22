@@ -13,6 +13,42 @@ export type PriorityAction = {
 
 export type AccessPlan = "guest" | "free" | "pro" | "enterprise";
 
+/**
+ * Extraction-level metadata tracking for each field.
+ * Captures source, confidence, derivation, and fallback chain.
+ * @phase Phase 1: Memory only (not persisted to DB)
+ */
+export type ExtractedFieldSource = "platform" | "generic" | "api" | "api_fallback" | "derived" | "synthetic" | "null";
+
+export type ExtractedFieldMetadata = {
+  source: ExtractedFieldSource;
+  confidence: "high" | "medium" | "low" | "unknown";
+  timestamp?: number; // unix ms (when extracted)
+  derivedFrom?: string[]; // field names used in derivation
+  fallbackChain?: string[]; // sources attempted in order
+  apiAge?: number; // hours old (if source=api)
+  reason?: string; // human readable explanation
+};
+
+export type ExtractorHealthReport = {
+  platformDetected: string;
+  primarySourceUsed: "platform" | "generic" | "api";
+  criticalFieldsFound: number; // x / 8
+  allFieldsAvailable: number; // x / total
+  sourceBreakdown: {
+    platform: number;
+    generic: number;
+    api: number;
+    derived: number;
+    synthetic: number;
+  };
+  fallbacksUsed: string[]; // descriptive list
+  blockedFields: string[]; // extraction failed
+  apiCallAttempted: boolean;
+  apiCallSucceeded: boolean;
+  errors: Array<{ field: string; error: string }>;
+};
+
 export type DerivedMetricLabel =
   | "strong"
   | "medium"
@@ -26,12 +62,9 @@ export type DerivedMetric = {
 };
 
 export type DerivedMetrics = {
-  contentQuality: DerivedMetric;
-  trustStrength: DerivedMetric;
-  offerStrength: DerivedMetric;
-  visualStrength: DerivedMetric;
-  decisionClarity: DerivedMetric;
-  reviewRisk: DerivedMetric;
+  productQuality: DerivedMetric;
+  sellerTrust: DerivedMetric;
+  marketPosition: DerivedMetric;
 };
 
 export type ReviewRatingBreakdown = {
@@ -425,4 +458,80 @@ export type BuildAnalysisResult = {
 
   priceCompetitiveness: string | null;
   dataSource: string;
+
+  // Phase 1: Extraction reliability metadata (memory only)
+  _fieldMetadata?: Record<string, ExtractedFieldMetadata>;
+  extractorHealth?: ExtractorHealthReport;
+};
+
+// =================================================================
+// Consolidated Analysis Input (New Layer)
+// =================================================================
+
+/**
+ * The source from which a piece of data was extracted.
+ * Stricter subset for the consolidated input.
+ */
+export type ConsolidatedDataSource =
+  | "json-ld"
+  | "meta-tags"
+  | "html-scrape"
+  | "api"
+  | "derived"
+  | "unknown";
+
+/**
+ * A container for a piece of data that includes metadata about its
+ * origin, reliability, and the logic used to produce it.
+ */
+export type DataField<T> = {
+  value: T | null;
+  source: ConsolidatedDataSource;
+  /** A score from 0.0 (unreliable) to 1.0 (ground truth) */
+  confidence: number;
+  /** A human-readable explanation of how this value was determined. */
+  reason: string;
+};
+
+/**
+ * A unified and reliable data object created by the "Analysis Pre-processing Layer".
+ * This object is the single source of truth for all downstream analysis,
+ * including the AI analysis and deterministic rule engines.
+ */
+export type ConsolidatedAnalysisInput = {
+  // Core Product Info
+  title: DataField<string>;
+  brand: DataField<string>;
+  productName: DataField<string>;
+  modelCode: DataField<string>;
+  category: DataField<string>;
+
+  // Pricing
+  price: DataField<number>;
+  originalPrice: DataField<number>;
+  currency: DataField<string>;
+
+  // Media
+  imageCount: DataField<number>;
+  hasVideo: DataField<boolean>;
+
+  // Ratings & Reviews
+  ratingValue: DataField<number>;
+  reviewCount: DataField<number>;
+
+  // Description & Content
+  descriptionLength: DataField<number>;
+  bulletPointCount: DataField<number>;
+
+  // Logistics & Fulfillment
+  stockQuantity: DataField<number>;
+  hasFreeShipping: DataField<boolean>;
+
+  // Seller Info
+  sellerName: DataField<string>;
+  sellerScore: DataField<number>;
+  isOfficialSeller: DataField<boolean>;
+
+  // Raw extracted data for reference
+  _raw: ExtractedProductFields;
 };

@@ -1,4 +1,4 @@
-import type { ExtractedProductFields } from "@/types/analysis";
+import type { ExtractedProductFields, ExtractedFieldMetadata } from "@/types/analysis";
 
 function cleanText(value: string | null | undefined) {
   if (!value) return null;
@@ -103,4 +103,71 @@ export function mergeExtractedFields(params: {
   merged.platform = platform ?? merged.platform ?? null;
 
   return merged;
+}
+
+/**
+ * Extended merge with field-level metadata tracking.
+ * Phase 1: Tracks source, confidence, and fallback chain for each field.
+ */
+export function mergeExtractedFieldsWithMetadata(params: {
+  genericFields: ExtractedProductFields;
+  platformFields: Partial<ExtractedProductFields>;
+  platform: string | null;
+}): {
+  merged: ExtractedProductFields;
+  fieldMetadata: Record<string, ExtractedFieldMetadata>;
+} {
+  const { genericFields, platformFields, platform } = params;
+
+  const merged = mergeExtractedFields(params);
+  const fieldMetadata: Record<string, ExtractedFieldMetadata> = {};
+
+  // Determine source for each field
+  for (const [key, value] of Object.entries(merged)) {
+    if (key === "extractor_status" || key === "platform") {
+      // Skip metadata fields
+      continue;
+    }
+
+    const genericValue = genericFields[key as keyof ExtractedProductFields];
+    const platformValue = platformFields[key as keyof ExtractedProductFields];
+
+    // Fallback chain for tracking
+    const fallbackChain: string[] = [];
+    let source: "platform" | "generic" | "api" | "api_fallback" | "derived" | "synthetic" | "null" = "null";
+
+    if (platformValue != null && isMeaningfulValue(platformValue)) {
+      source = "platform";
+      fallbackChain.push("platform");
+    } else if (genericValue != null && isMeaningfulValue(genericValue)) {
+      source = "generic";
+      fallbackChain.push("platform", "generic");
+    } else {
+      // Field is null/missing
+      source = "null";
+      fallbackChain.push("platform", "generic");
+    }
+
+    // Determine confidence
+    let confidence: "high" | "medium" | "low" | "unknown" = "unknown";
+    if (source === "platform") {
+      confidence = "high"; // Platform extraction is trusted
+    } else if (source === "generic") {
+      confidence = "medium"; // HTML parsing less precise
+    } else {
+      confidence = "low"; // Field missing
+    }
+
+    fieldMetadata[key] = {
+      source,
+      confidence,
+      timestamp: Date.now(),
+      fallbackChain: fallbackChain.length > 1 ? fallbackChain : undefined,
+    };
+  }
+
+  return {
+    merged,
+    fieldMetadata,
+  };
 }
