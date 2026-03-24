@@ -1,10 +1,5 @@
-import RoutePlaceholder from "../_ui/route-placeholder";
+import MarketingShellFrame from "../_ui/marketing-shell-frame";
 
 export default function PricingPage() {
-  return (
-    <RoutePlaceholder
-      title="Planlar"
-      description="Planlar sayfasi yeniden tasarlanacak."
-    />
-  );
+  return <MarketingShellFrame initialView="pricing" />;
 }

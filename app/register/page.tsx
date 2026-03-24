@@ -1,10 +1,5 @@
-import RoutePlaceholder from "../_ui/route-placeholder";
+import MarketingShellFrame from "../_ui/marketing-shell-frame";
 
 export default function RegisterPage() {
-  return (
-    <RoutePlaceholder
-      title="Kayit"
-      description="Kayit ekrani yeniden tasarlanacak. Bu gecici surum minimum iskelet sunar."
-    />
-  );
+  return <MarketingShellFrame initialView="register" />;
 }

@@ -1,10 +1,5 @@
-import RoutePlaceholder from "../_ui/route-placeholder";
+import DashboardShellFrame from "../_ui/dashboard-shell-frame";
 
 export default function ReportsPage() {
-  return (
-    <RoutePlaceholder
-      title="Raporlar"
-      description="Rapor listesi yeniden tasarlanacak. Su an bu alanda sade placeholder kullaniliyor."
-    />
-  );
+  return <DashboardShellFrame initialView="reports" />;
 }

@@ -1,10 +1,5 @@
-import RoutePlaceholder from "../_ui/route-placeholder";
+import DashboardShellFrame from "../_ui/dashboard-shell-frame";
 
 export default function DashboardPage() {
-  return (
-    <RoutePlaceholder
-      title="Dashboard"
-      description="Bu ekran yeniden tasarlanacak. Su an yalnizca temel iskelet gosteriliyor."
-    />
-  );
+  return <DashboardShellFrame initialView="overview" />;
 }

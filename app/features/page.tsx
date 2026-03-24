@@ -1,10 +1,5 @@
-import RoutePlaceholder from "../_ui/route-placeholder";
+import MarketingShellFrame from "../_ui/marketing-shell-frame";
 
 export default function FeaturesPage() {
-  return (
-    <RoutePlaceholder
-      title="Ozellikler"
-      description="Ozellikler sayfasi yeniden tasarlanacak."
-    />
-  );
+  return <MarketingShellFrame initialView="features" />;
 }

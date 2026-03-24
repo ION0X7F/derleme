@@ -1,10 +1,10 @@
-import RoutePlaceholder from "../../_ui/route-placeholder";
+import DashboardShellFrame from "../../_ui/dashboard-shell-frame";
 
-export default function LegacyReportDetailPage() {
-  return (
-    <RoutePlaceholder
-      title="Analiz sonucu"
-      description="Bu rapor route'u yeniden tasarlanacak. Simdilik sade placeholder gosteriliyor."
-    />
-  );
+export default async function LegacyReportDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return <DashboardShellFrame initialView="report-detail" reportId={id} />;
 }

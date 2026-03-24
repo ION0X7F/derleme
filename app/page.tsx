@@ -1,3 +1,5 @@
+import MarketingShellFrame from "./_ui/marketing-shell-frame";
+
 export default function HomePage() {
-  return null;
+  return <MarketingShellFrame initialView="home" />;
 }

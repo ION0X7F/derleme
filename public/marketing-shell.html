@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SellBoost AI — Trendyol Satış Analizi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#09090e;--bg2:#0f1018;--bg3:#161922;--surface:#1b1f2b;--surface2:#222635;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.11);
+  --brand:#4f7fff;--brand-lo:rgba(79,127,255,.12);--brand2:#7c5cfc;
+  --accent:#00d4a8;--accent-lo:rgba(0,212,168,.1);
+  --warn:#f59e0b;--danger:#ef4444;
+  --text:#eceff8;--muted:#8a93ad;--dim:#3a4058;
+  --r:12px;--rL:20px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Instrument Sans',sans-serif;font-size:15px;line-height:1.6;overflow-x:hidden;}
+h1,h2,h3,h4{font-family:'Bricolage Grotesque',sans-serif;line-height:1.08;letter-spacing:-.025em;}
+a{color:inherit;text-decoration:none;}
+button,input{font-family:inherit;}
+input{outline:none;}
+canvas{display:block;width:100%!important;}
+.page{display:none;min-height:100vh;flex-direction:column;}
+.page.active{display:flex;animation:fadeIn .32s ease both;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+nav{position:fixed;top:0;left:0;right:0;z-index:300;border-bottom:1px solid transparent;transition:background .3s,border-color .3s;}
+nav.solid{background:rgba(9,9,14,.9);backdrop-filter:blur(20px);border-color:var(--border);}
+.nav-wrap{display:flex;align-items:center;justify-content:space-between;height:66px;width:min(1240px,100%);margin:0 auto;padding:0 32px;}
+.logo{display:flex;align-items:center;gap:10px;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:20px;letter-spacing:-.035em;cursor:pointer;user-select:none;flex-shrink:0;}
+.logo-mark{width:35px;height:35px;background:linear-gradient(135deg,var(--brand),var(--brand2));border-radius:9px;display:grid;place-items:center;font-size:17px;flex-shrink:0;}
+.logo span{color:var(--brand);}
+.nav-tabs{display:flex;gap:2px;}
+.ntab{padding:7px 15px;border-radius:999px;font-size:13.5px;font-weight:500;color:var(--muted);background:transparent;border:none;cursor:pointer;transition:color .2s,background .2s;}
+.ntab:hover{color:var(--text);background:rgba(255,255,255,.05);}
+.ntab.act{color:var(--text);background:rgba(255,255,255,.08);}
+.nav-btns{display:flex;gap:8px;align-items:center;}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 22px;border-radius:999px;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:13.5px;border:none;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.btn-sm{padding:8px 16px;font-size:12.5px;}
+.btn-lg{padding:15px 34px;font-size:16px;}
+.btn-primary{background:var(--brand);color:#fff;}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border2);}
+.btn-outline{background:transparent;color:var(--brand);border:1px solid rgba(79,127,255,.4);}
+.btn-full{width:100%;justify-content:center;}
+.c{width:min(1240px,100%);margin:0 auto;padding:0 32px;}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);margin-bottom:14px;}
+.eyebrow::before{content:'';display:block;width:18px;height:2px;background:var(--accent);border-radius:2px;}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:4px 11px;border-radius:999px;}
+.t-blue{background:var(--brand-lo);color:var(--brand);border:1px solid rgba(79,127,255,.2);}
+.t-green{background:var(--accent-lo);color:var(--accent);border:1px solid rgba(0,212,168,.2);}
+.t-warn{background:rgba(245,158,11,.1);color:var(--warn);border:1px solid rgba(245,158,11,.2);}
+.t-red{background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.2);}
+.sec{padding:100px 0;}
+.sec-center{text-align:center;max-width:620px;margin:0 auto 56px;}
+.hero{min-height:100vh;display:flex;align-items:center;justify-content:center;padding-top:66px;position:relative;overflow:hidden;text-align:center;}
+.hero-bg{position:absolute;inset:0;pointer-events:none;}
+.hg1{position:absolute;top:-10%;left:50%;transform:translateX(-50%);width:900px;height:600px;background:radial-gradient(ellipse,rgba(79,127,255,.15) 0%,transparent 68%);}
+.hg2{position:absolute;bottom:-5%;right:0;width:500px;height:400px;background:radial-gradient(ellipse,rgba(124,92,252,.1) 0%,transparent 70%);}
+.hg3{position:absolute;left:0;top:20%;width:400px;height:400px;background:radial-gradient(ellipse,rgba(0,212,168,.06) 0%,transparent 70%);}
+.hgrid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:70px 70px;mask-image:radial-gradient(ellipse at 50% 40%,black 20%,transparent 65%);}
+.hero-inner{position:relative;max-width:860px;padding:60px 24px;margin:0 auto;}
+.hero-badge{display:inline-flex;align-items:center;gap:9px;padding:7px 18px;background:rgba(79,127,255,.08);border:1px solid rgba(79,127,255,.2);border-radius:999px;font-size:13px;color:var(--brand);font-weight:500;margin-bottom:28px;}
+.pulse{width:7px;height:7px;background:var(--brand);border-radius:50%;animation:blip 2s infinite;}
+@keyframes blip{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.7);}}
+.hero h1{font-size:clamp(46px,7vw,86px);font-weight:800;margin-bottom:22px;}
+.hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--brand) 0%,var(--brand2) 60%,var(--accent) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hero-desc{font-size:18px;color:var(--muted);max-width:580px;margin:0 auto 44px;line-height:1.75;}
+.hero-input-wrap{display:flex;align-items:center;gap:10px;max-width:560px;margin:0 auto 36px;background:var(--surface);border:1px solid var(--border2);border-radius:999px;padding:7px 7px 7px 24px;}
+.url-input{flex:1;background:transparent;border:none;padding:8px 0;color:var(--text);font-size:14.5px;}
+.hero-trust{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;}
+.trust-item{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);}
+.trust-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;}
+.stats-bar{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+.stats-inner{display:grid;grid-template-columns:repeat(4,1fr);}
+.stat-cell{padding:30px 20px;text-align:center;}
+.stat-cell+.stat-cell{border-left:1px solid var(--border);}
+.sv{font-family:'Bricolage Grotesque',sans-serif;font-size:36px;font-weight:800;line-height:1;background:linear-gradient(135deg,var(--text),var(--muted));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px;}
+.sl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;}
+.benefits-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+.benefit-card,.chart-card,.faq-item,.price-card,.analyze-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rL);}
+.benefit-card{padding:32px;}
+.bc-num{font-family:'Bricolage Grotesque',sans-serif;font-size:40px;font-weight:800;color:var(--dim);line-height:1;margin-bottom:18px;}
+.bc-icon{width:46px;height:46px;background:var(--brand-lo);border-radius:11px;display:grid;place-items:center;font-size:20px;margin-bottom:18px;border:1px solid rgba(79,127,255,.15);}
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--border);border-radius:var(--rL);overflow:hidden;gap:1px;background:var(--border);}
+.fg-item{background:var(--bg2);padding:34px 30px;}
+.fg-ey{font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--brand2);margin-bottom:12px;}
+.steps-wrap{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;position:relative;}
+.step{display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 10px;}
+.step-num{width:54px;height:54px;background:var(--bg2);border:1px solid var(--border2);border-radius:50%;display:grid;place-items:center;font-family:'Bricolage Grotesque',sans-serif;font-size:13px;font-weight:800;color:var(--brand);margin-bottom:22px;}
+.pricing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:start;}
+.price-card{padding:28px;position:relative;}
+.price-card.feat{background:linear-gradient(155deg,rgba(79,127,255,.07),rgba(124,92,252,.05));border-color:rgba(79,127,255,.3);}
+.pbadge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;font-size:10.5px;font-weight:700;padding:4px 14px;border-radius:999px;letter-spacing:.07em;white-space:nowrap;}
+.pbadge.g{background:var(--accent);color:#09090e;}
+.pname{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;}
+.pamount{font-family:'Bricolage Grotesque',sans-serif;font-size:34px;font-weight:800;line-height:1;margin-bottom:3px;}
+.pbilling,.field-hint,.footer-copy{font-size:12.5px;color:var(--dim);}
+.psub{font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid var(--border);}
+.pfeats,.faq-list,.form-grid,.auth-feat-list,.actions-list{display:grid;gap:10px;}
+.pfeat,.auth-feat{display:flex;align-items:flex-start;gap:9px;font-size:12.5px;color:var(--muted);}
+.pcta{display:block;text-align:center;padding:12px;border-radius:999px;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:13.5px;border:none;width:100%;}
+.cta-band{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:80px 0;text-align:center;position:relative;overflow:hidden;}
+.footer-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:20px;}
+.footer-links{display:flex;gap:22px;flex-wrap:wrap;}
+#report{padding-top:66px;}
+.report-layout{display:grid;grid-template-columns:248px 1fr;flex:1;min-height:calc(100vh - 66px);}
+.report-sidebar{background:var(--bg2);border-right:1px solid var(--border);padding:24px 16px;position:sticky;top:66px;height:calc(100vh - 66px);overflow-y:auto;display:flex;flex-direction:column;gap:4px;}
+.s-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;font-size:13.5px;color:var(--muted);background:transparent;border:none;text-align:left;width:100%;}
+.s-item.act{background:var(--brand-lo);color:var(--brand);}
+.report-main{padding:32px 36px;overflow-y:auto;}
+.rh-top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:22px;}
+.score-strip,.signal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+.sc-card,.sig-item{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;}
+.sc-bar{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;}
+.sc-fill{height:100%;}
+.fill-green{background:var(--accent);}.fill-blue{background:var(--brand);}.fill-warn{background:var(--warn);}.fill-red{background:var(--danger);}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;}
+.charts-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:18px;}
+.chart-card{padding:22px;}
+.chart-card.full{grid-column:1/-1;}
+.chart-h180{height:180px;}.chart-h200{height:200px;}.chart-h220{height:220px;}
+.report-section{display:none;}.report-section.active{display:block;}
+.auth-page{flex:1;display:flex;align-items:stretch;padding-top:66px;}
+.auth-left{flex:1;display:flex;align-items:center;justify-content:center;padding:60px 48px;}
+.auth-right{width:400px;flex-shrink:0;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 36px;text-align:center;}
+.auth-form-box{width:min(480px,100%);}
+.auth-eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:10px;}
+.auth-title{font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(26px,3vw,36px);font-weight:800;margin-bottom:8px;}
+.auth-sub{font-size:14px;color:var(--muted);margin-bottom:34px;line-height:1.6;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.field{display:flex;flex-direction:column;gap:6px;}
+.fi{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:11px 15px;color:var(--text);font-size:14px;}
+.divider-or{display:flex;align-items:center;gap:12px;color:var(--dim);font-size:12.5px;margin:4px 0;}
+.divider-or::before,.divider-or::after{content:'';flex:1;height:1px;background:var(--border);}
+.captcha-box{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:15px 18px;display:flex;align-items:center;justify-content:space-between;}
+.captcha-chk{width:22px;height:22px;border:2px solid var(--dim);border-radius:4px;display:grid;place-items:center;flex-shrink:0;}
+.form-error{display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:var(--danger);font-size:13px;padding:10px 14px;border-radius:8px;}
+.form-error.show{display:block;}
+.auth-footer{margin-top:22px;text-align:center;font-size:13.5px;color:var(--muted);}
+.social-btn{display:flex;align-items:center;justify-content:center;gap:10px;padding:11px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--text);font-size:13.5px;font-weight:500;cursor:pointer;transition:all .2s;width:100%;}
+@media(max-width:900px){.benefits-grid{grid-template-columns:1fr;}.features-grid{grid-template-columns:1fr 1fr;}.pricing-grid,.charts-grid,.charts-grid-3{grid-template-columns:1fr;}.auth-right{display:none;}}
+@media(max-width:640px){.c{padding:0 18px;}.nav-tabs{display:none;}.hero-input-wrap{flex-direction:column;border-radius:16px;padding:14px 16px;align-items:stretch;}.stats-inner{grid-template-columns:repeat(2,1fr);}.form-row{grid-template-columns:1fr;}.auth-left{padding:28px 18px;}.report-main{padding:18px 16px;}}
+</style>
+</head>
+<body>
+<nav id="mainNav">
+  <div class="nav-wrap">
+    <div class="logo" onclick="goPage('home')"><div class="logo-mark">⚡</div>Sell<span>Boost</span></div>
+    <div class="nav-tabs">
+      <button class="ntab act" onclick="goPage('home')">Anasayfa</button>
+      <button class="ntab" onclick="goPage('features')">Özellikler</button>
+      <button class="ntab" onclick="goPage('pricing')">Fiyatlandırma</button>
+      <button class="ntab" onclick="goPage('report')">Rapor Demo</button>
+    </div>
+    <div class="nav-btns">
+      <button class="btn btn-ghost btn-sm" onclick="goPage('login')">Giriş Yap</button>
+      <button class="btn btn-primary btn-sm" onclick="goPage('register')">Ücretsiz Başla</button>
+    </div>
+  </div>
+</nav>
+<div id="home" class="page active">
+  <section class="hero">
+    <div class="hero-bg"><div class="hg1"></div><div class="hg2"></div><div class="hg3"></div><div class="hgrid"></div></div>
+    <div class="hero-inner">
+      <div class="hero-badge"><div class="pulse"></div>Trendyol Satış Analizi · AI + Deterministik Motor</div>
+      <h1>Ürünün neden<br><em>satmadığını</em><br>artık biliyorsun</h1>
+      <p class="hero-desc">Trendyol ürün linkini yapıştır. Fiyat, teslimat, içerik, güven ve rekabet sinyallerini tek karar panelinde oku. Saniyeler içinde aksiyona dönük rapor.</p>
+      <div class="hero-input-wrap"><input class="url-input" type="url" placeholder="trendyol.com/... ürün linkini buraya yapıştır"><button class="btn btn-primary" onclick="goPage('report')">Analiz Et →</button></div>
+      <div class="hero-trust"><div class="trust-item"><div class="trust-dot"></div>Trendyol odaklı</div><div class="trust-item"><div class="trust-dot"></div>Kategori benchmark</div><div class="trust-item"><div class="trust-dot"></div>Aksiyona dönük çıktı</div><div class="trust-item"><div class="trust-dot"></div>AI + kural motoru</div></div>
+    </div>
+  </section>
+  <div class="stats-bar"><div class="stats-inner c"><div class="stat-cell"><div class="sv">5+</div><div class="sl">Sinyal Katmanı</div></div><div class="stat-cell"><div class="sv">AI</div><div class="sl">Deterministik Omurga</div></div><div class="stat-cell"><div class="sv">%100</div><div class="sl">Veri Güvenilirliği Önce</div></div><div class="stat-cell"><div class="sv">3+</div><div class="sl">Plan Seçeneği</div></div></div></div>
+  <section class="sec"><div class="c"><div class="sec-center"><div class="eyebrow" style="justify-content:center;">Fark Ne</div><h2 style="font-size:clamp(30px,3.5vw,46px);font-weight:800;margin-bottom:14px;">Skor değil, kritik teşhis önce gelir</h2><p style="font-size:16px;color:var(--muted);line-height:1.7;">Sadece sayı göstermek yerine satışı frenleyen ana darboğazı adlandırır ve aksiyona dönük çıktı üretir.</p></div><div class="benefits-grid"><div class="benefit-card"><div class="bc-num">01</div><div class="bc-icon">🎯</div><h3>Kritik teşhis önce gelir</h3><p>Skor yığınından önce ana darboğazı adlandırır ve hangi katmanın satışı frenlediğini gösterir.</p></div><div class="benefit-card"><div class="bc-num">02</div><div class="bc-icon">📊</div><h3>Rekabet sinyalleri birlikte okunur</h3><p>Fiyat, teslimat, güven ve diğer satıcı baskısını aynı karar ekseninde yorumlar.</p></div><div class="benefit-card"><div class="bc-num">03</div><div class="bc-icon">⚡</div><h3>AI yorumları aksiyona döner</h3><p>Başlık, içerik, güven ve teklif tarafında önce neyin değişmesi gerektiğini sıralar.</p></div></div></div></section>
+  <section class="sec" style="background:var(--bg2);padding:80px 0;"><div class="c"><div class="sec-center"><div class="eyebrow" style="justify-content:center;">Nasıl Çalışır</div><h2 style="font-size:clamp(28px,3vw,44px);font-weight:800;margin-bottom:12px;">5 adımda karar ekranın hazır</h2><p style="font-size:16px;color:var(--muted);">URL'yi gir, sistem otomatik tarar, analiz panelin açılır.</p></div><div class="steps-wrap"><div class="step"><div class="step-num">01</div><div><h3>Linki gir</h3><p>Trendyol ürün bağlantısını yapıştır.</p></div></div><div class="step"><div class="step-num">02</div><div><h3>Veriyi zenginleştir</h3><p>Ham HTML ve satıcı verisi tamamlanır.</p></div></div><div class="step"><div class="step-num">03</div><div><h3>Sinyalleri çarpıştır</h3><p>Fiyat, teslimat ve içerik benchmark ile değerlendirilir.</p></div></div><div class="step"><div class="step-num">04</div><div><h3>AI yorumu oluştur</h3><p>Model, deterministik teşhisle hizalanır.</p></div></div><div class="step"><div class="step-num">05</div><div><h3>Aksiyonları gör</h3><p>Kritik teşhis ve öncelikler raporda açılır.</p></div></div></div></div></section>
+  <div class="cta-band"><div class="c"><h2>Satışlarını frenliyeni bul.</h2><p>Trendyol ürün linkini yapıştır, karar panelin birkaç saniyede hazır.</p><div class="cta-btns"><button class="btn btn-primary btn-lg" onclick="goPage('register')">Ücretsiz Analiz Et →</button><button class="btn btn-ghost btn-lg" onclick="goPage('pricing')">Planları Karşılaştır</button></div></div></div>
+</div>
+
+<div id="features" class="page"><section style="padding:100px 0 60px;text-align:center;background:var(--bg);position:relative;overflow:hidden;"><div class="c" style="position:relative;"><div class="eyebrow" style="justify-content:center;">Özellikler</div><h1 style="font-size:clamp(36px,5vw,64px);font-weight:800;margin-bottom:16px;">Her sinyal, bir <em style="font-style:normal;background:linear-gradient(135deg,var(--brand),var(--brand2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">karar fırsatı</em></h1><p style="font-size:17px;color:var(--muted);max-width:560px;margin:0 auto;line-height:1.75;">Ürün sayfasının tüm katmanlarını tarar, fırsatları ve zayıf noktaları tek panelde açar.</p></div></section><section class="sec"><div class="c"><div class="features-grid"><div class="fg-item"><div class="fg-ey">Keşif</div><h3>Başlık, açıklama ve görsel yeterliliği</h3><p>İçerik derinliği, görsel çeşitlilik ve ürün anlatımı birlikte değerlendirilir.</p></div><div class="fg-item"><div class="fg-ey">Güven</div><h3>Yorum, satıcı ve iade sinyalleri</h3><p>Yıldız puanı, yorum özeti ve resmi satıcı etkisi aynı panelde görünür.</p></div><div class="fg-item"><div class="fg-ey">Teklif</div><h3>Fiyat ve teslimat baskısı aynı eksende</h3><p>Fiyat pozisyonu, kargo hızı ve kampanya sinyalleri karar seviyesinde yorumlanır.</p></div><div class="fg-item"><div class="fg-ey">Rekabet</div><h3>Diğer satıcıları ayrışmaya çevir</h3><p>Rakip sayısı, fiyat farkı ve güven seviyesi rakip baskısına çevrilir.</p></div><div class="fg-item"><div class="fg-ey">Yorumlama</div><h3>AI sinyalleri tekleştirir, aksiyon üretir</h3><p>Veri çarpıştırma, kritik teşhis ve öncelikli aksiyonlar tek çıktıya döner.</p></div><div class="fg-item"><div class="fg-ey">Yönetim</div><h3>Rapor kütüphanesi ve export akışı</h3><p>Kayıtlı rapor, premium export ve tekrar okunabilir karar ekranları aynı deneyimde.</p></div></div></div></section></div>
+
+<div id="pricing" class="page"><section style="padding:100px 0 60px;text-align:center;background:var(--bg);position:relative;overflow:hidden;"><div class="c" style="position:relative;"><div class="eyebrow" style="justify-content:center;">Fiyatlandırma</div><h1 style="font-size:clamp(34px,5vw,62px);font-weight:800;margin-bottom:14px;">İhtiyacına uygun plan</h1><p style="font-size:17px;color:var(--muted);max-width:500px;margin:0 auto;">Ücretsiz başla, büyürken yükselt.</p></div></section><section style="padding:20px 0 80px;"><div class="c"><div class="pricing-grid"><div class="price-card"><div class="pname">Ücretsiz</div><div class="pamount">₺0</div><div class="pbilling">/ ay</div><div class="psub">Sistemi tanımak isteyenler için giriş seviyesi</div><div class="pfeats"><div class="pfeat">✓ Sınırlı analiz hakkı</div><div class="pfeat">✓ Temel skor görünümü</div><div class="pfeat">✓ Sınırlı AI önizleme</div></div><button class="pcta btn-ghost" onclick="goPage('register')">Ücretsiz Başla</button></div><div class="price-card feat"><div class="pbadge">En popüler</div><div class="pname">Pro</div><div class="pamount">₺399</div><div class="pbilling">/ ay</div><div class="psub">Gerçek kullanıcılar için ana karar paneli</div><div class="pfeats"><div class="pfeat">✓ Tam AI analiz</div><div class="pfeat">✓ Rakip fiyat analizi</div><div class="pfeat">✓ Detaylı dashboard</div></div><button class="pcta btn-primary" onclick="goPage('register')">Pro'ya Geç</button></div></div></div></section><section style="padding:0 0 80px;"><div class="c"><div style="text-align:center;margin-bottom:36px;"><h2 style="font-size:30px;font-weight:800;">Sık sorulan sorular</h2></div><div class="faq-list"><div class="faq-item"><div class="faq-q">SellBoost tam olarak neyi analiz ediyor?<div class="faq-ico">+</div></div><div class="faq-a">Trendyol ürün sayfasındaki fiyat, teslimat, yorum, güven, içerik ve rekabet sinyallerini tek karar paneline topluyor.</div></div><div class="faq-item"><div class="faq-q">Ücretsiz plan ile Pro arasındaki ana fark nedir?<div class="faq-ico">+</div></div><div class="faq-a">Ücretsiz plan temel skor deneyimi sunar. Pro ise tam AI yorumu, derin dashboard, export ve güçlü aksiyon ekranlarını açar.</div></div></div></div></section></div>
+<div id="report" class="page"><div class="report-layout"><div class="report-sidebar"><div class="s-lbl">Rapor Bölümleri</div><button class="s-item act" onclick="setSection(this,'sec-overview')">📊 Genel Bakış</button><button class="s-item" onclick="setSection(this,'sec-demand')">📈 Talep &amp; Hacim</button><button class="s-item" onclick="setSection(this,'sec-price')">💰 Fiyat &amp; Rekabet</button><button class="s-item" onclick="setSection(this,'sec-content')">📝 İçerik &amp; SEO</button><button class="s-item" onclick="setSection(this,'sec-trust')">🛡 Güven &amp; Yorum</button><button class="s-item" onclick="setSection(this,'sec-actions')">✅ Aksiyonlar</button></div><div class="report-main"><div class="rh-top"><div><div class="rh-title">Analiz Raporu · 24 Mart 2026</div><div class="rh-name">Philips HP8321/00 Saç Düzleştirici</div><div class="rh-url">trendyol.com/philips/hp8321-00-sac-duzlestiricip-123456789.html</div></div><div class="rh-actions"><span class="tag t-blue">Pro Analiz</span><button class="btn btn-ghost btn-sm">Export PDF</button><button class="btn btn-outline btn-sm">Yeniden Analiz</button></div></div><div id="sec-overview" class="report-section active"><div class="score-strip"><div class="sc-card"><div class="sc-lbl">Genel Skor</div><div class="sc-val" style="color:var(--brand)">74</div><div class="sc-bar"><div class="sc-fill fill-blue" style="width:74%"></div></div></div><div class="sc-card"><div class="sc-lbl">SEO Skoru</div><div class="sc-val" style="color:var(--warn)">61</div><div class="sc-bar"><div class="sc-fill fill-warn" style="width:61%"></div></div></div><div class="sc-card"><div class="sc-lbl">Dönüşüm</div><div class="sc-val" style="color:var(--accent)">83</div><div class="sc-bar"><div class="sc-fill fill-green" style="width:83%"></div></div></div><div class="sc-card"><div class="sc-lbl">Güven</div><div class="sc-val" style="color:var(--danger)">55</div><div class="sc-bar"><div class="sc-fill fill-red" style="width:55%"></div></div></div></div><div class="signal-grid"><div class="sig-item"><div class="sig-name">Fiyat Pozisyonu</div><div class="sig-val" style="color:var(--accent)">✓ İyi</div><div class="sig-trend trend-up">Benchmark altında</div></div><div class="sig-item"><div class="sig-name">Kargo Hızı</div><div class="sig-val" style="color:var(--accent)">✓ Hızlı</div><div class="sig-trend trend-up">Ücretsiz kargo</div></div><div class="sig-item"><div class="sig-name">Görsel Sayısı</div><div class="sig-val" style="color:var(--warn)">⚠ 4</div><div class="sig-trend trend-dn">Ort. 8+ olmalı</div></div><div class="sig-item"><div class="sig-name">Başlık</div><div class="sig-val" style="color:var(--danger)">✗ Zayıf</div><div class="sig-trend trend-dn">Anahtar kelime eksik</div></div></div><div class="charts-grid"><div class="chart-card"><div class="cc-head"><div><div class="cc-title">Performans Radar</div><div class="cc-sub">6 boyutta kıyaslama</div></div></div><div class="chart-h220"><canvas id="radarChart"></canvas></div></div><div class="chart-card"><div class="cc-head"><div><div class="cc-title">Skor Trendi (Son 8 Analiz)</div><div class="cc-sub">Genel skor değişimi</div></div></div><div class="chart-h220"><canvas id="trendChart"></canvas></div></div></div></div><div id="sec-demand" class="report-section"><div class="charts-grid"><div class="chart-card"><div class="cc-head"><div><div class="cc-title">Aylık Satış Hacmi Tahmini</div><div class="cc-sub">Kategori bazlı tahmin (adet)</div></div><span class="tag t-green">AI Tahmin</span></div><div class="chart-h220"><canvas id="salesVolChart"></canvas></div></div><div class="chart-card"><div class="cc-head"><div><div class="cc-title">Talep Büyüklüğü Endeksi</div><div class="cc-sub">Arama hacmi &amp; tıklama talebi</div></div></div><div class="chart-h220"><canvas id="demandChart"></canvas></div></div></div></div><div id="sec-price" class="report-section"><div class="charts-grid"><div class="chart-card"><div class="cc-head"><div><div class="cc-title">Fiyat Konumu (Rakipler)</div></div></div><div class="chart-h220"><canvas id="priceCompChart"></canvas></div></div><div class="chart-card"><div class="cc-head"><div><div class="cc-title">Fiyat Geçmişi (90 Gün)</div></div></div><div class="chart-h220"><canvas id="priceHistChart"></canvas></div></div></div></div><div id="sec-content" class="report-section"><div class="charts-grid"><div class="chart-card"><div class="cc-head"><div><div class="cc-title">İçerik Kalite Skoru</div></div></div><div class="chart-h220"><canvas id="contentRadarChart"></canvas></div></div><div class="chart-card"><div class="cc-head"><div><div class="cc-title">Görsel Sayısı vs. Benchmark</div></div></div><div class="chart-h220"><canvas id="imageChart"></canvas></div></div></div></div><div id="sec-trust" class="report-section"><div class="charts-grid"><div class="chart-card"><div class="cc-head"><div><div class="cc-title">Yorum Dağılımı</div></div></div><div class="chart-h220"><canvas id="reviewDistChart"></canvas></div></div><div class="chart-card"><div class="cc-head"><div><div class="cc-title">Yorum Büyüme Trendi</div></div></div><div class="chart-h220"><canvas id="reviewTrendChart"></canvas></div></div></div></div><div id="sec-actions" class="report-section"><div style="margin-bottom:22px;"><h3 style="font-family:'Bricolage Grotesque',sans-serif;font-size:18px;font-weight:700;margin-bottom:5px;">Öncelikli Aksiyon Listesi</h3><p style="font-size:13px;color:var(--muted);">AI ve deterministik motor tarafından üretilen, veri dayanaklı aksiyonlar</p></div><div class="actions-list"><div class="action-item"><div class="action-prio prio-1">Öncelik 1</div><div><div class="action-title">Başlık optimize edilmeli</div><div class="action-desc">Anahtar kelime yoğunluğu kategorinin altında.</div></div></div><div class="action-item"><div class="action-prio prio-1">Öncelik 2</div><div><div class="action-title">Görsel sayısı artırılmalı</div><div class="action-desc">Mevcut 4 görsel, kategorinin ortalamasının altında.</div></div></div></div></div></div></div></div>
+<div id="login" class="page"><div class="auth-page"><div class="auth-left"><div class="auth-form-box"><div class="auth-eyebrow">Giriş Yap</div><h1 class="auth-title">Tekrar hoş geldin</h1><p class="auth-sub">Hesabına giriş yap, raporlarına devam et.</p><div style="margin-bottom:16px;"><button class="social-btn">Google ile Giriş Yap</button></div><div class="divider-or">ya da</div><div class="form-grid" style="margin-top:14px;"><div class="field"><label>E-posta veya Telefon</label><input class="fi" id="li-user" type="text" placeholder="ornek@mail.com"></div><div class="field"><label>Şifre</label><input class="fi" id="li-pass" type="password" placeholder="••••••••"></div><div class="captcha-box" id="liCap" onclick="toggleCap('liCap','liCapIco')"><div style="display:flex;align-items:center;gap:12px;"><div class="captcha-chk"><svg id="liCapIco" width="12" height="12" viewBox="0 0 12 12" style="display:none;"><polyline points="2 6 5 9 10 3" stroke="white" stroke-width="2" fill="none"/></svg></div><span>Ben robot değilim</span></div><div class="captcha-logo">reCAPTCHA</div></div><div class="form-error" id="liErr">Lütfen tüm alanları doldurun.</div><button class="btn btn-primary btn-full" onclick="doLogin()">Giriş Yap →</button></div></div></div><div class="auth-right"><div class="auth-right-title">SellBoost AI</div><p>Trendyol ürün sayfanın neden iyi ya da kötü performans gösterdiğini gör.</p></div></div></div>
+<div id="register" class="page"><div class="auth-page"><div class="auth-left"><div class="auth-form-box"><div class="auth-eyebrow">Kayıt Ol</div><h1 class="auth-title">Hesap oluştur</h1><p class="auth-sub">Ücretsiz başla, ilk analizini dakikalar içinde yap.</p><div class="divider-or">ya da e-posta ile kayıt ol</div><div class="form-grid" style="margin-top:14px;"><div class="form-row"><div class="field"><label>İsim</label><input class="fi" id="rg-name" type="text" placeholder="Adınız"></div><div class="field"><label>Soyisim</label><input class="fi" id="rg-sname" type="text" placeholder="Soyadınız"></div></div><div class="field"><label>E-posta</label><input class="fi" id="rg-email" type="email" placeholder="ornek@mail.com"></div><div class="field"><label>E-posta Tekrar</label><input class="fi" id="rg-email2" type="email" placeholder="E-postanızı tekrar girin"></div><div class="field"><label>Cep Telefonu</label><input class="fi" id="rg-phone" type="tel" placeholder="05xx xxx xx xx"></div><div class="field"><label>Şifre</label><input class="fi" id="rg-pass" type="password" placeholder="En az 8 karakter"></div><div class="captcha-box" id="rgCap" onclick="toggleCap('rgCap','rgCapIco')"><div style="display:flex;align-items:center;gap:12px;"><div class="captcha-chk"><svg id="rgCapIco" width="12" height="12" viewBox="0 0 12 12" style="display:none;"><polyline points="2 6 5 9 10 3" stroke="white" stroke-width="2" fill="none"/></svg></div><span>Ben robot değilim</span></div><div class="captcha-logo">reCAPTCHA</div></div><div class="form-error" id="rgErr">Lütfen tüm zorunlu alanları doldurun.</div><button class="btn btn-primary btn-full" onclick="doRegister()">Kayıt Ol →</button></div></div></div><div class="auth-right"><div class="auth-right-title">Neden SellBoost?</div><p>Trendyol'da ürün yönetiyorsan, veri odaklı karar vermeye başlamanın en hızlı yolu.</p></div></div></div>
+<script>
+Chart.defaults.color='#8a93ad';Chart.defaults.borderColor='rgba(255,255,255,0.06)';Chart.defaults.font.family="'Instrument Sans',sans-serif";Chart.defaults.font.size=11;
+const brand='#4f7fff',brand2='#7c5cfc',accent='#00d4a8',warn='#f59e0b',danger='#ef4444',gc='rgba(255,255,255,0.06)',ci={};
+function dc(id){if(ci[id]){ci[id].destroy();delete ci[id];}}
+function ch(id,type,data,opts){dc(id);const ctx=document.getElementById(id);if(!ctx)return;ci[id]=new Chart(ctx,{type,data,options:{responsive:true,maintainAspectRatio:false,...opts}});}
+function goPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('act'));const map={home:0,features:1,pricing:2,report:3};if(map[id]!==undefined)document.querySelectorAll('.ntab')[map[id]]?.classList.add('act');window.scrollTo(0,0);if(id==='report')setTimeout(()=>initSec('sec-overview'),120);}
+window.addEventListener('scroll',()=>{document.getElementById('mainNav').classList.toggle('solid',window.scrollY>20);});
+function setSection(btn,secId){document.querySelectorAll('.s-item').forEach(b=>b.classList.remove('act'));btn.classList.add('act');document.querySelectorAll('.report-section').forEach(s=>s.classList.remove('active'));document.getElementById(secId).classList.add('active');setTimeout(()=>initSec(secId),80);}
+document.addEventListener('click',e=>{const q=e.target.closest('.faq-q');if(!q)return;const item=q.closest('.faq-item');const open=item.classList.contains('open');document.querySelectorAll('.faq-item.open').forEach(i=>i.classList.remove('open'));if(!open)item.classList.add('open');});
+function toggleCap(boxId,icoId){const box=document.getElementById(boxId),ico=document.getElementById(icoId);box.classList.toggle('checked');ico.style.display=box.classList.contains('checked')?'block':'none';}
+function doLogin(){const u=document.getElementById('li-user').value.trim(),p=document.getElementById('li-pass').value.trim(),cap=document.getElementById('liCap').classList.contains('checked'),err=document.getElementById('liErr');if(!u||!p||!cap){err.classList.add('show');return;}err.classList.remove('show');goPage('report');}
+function doRegister(){const vals=['rg-name','rg-sname','rg-email','rg-email2','rg-phone','rg-pass'].map(id=>document.getElementById(id)),cap=document.getElementById('rgCap').classList.contains('checked'),err=document.getElementById('rgErr');if(vals.some(v=>!v.value.trim())||!cap){err.classList.add('show');return;}if(document.getElementById('rg-email').value.trim()!==document.getElementById('rg-email2').value.trim()){err.classList.add('show');return;}err.classList.remove('show');goPage('report');}
+function initSec(sec){if(sec==='sec-overview'){bRadar();bTrend();}else if(sec==='sec-demand'){bSalesVol();bDemand();}else if(sec==='sec-price'){bPriceComp();bPriceHist();}else if(sec==='sec-content'){bContentRadar();bImageChart();}else if(sec==='sec-trust'){bRevDist();bRevTrend();}}
+function bRadar(){ch('radarChart','radar',{labels:['SEO','Dönüşüm','Güven','Teklif','İçerik','Rekabet'],datasets:[{data:[61,83,55,78,48,66],borderColor:brand,backgroundColor:'rgba(79,127,255,.15)',pointBackgroundColor:brand,pointRadius:4},{data:[70,72,68,65,72,60],borderColor:'rgba(255,255,255,.2)',backgroundColor:'rgba(255,255,255,.03)',pointRadius:3,borderDash:[4,4]}]},{plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:14}}}});}
+function bTrend(){ch('trendChart','line',{labels:['A1','A2','A3','A4','A5','A6','A7','A8'],datasets:[{data:[62,65,61,68,70,67,72,74],borderColor:brand,backgroundColor:'rgba(79,127,255,.1)',fill:true,tension:.4,pointRadius:4,pointBackgroundColor:brand}]},{plugins:{legend:{display:false}},scales:{y:{min:50,max:100,grid:{color:gc}},x:{grid:{display:false}}}});}
+function bSalesVol(){ch('salesVolChart','bar',{labels:['Oca','Şub','Mar','Nis'],datasets:[{data:[320,290,410,380],backgroundColor:brand,borderRadius:6,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:gc}},x:{grid:{display:false}}}});}
+function bDemand(){ch('demandChart','line',{labels:['Oca','Şub','Mar','Nis'],datasets:[{data:[68,62,74,70],borderColor:accent,backgroundColor:'rgba(0,212,168,.1)',fill:true,tension:.4,pointRadius:3},{data:[55,50,63,58],borderColor:warn,backgroundColor:'rgba(245,158,11,.07)',fill:true,tension:.4,pointRadius:3}]},{plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:12}}}});}
+function bPriceComp(){ch('priceCompChart','bar',{labels:['Bu Ürün','R1','R2'],datasets:[{data:[849,920,795],backgroundColor:[accent,'rgba(255,255,255,.12)','rgba(255,255,255,.12)'],borderRadius:6,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:gc}},x:{grid:{display:false}}}});}
+function bPriceHist(){ch('priceHistChart','line',{labels:['1 Oc','15 Oc','1 Şub'],datasets:[{data:[999,949,849],borderColor:warn,backgroundColor:'rgba(245,158,11,.1)',fill:true,tension:.3,pointRadius:5,pointBackgroundColor:warn}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:gc}},x:{grid:{display:false}}}});}
+function bContentRadar(){ch('contentRadarChart','radar',{labels:['Başlık','Açıklama','Görseller','SSS','Anahtar K.'],datasets:[{data:[35,40,50,20,45],borderColor:brand,backgroundColor:'rgba(79,127,255,.15)',pointBackgroundColor:brand,pointRadius:4},{data:[72,65,80,55,70],borderColor:'rgba(255,255,255,.2)',backgroundColor:'rgba(255,255,255,.04)',pointRadius:3,borderDash:[4,4]}]},{plugins:{legend:{position:'bottom',labels:{boxWidth:10,padding:14}}}});}
+function bImageChart(){ch('imageChart','bar',{labels:['Bu Ürün','Kategori Ort.','Top Rakip'],datasets:[{data:[4,8.3,12],backgroundColor:[warn,brand,accent],borderRadius:6,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:gc}},x:{grid:{display:false}}}});}
+function bRevDist(){ch('reviewDistChart','bar',{labels:['5⭐','4⭐','3⭐'],datasets:[{data:[520,180,72],backgroundColor:[accent,'rgba(0,212,168,.6)','rgba(245,158,11,.7)'],borderRadius:5,borderSkipped:false}]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:gc}},y:{grid:{display:false}}}});}
+function bRevTrend(){ch('reviewTrendChart','bar',{labels:['Eki','Kas','Ara'],datasets:[{data:[62,88,110],backgroundColor:accent,borderRadius:6,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:gc}},x:{grid:{display:false}}}});}
+function initFromQuery(){const p=new URLSearchParams(window.location.search);goPage(p.get('page')||'home');}
+initFromQuery();
+</script>
+</body>
+</html>

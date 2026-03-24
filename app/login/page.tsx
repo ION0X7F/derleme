@@ -1,10 +1,5 @@
-import RoutePlaceholder from "../_ui/route-placeholder";
+import MarketingShellFrame from "../_ui/marketing-shell-frame";
 
 export default function LoginPage() {
-  return (
-    <RoutePlaceholder
-      title="Giris"
-      description="Giris ekrani yeniden tasarlanacak. Bu gecici surum minimum arayuz saglar."
-    />
-  );
+  return <MarketingShellFrame initialView="login" />;
 }
