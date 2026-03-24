@@ -49,6 +49,27 @@ function normalizeHostname(hostname: string) {
   return hostname.toLowerCase().replace(/^www\./, "");
 }
 
+function isPrivateOrLocalHostname(hostname: string) {
+  if (
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local")
+  ) {
+    return true;
+  }
+
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) {
+    const [a, b] = hostname.split(".").map((part) => Number(part));
+    if (a === 10) return true;
+    if (a === 127) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+  }
+
+  return false;
+}
+
 function isShortTrendyolLink(hostname: string) {
   return hostname === "ty.gl" || hostname.endsWith(".ty.gl");
 }
@@ -77,6 +98,15 @@ export function validateProductUrl(
 
   const normalizedUrl = parsed.toString();
   const hostname = normalizeHostname(parsed.hostname);
+
+  if (isPrivateOrLocalHostname(hostname)) {
+    return {
+      ok: false,
+      code: "URL_INVALID",
+      message: "Lokal veya ozel ag URL'leri desteklenmiyor.",
+    };
+  }
+
   const platform = detectPlatform(normalizedUrl);
 
   if (!platform) {
@@ -108,6 +138,22 @@ export function validateProductUrl(
       code: "URL_INVALID",
       message: "Kisaltma link yerine dogrudan Trendyol urun linki kullanin.",
     };
+  }
+
+  if (platform === "trendyol") {
+    const pathname = parsed.pathname.toLocaleLowerCase("tr-TR");
+    const isLikelyProductPath =
+      pathname.includes("-p-") ||
+      pathname.includes("/p/") ||
+      /\/p-\d+/.test(pathname);
+
+    if (!isLikelyProductPath) {
+      return {
+        ok: false,
+        code: "URL_INVALID",
+        message: "Lutfen dogrudan Trendyol urun sayfasi URL'si girin.",
+      };
+    }
   }
 
   return {

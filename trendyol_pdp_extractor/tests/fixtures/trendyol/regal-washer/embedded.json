@@ -1,0 +1,31 @@
+{
+  "product": {
+    "name": "CM 60100 Camasir Makinesi",
+    "brand": { "name": "Regal" },
+    "sku": "917432292",
+    "description": "6 kg camasir makinesi.",
+    "image": [
+      "https://cdn.example.com/regal-1.jpg",
+      "https://cdn.example.com/regal-2.jpg"
+    ],
+    "ratingScore": { "averageRating": 4.6, "commentCount": 55 },
+    "favoriteCount": 7132,
+    "merchantListing": {
+      "merchant": {
+        "name": "Regal Kurumsal Mağaza",
+        "id": 144831,
+        "sellerScore": { "value": 9.1 },
+        "merchantBadges": [{ "type": "BADGE" }]
+      },
+      "winnerVariant": {
+        "listingId": "regal-main-listing",
+        "price": { "discountedPrice": 13999.0, "originalPrice": 13999.0 },
+        "quantity": 35,
+        "freeCargo": true,
+        "rushDeliveryDuration": 1,
+        "fulfilmentType": "MP"
+      }
+    }
+  }
+}
+

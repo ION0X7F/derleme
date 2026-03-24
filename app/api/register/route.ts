@@ -1,10 +1,5 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import {
-  PlanCode,
-  SubscriptionPlanVariant,
-  SubscriptionStatus,
-} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -63,7 +58,7 @@ export async function POST(req: Request) {
     }
 
     const freePlan = await prisma.plan.upsert({
-      where: { code: PlanCode.FREE },
+      where: { code: "FREE" },
       update: {
         name: "Free",
         description: "Temel Trendyol analizi",
@@ -76,7 +71,7 @@ export async function POST(req: Request) {
         isActive: true,
       },
       create: {
-        code: PlanCode.FREE,
+        code: "FREE",
         name: "Free",
         description: "Temel Trendyol analizi",
         monthlyAnalysisLimit: 10,
@@ -100,8 +95,8 @@ export async function POST(req: Request) {
         subscription: {
           create: {
             planId: freePlan.id,
-            status: SubscriptionStatus.ACTIVE,
-            variant: SubscriptionPlanVariant.FREE,
+            status: "ACTIVE",
+            variant: "FREE",
           },
         },
       },

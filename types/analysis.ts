@@ -18,16 +18,65 @@ export type AccessPlan = "guest" | "free" | "pro" | "enterprise";
  * Captures source, confidence, derivation, and fallback chain.
  * @phase Phase 1: Memory only (not persisted to DB)
  */
-export type ExtractedFieldSource = "platform" | "generic" | "api" | "api_fallback" | "derived" | "synthetic" | "null";
+export type CanonicalFieldSource =
+  | "html"
+  | "embedded_json"
+  | "runtime_xhr"
+  | "parser_inference"
+  | "derived_from_similar_products"
+  | "keyword_search"
+  | "not_found";
+
+export type CanonicalFieldConfidence = "high" | "medium" | "low" | "none";
+
+export type LegacyExtractedFieldSource =
+  | "platform"
+  | "generic"
+  | "api"
+  | "api_fallback"
+  | "derived"
+  | "synthetic"
+  | "null"
+  | "xhr"
+  | "embedded_json"
+  | "html"
+  | "heuristic"
+  | "not_found";
+
+export type LegacyExtractedFieldConfidence =
+  | "high"
+  | "medium"
+  | "low"
+  | "unknown"
+  | "none";
+
+export type ExtractedFieldSource =
+  | CanonicalFieldSource
+  | LegacyExtractedFieldSource;
+
+export type ExtractedFieldConfidence =
+  | CanonicalFieldConfidence
+  | LegacyExtractedFieldConfidence;
+
+export type NormalizedFieldMetadata = {
+  source: CanonicalFieldSource;
+  confidence: CanonicalFieldConfidence;
+  notes?: string[];
+  extractionReason?: string;
+  fallbackChain?: string[];
+  derivedFrom?: string[];
+};
 
 export type ExtractedFieldMetadata = {
   source: ExtractedFieldSource;
-  confidence: "high" | "medium" | "low" | "unknown";
+  confidence: ExtractedFieldConfidence;
   timestamp?: number; // unix ms (when extracted)
   derivedFrom?: string[]; // field names used in derivation
   fallbackChain?: string[]; // sources attempted in order
   apiAge?: number; // hours old (if source=api)
   reason?: string; // human readable explanation
+  notes?: string[];
+  extractionReason?: string;
 };
 
 export type ExtractorHealthReport = {
@@ -137,6 +186,413 @@ export type OtherSellersSummary = {
   same_price_count: number;
   cheaper_count: number;
   more_expensive_count: number;
+};
+
+export type SimilarProductCandidate = {
+  title?: string | null;
+  url?: string | null;
+  short_url?: string | null;
+  price?: number | null;
+  currency?: string | null;
+  brand?: string | null;
+  sku?: string | null;
+  rating_value?: number | null;
+  review_count?: number | null;
+  question_count?: number | null;
+  seller_score?: number | null;
+  thumbnail?: string | null;
+};
+
+export type UserPricePosition =
+  | "affordable"
+  | "average"
+  | "expensive"
+  | "unclear";
+
+export type PriceCompetitivenessLevel =
+  | "strong_advantage"
+  | "neutral"
+  | "disadvantage"
+  | "unclear";
+
+export type SalesLevel =
+  | "very_low"
+  | "low"
+  | "medium"
+  | "good"
+  | "high"
+  | "unclear";
+
+export type MarketPositionLevel =
+  | "leading"
+  | "strong"
+  | "average"
+  | "lagging"
+  | "unclear";
+
+export type GrowthOpportunityLevel =
+  | "low"
+  | "medium"
+  | "high"
+  | "very_high"
+  | "unclear";
+
+export type AnalysisOutcomeType =
+  | "working_good"
+  | "working_underperforming"
+  | "working_risky"
+  | "conversion_problem"
+  | "low_demand"
+  | "unclear";
+
+export type MarketIssueType =
+  | "price"
+  | "trust"
+  | "listing"
+  | "visibility"
+  | "demand"
+  | "mixed"
+  | "unclear";
+
+export type EstimationConfidence = "low" | "medium" | "high" | "unclear";
+
+export type EstimatedSalesRange = {
+  min: number;
+  max: number;
+  windowDays: number;
+};
+
+export type CompetitorSalesEstimate = {
+  sellerName: string | null;
+  estimatedSalesLevel: SalesLevel;
+  estimatedSalesRange: EstimatedSalesRange | null;
+  estimationConfidence: EstimationConfidence;
+  relativeAdvantageSignals: string[];
+};
+
+export type MarketDemandSignal = "low" | "medium" | "high" | "unclear";
+
+export type MarketDemandVerdict = {
+  result: string;
+  confidence: EstimationConfidence;
+  referenceSellerCount: number;
+};
+
+export type DemandStatus = "high" | "medium" | "low" | "unclear";
+
+export type CaptureStatus = "strong" | "average" | "weak" | "unclear";
+
+export type DiagnosisConfidence = "high" | "medium" | "low";
+
+export type ComparisonMode =
+  | "same_product"
+  | "similar_products_fallback"
+  | "insufficient_data";
+
+export type ComparisonConfidence = "high" | "medium" | "low";
+
+export type ComparisonPosition =
+  | "better"
+  | "competitive"
+  | "weaker"
+  | "unknown";
+
+export type OverallOfferCompetitiveness =
+  | "strong"
+  | "balanced"
+  | "weak"
+  | "unknown";
+
+export type CompetitorPriceSummary = {
+  competitorCount: number | null;
+  lowestCompetitorPrice: number | null;
+  highestCompetitorPrice: number | null;
+  averageCompetitorPrice: number | null;
+  medianCompetitorPrice: number | null;
+  userPriceRank: number | null;
+  userPriceDeltaFromMedian: number | null;
+  userPricePosition: UserPricePosition | null;
+  priceCompetitiveness: PriceCompetitivenessLevel | null;
+};
+
+export type MarketInsights = {
+  competitorCount: number | null;
+  lowestCompetitorPrice: number | null;
+  highestCompetitorPrice: number | null;
+  averageCompetitorPrice: number | null;
+  medianCompetitorPrice: number | null;
+  userPriceRank: number | null;
+  userPriceDeltaFromMedian: number | null;
+  userPricePosition: UserPricePosition | null;
+  priceCompetitiveness: PriceCompetitivenessLevel | null;
+  salesLevel: SalesLevel | null;
+  marketPosition: MarketPositionLevel | null;
+  growthOpportunityLevel: GrowthOpportunityLevel | null;
+  outcomeType: AnalysisOutcomeType | null;
+  primaryIssue: MarketIssueType | null;
+  secondaryIssues: MarketIssueType[] | null;
+  mainIssues: MarketIssueType[] | null;
+  competitorSalesEstimates: CompetitorSalesEstimate[] | null;
+  strongestCompetitorSalesLevel: SalesLevel | null;
+  strongestCompetitorSalesRange: EstimatedSalesRange | null;
+  userEstimatedSalesLevel: SalesLevel | null;
+  userEstimatedSalesRange: EstimatedSalesRange | null;
+  marketDemandSignal: MarketDemandSignal | null;
+};
+
+export type MarketComparisonInsights = {
+  comparisonMode: ComparisonMode;
+  comparisonConfidence: ComparisonConfidence;
+  comparisonReasons: string[];
+  demandStatus: DemandStatus;
+  captureStatus: CaptureStatus;
+  diagnosisConfidence: DiagnosisConfidence;
+  diagnosisReasons: string[];
+  evidenceSummary: string[];
+  uncertaintyNotes: string[];
+  pricePosition: ComparisonPosition;
+  shippingPosition: ComparisonPosition;
+  sellerReputationPosition: ComparisonPosition;
+  promotionPosition: ComparisonPosition;
+  overallOfferCompetitiveness: OverallOfferCompetitiveness;
+  dominantGapReason: string | null;
+  strongestAdvantageReason: string | null;
+  competitorSummary: CompetitorPriceSummary;
+  competitorSalesEstimates: CompetitorSalesEstimate[];
+  strongestCompetitorSalesLevel: SalesLevel;
+  strongestCompetitorSalesRange: EstimatedSalesRange | null;
+  userEstimatedSalesLevel: SalesLevel;
+  userEstimatedSalesRange: EstimatedSalesRange | null;
+  marketDemandSignal: MarketDemandSignal;
+  marketPosition: MarketPositionLevel;
+  growthOpportunityLevel: GrowthOpportunityLevel;
+  outcomeType: AnalysisOutcomeType;
+  primaryIssue: MarketIssueType;
+  secondaryIssues: MarketIssueType[];
+  mainIssues: MarketIssueType[];
+  demandVerdict: MarketDemandVerdict;
+};
+
+export type AnalysisVisualBlockKey =
+  | "price_position"
+  | "sales_status"
+  | "growth_opportunity"
+  | "market_position"
+  | "market_interest"
+  | "interest_to_sales_funnel"
+  | "customer_trust"
+  | "page_strength"
+  | "main_challenges"
+  | "competitor_strength";
+
+export type AnalysisVisualChartType =
+  | "range_distribution"
+  | "segmented_meter"
+  | "gauge"
+  | "position_ladder"
+  | "score_bar"
+  | "funnel"
+  | "stacked_meter"
+  | "quality_indicator"
+  | "ranked_bars"
+  | "grouped_buckets";
+
+export type AnalysisVisualAvailability = "ready" | "limited" | "hidden";
+
+export type AnalysisVisualPricePositionData = {
+  min: number | null;
+  median: number | null;
+  max: number | null;
+  userValue: number | null;
+  userLabel: string;
+};
+
+export type AnalysisVisualLevelData = {
+  level: string;
+  normalizedScore: number | null;
+  label: string;
+};
+
+export type AnalysisVisualMarketPositionData = {
+  position: MarketPositionLevel | "unclear";
+  label: string;
+  rankHint?: string | null;
+};
+
+export type AnalysisVisualInterestData = {
+  level: MarketDemandSignal | "unclear";
+  normalizedScore: number | null;
+  supportingSignals: string[];
+};
+
+export type AnalysisVisualFunnelStage = {
+  label: string;
+  value: number | null;
+  normalizedValue: number | null;
+};
+
+export type AnalysisVisualTrustData = {
+  overallLevel: "low" | "medium" | "high" | "unclear";
+  subScores: Array<{
+    key: "rating" | "reviews" | "questions" | "seller";
+    label: string;
+    value: number | null;
+    normalizedScore: number | null;
+  }>;
+};
+
+export type AnalysisVisualPageStrengthData = {
+  overallLevel: "low" | "medium" | "high" | "unclear";
+  parts: Array<{
+    key: "title" | "description" | "images";
+    label: string;
+    normalizedScore: number | null;
+    level: "low" | "medium" | "high" | "unclear";
+  }>;
+};
+
+export type AnalysisVisualIssueBarsData = {
+  issueBars: Array<{
+    key: MarketIssueType;
+    label: string;
+    value: number;
+    normalizedValue: number;
+  }>;
+};
+
+export type AnalysisVisualCompetitorStrengthData = {
+  buckets: Array<{
+    key: "strong" | "medium" | "weak" | "unclear";
+    label: string;
+    count: number;
+    normalizedValue: number;
+  }>;
+};
+
+export type AnalysisVisualBlockMeta = {
+  shortLabel?: string;
+  statusLabel?: string;
+  visible?: boolean;
+};
+
+export type AnalysisVisualBlock =
+  AnalysisVisualBlockMeta &
+  (| {
+      key: "price_position";
+      title: "Fiyatın Nerede?";
+      chartType: "range_distribution";
+      availability: AnalysisVisualAvailability;
+      description: string;
+      data: AnalysisVisualPricePositionData;
+      reasonIfLimited?: string;
+    }
+  | {
+      key: "sales_status";
+      title: "Satış Durumu";
+      chartType: "segmented_meter";
+      availability: AnalysisVisualAvailability;
+      description: string;
+      data: AnalysisVisualLevelData;
+      reasonIfLimited?: string;
+    }
+  | {
+      key: "growth_opportunity";
+      title: "Büyüme Fırsatı";
+      chartType: "gauge";
+      availability: AnalysisVisualAvailability;
+      description: string;
+      data: AnalysisVisualLevelData;
+      reasonIfLimited?: string;
+    }
+  | {
+      key: "market_position";
+      title: "Diğer Mağazalara Göre Durumun";
+      chartType: "position_ladder";
+      availability: AnalysisVisualAvailability;
+      description: string;
+      data: AnalysisVisualMarketPositionData;
+      reasonIfLimited?: string;
+    }
+  | {
+      key: "market_interest";
+      title: "Ürüne İlgi";
+      chartType: "score_bar";
+      availability: AnalysisVisualAvailability;
+      description: string;
+      data: AnalysisVisualInterestData;
+      reasonIfLimited?: string;
+    }
+  | {
+      key: "interest_to_sales_funnel";
+      title: "İlgi Satışa Dönüyor mu?";
+      chartType: "funnel";
+      availability: AnalysisVisualAvailability;
+      description: string;
+      data: { stages: AnalysisVisualFunnelStage[] };
+      reasonIfLimited?: string;
+    }
+  | {
+      key: "customer_trust";
+      title: "Müşteri Güveni";
+      chartType: "stacked_meter";
+      availability: AnalysisVisualAvailability;
+      description: string;
+      data: AnalysisVisualTrustData;
+      reasonIfLimited?: string;
+    }
+  | {
+      key: "page_strength";
+      title: "Sayfa Gücü";
+      chartType: "quality_indicator";
+      availability: AnalysisVisualAvailability;
+      description: string;
+      data: AnalysisVisualPageStrengthData;
+      reasonIfLimited?: string;
+    }
+  | {
+      key: "main_challenges";
+      title: "Seni En Çok Ne Zorluyor?";
+      chartType: "ranked_bars";
+      availability: AnalysisVisualAvailability;
+      description: string;
+      data: AnalysisVisualIssueBarsData;
+      reasonIfLimited?: string;
+    }
+  | {
+      key: "competitor_strength";
+      title: "Rakipler Ne Kadar Güçlü?";
+      chartType: "grouped_buckets";
+      availability: AnalysisVisualAvailability;
+      description: string;
+      data: AnalysisVisualCompetitorStrengthData;
+      reasonIfLimited?: string;
+    });
+
+export type AnalysisVisualsPack = {
+  version: 1;
+  blocks: AnalysisVisualBlock[];
+};
+
+export type MarketOverviewSummary = {
+  salesStatus: {
+    level: SalesLevel | "unclear";
+    label: string;
+  };
+  marketPosition: {
+    level: MarketPositionLevel | "unclear";
+    label: string;
+  };
+  growthOpportunity: {
+    level: GrowthOpportunityLevel | "unclear";
+    label: string;
+  };
+  priceAdvantage: {
+    level: PriceCompetitivenessLevel | "unclear";
+    label: string;
+  };
+  relativeMarketStatus: string;
+  demandConfidence: EstimationConfidence;
+  mainPressureAreas: string[];
 };
 
 export type MissingDataPriority = "critical" | "important" | "optional";
@@ -296,6 +752,7 @@ export type ExtractedProductFields = {
   other_sellers_count: number | null;
   other_seller_offers: OtherSellerOffer[] | null;
   other_sellers_summary: OtherSellersSummary | null;
+  similar_product_candidates?: SimilarProductCandidate[] | null;
   has_brand_page: boolean;
   official_seller: boolean;
   has_campaign: boolean;
@@ -405,6 +862,14 @@ export type AnalysisTraceMetricSnapshot = {
 export type AnalysisTrace = {
   version: number;
   mode: "deterministic" | "ai_enriched";
+  aiDecision?: {
+    eligible: boolean;
+    executed: boolean;
+    mode: "skip" | "cautious" | "full";
+    reason: string;
+    blockingFields: string[];
+    coverageTier: "strong" | "medium" | "weak";
+  } | null;
   primaryDiagnosis: string | null;
   primaryTheme: AnalysisTraceTheme | null;
   confidence: "high" | "medium" | "low";
@@ -420,6 +885,49 @@ export type AnalysisTrace = {
   recommendedFocus: string[];
   blockedByData: string[];
   decisionFlow: AnalysisTraceStep[];
+};
+
+export type InternalDebugStage =
+  | "fetch"
+  | "parse"
+  | "merge"
+  | "override"
+  | "analysis"
+  | "confidence";
+
+export type InternalDebugLevel = "info" | "warn";
+
+export type InternalDebugEvent = {
+  stage: InternalDebugStage;
+  level: InternalDebugLevel;
+  code: string;
+  message: string;
+  field?: string;
+  meta?: Record<string, unknown>;
+  timestamp: string;
+};
+
+export type InternalDebugTraceSummary = {
+  totalEvents: number;
+  warnings: number;
+  fetchEvents: number;
+  parseEvents: number;
+  mergeEvents: number;
+  overrideEvents: number;
+  analysisEvents: number;
+  confidenceEvents: number;
+  missingCriticalCount: number;
+  overrideConflictCount: number;
+  confidenceDowngradeCount: number;
+};
+
+export type InternalDebugTraceReport = {
+  enabled: boolean;
+  pipeline: string;
+  urlHost?: string | null;
+  platform?: string | null;
+  events: InternalDebugEvent[];
+  summary: InternalDebugTraceSummary;
 };
 
 export type AnalysisSectionLock =
@@ -454,6 +962,13 @@ export type BuildAnalysisResult = {
   weaknesses: string[];
   suggestions: AnalysisSuggestion[];
   priorityActions: PriorityAction[];
+  analysisVisuals?: AnalysisVisualsPack;
+  marketOverview?: MarketOverviewSummary;
+  marketComparison?: MarketComparisonInsights | null;
+  aiCommentary?: {
+    mode: "deterministic" | "ai_enriched";
+    summary: string;
+  } | null;
   analysisTrace: AnalysisTrace | null;
 
   priceCompetitiveness: string | null;
@@ -461,7 +976,9 @@ export type BuildAnalysisResult = {
 
   // Phase 1: Extraction reliability metadata (memory only)
   _fieldMetadata?: Record<string, ExtractedFieldMetadata>;
+  _normalizedFieldMetadata?: Record<string, NormalizedFieldMetadata>;
   extractorHealth?: ExtractorHealthReport;
+  debugTrace?: InternalDebugTraceReport | null;
 };
 
 // =================================================================
@@ -491,6 +1008,32 @@ export type DataField<T> = {
   confidence: number;
   /** A human-readable explanation of how this value was determined. */
   reason: string;
+  metadata?: NormalizedFieldMetadata;
+};
+
+export type ConsolidatedMarketInsights = {
+  competitorCount: DataField<number>;
+  lowestCompetitorPrice: DataField<number>;
+  highestCompetitorPrice: DataField<number>;
+  averageCompetitorPrice: DataField<number>;
+  medianCompetitorPrice: DataField<number>;
+  userPriceRank: DataField<number>;
+  userPriceDeltaFromMedian: DataField<number>;
+  userPricePosition: DataField<UserPricePosition>;
+  priceCompetitiveness: DataField<PriceCompetitivenessLevel>;
+  salesLevel: DataField<SalesLevel>;
+  marketPosition: DataField<MarketPositionLevel>;
+  growthOpportunityLevel: DataField<GrowthOpportunityLevel>;
+  outcomeType: DataField<AnalysisOutcomeType>;
+  primaryIssue: DataField<MarketIssueType>;
+  secondaryIssues: DataField<MarketIssueType[]>;
+  mainIssues: DataField<MarketIssueType[]>;
+  competitorSalesEstimates: DataField<CompetitorSalesEstimate[]>;
+  strongestCompetitorSalesLevel: DataField<SalesLevel>;
+  strongestCompetitorSalesRange: DataField<EstimatedSalesRange>;
+  userEstimatedSalesLevel: DataField<SalesLevel>;
+  userEstimatedSalesRange: DataField<EstimatedSalesRange>;
+  marketDemandSignal: DataField<MarketDemandSignal>;
 };
 
 /**
@@ -531,6 +1074,13 @@ export type ConsolidatedAnalysisInput = {
   sellerName: DataField<string>;
   sellerScore: DataField<number>;
   isOfficialSeller: DataField<boolean>;
+
+  // Market comparison / positioning block
+  marketInsights?: ConsolidatedMarketInsights | null;
+  marketComparison?: MarketComparisonInsights | null;
+
+  // Canonical field-level metadata for confidence-aware analysis
+  _fieldMetadata?: Record<string, NormalizedFieldMetadata>;
 
   // Raw extracted data for reference
   _raw: ExtractedProductFields;

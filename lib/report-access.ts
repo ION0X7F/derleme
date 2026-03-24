@@ -23,6 +23,23 @@ type StoredReportLike = {
   analysisTrace?: unknown;
 };
 
+const REPORT_LIST_EXTRACTED_DATA_KEYS = [
+  "title",
+  "product_name",
+  "h1",
+  "product_title",
+  "name",
+  "has_free_shipping",
+  "has_return_info",
+  "has_shipping_info",
+  "official_seller",
+  "seller_badges",
+  "seller_score",
+  "other_sellers_count",
+  "other_sellers_summary",
+  "campaign_label",
+] as const;
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -188,6 +205,104 @@ export function sanitizeStoredReportForAccess<T extends StoredReportLike>(report
   return nextReport;
 }
 
+function compactExtractedDataForList(extractedData: unknown) {
+  if (!isObject(extractedData)) {
+    return null;
+  }
+
+  const compact: Record<string, unknown> = {};
+  for (const key of REPORT_LIST_EXTRACTED_DATA_KEYS) {
+    if (key in extractedData) {
+      compact[key] = extractedData[key];
+    }
+  }
+
+  if (isObject(compact.other_sellers_summary)) {
+    const summary = compact.other_sellers_summary;
+    compact.other_sellers_summary = {
+      count: typeof summary.count === "number" ? summary.count : null,
+      avg_score: typeof summary.avg_score === "number" ? summary.avg_score : null,
+      official_count:
+        typeof summary.official_count === "number" ? summary.official_count : null,
+      fast_delivery_count:
+        typeof summary.fast_delivery_count === "number"
+          ? summary.fast_delivery_count
+          : null,
+      scored_count:
+        typeof summary.scored_count === "number" ? summary.scored_count : null,
+    };
+  }
+
+  return compact;
+}
+
+function compactAnalysisTraceForList(analysisTrace: unknown) {
+  if (!isObject(analysisTrace)) {
+    return null;
+  }
+
+  const aiDecision = isObject(analysisTrace.aiDecision)
+    ? {
+        executed: analysisTrace.aiDecision.executed === true,
+        mode:
+          typeof analysisTrace.aiDecision.mode === "string"
+            ? analysisTrace.aiDecision.mode
+            : null,
+        reason:
+          typeof analysisTrace.aiDecision.reason === "string"
+            ? analysisTrace.aiDecision.reason
+            : null,
+        coverageTier:
+          typeof analysisTrace.aiDecision.coverageTier === "string"
+            ? analysisTrace.aiDecision.coverageTier
+            : null,
+      }
+    : null;
+
+  return {
+    mode: typeof analysisTrace.mode === "string" ? analysisTrace.mode : null,
+    primaryDiagnosis:
+      typeof analysisTrace.primaryDiagnosis === "string"
+        ? analysisTrace.primaryDiagnosis
+        : null,
+    primaryTheme:
+      typeof analysisTrace.primaryTheme === "string"
+        ? analysisTrace.primaryTheme
+        : null,
+    confidence:
+      typeof analysisTrace.confidence === "string" ? analysisTrace.confidence : null,
+    scoreSummary: isObject(analysisTrace.scoreSummary)
+      ? {
+          seo:
+            typeof analysisTrace.scoreSummary.seo === "number"
+              ? analysisTrace.scoreSummary.seo
+              : null,
+          conversion:
+            typeof analysisTrace.scoreSummary.conversion === "number"
+              ? analysisTrace.scoreSummary.conversion
+              : null,
+          overall:
+            typeof analysisTrace.scoreSummary.overall === "number"
+              ? analysisTrace.scoreSummary.overall
+              : null,
+        }
+      : null,
+    aiDecision,
+  };
+}
+
+export function sanitizeStoredReportListItemForAccess<T extends StoredReportLike>(report: T): T {
+  const sanitized = sanitizeStoredReportForAccess(report);
+  const compact = {
+    ...sanitized,
+  };
+
+  compact.extractedData = compactExtractedDataForList(sanitized.extractedData);
+  compact.analysisTrace = compactAnalysisTraceForList(sanitized.analysisTrace);
+
+  return compact;
+}
+
 export function prepareStoredReportForClient<T extends StoredReportLike>(
   report: T
 ): T {
@@ -224,4 +339,46 @@ export function prepareSavedReportForClient<T extends StoredReportLike>(
       createdAt: getCreatedAtValue(report.createdAt),
     };
   }
+}
+
+export function prepareSavedReportListItemForClient<T extends StoredReportLike>(
+  report: T
+): SavedReport {
+  const sanitized = sanitizeStoredReportListItemForAccess(report);
+
+  return {
+    id: getStringOrNull(sanitized.id) || `report-${Date.now()}`,
+    url: getStringOrNull(sanitized.url) || "/reports",
+    platform: getStringOrNull(sanitized.platform),
+    category: getStringOrNull(sanitized.category),
+    seoScore: getNumberOrNull(sanitized.seoScore),
+    conversionScore: getNumberOrNull(sanitized.conversionScore),
+    overallScore: getNumberOrNull(sanitized.overallScore),
+    dataCompletenessScore: getNumberOrNull(sanitized.dataCompletenessScore),
+    priceCompetitiveness: getStringOrNull(sanitized.priceCompetitiveness),
+    summary: getStringOrNull(sanitized.summary),
+    dataSource: getStringOrNull(sanitized.dataSource),
+    derivedMetrics: isObject(sanitized.derivedMetrics)
+      ? (sanitized.derivedMetrics as SavedReport["derivedMetrics"])
+      : null,
+    coverage: isObject(sanitized.coverage)
+      ? (sanitized.coverage as SavedReport["coverage"])
+      : null,
+    analysisTrace: isObject(sanitized.analysisTrace)
+      ? (sanitized.analysisTrace as SavedReport["analysisTrace"])
+      : null,
+    accessState: isObject(sanitized.accessState)
+      ? (sanitized.accessState as SavedReport["accessState"])
+      : null,
+    extractedData: isObject(sanitized.extractedData)
+      ? (sanitized.extractedData as SavedReport["extractedData"])
+      : null,
+    suggestions: Array.isArray(sanitized.suggestions)
+      ? (sanitized.suggestions as SavedReport["suggestions"])
+      : [],
+    priorityActions: Array.isArray(sanitized.priorityActions)
+      ? (sanitized.priorityActions as SavedReport["priorityActions"])
+      : [],
+    createdAt: getCreatedAtValue(sanitized.createdAt),
+  };
 }

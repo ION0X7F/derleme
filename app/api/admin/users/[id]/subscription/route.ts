@@ -1,25 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  PlanCode,
-  SubscriptionPlanVariant,
-  SubscriptionStatus,
-} from "@prisma/client";
 import { auth } from "@/auth";
 import {
   getPlanDisplayName,
   getRuntimePlanCodeForPlanId,
   isAppPlanId,
+  type RuntimePlanCode,
   type AppPlanId,
 } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 import { getUserMembershipSnapshot } from "@/lib/user-membership";
+type SubscriptionPlanVariantValue = "FREE" | "PRO_MONTHLY" | "PRO_YEARLY" | "TEAM";
 
 type UpdateSubscriptionBody = {
   planId?: string;
   planCode?: string;
 };
 
-const ALLOWED_PLAN_CODES = new Set<PlanCode>([PlanCode.FREE, PlanCode.PREMIUM]);
+const ALLOWED_PLAN_CODES = new Set<RuntimePlanCode>(["FREE", "PREMIUM"]);
 
 export async function PATCH(
   req: NextRequest,
@@ -43,21 +40,21 @@ export async function PATCH(
     ? getRuntimePlanCodeForPlanId(normalizedPlanId)
     : rawPlanCode;
 
-  if (!ALLOWED_PLAN_CODES.has(rawResolvedPlanCode as PlanCode)) {
+  if (!ALLOWED_PLAN_CODES.has(rawResolvedPlanCode as RuntimePlanCode)) {
     return NextResponse.json(
       { error: "Gecersiz plan secimi." },
       { status: 400 }
     );
   }
 
-  const planCode = rawResolvedPlanCode as PlanCode;
+  const planCode = rawResolvedPlanCode as RuntimePlanCode;
 
   const planVariant =
     normalizedPlanId === null
       ? rawPlanCode === "PREMIUM"
-        ? SubscriptionPlanVariant.PRO_MONTHLY
-        : SubscriptionPlanVariant.FREE
-      : (normalizedPlanId as SubscriptionPlanVariant);
+        ? "PRO_MONTHLY"
+        : "FREE"
+      : (normalizedPlanId as SubscriptionPlanVariantValue);
 
   const [targetUser, plan] = await Promise.all([
     prisma.user.findUnique({
@@ -91,7 +88,7 @@ export async function PATCH(
       where: { userId: targetUser.id },
       update: {
         planId: plan.id,
-        status: SubscriptionStatus.ACTIVE,
+        status: "ACTIVE",
         variant: planVariant,
         startDate: new Date(),
         endDate: null,
@@ -100,7 +97,7 @@ export async function PATCH(
       create: {
         userId: targetUser.id,
         planId: plan.id,
-        status: SubscriptionStatus.ACTIVE,
+        status: "ACTIVE",
         variant: planVariant,
       },
     }),
@@ -121,6 +118,6 @@ export async function PATCH(
     planCode: membership?.planCode ?? plan.code,
     planId: membership?.planId ?? normalizedPlanId ?? "FREE",
     planLabel: getPlanDisplayName(membership?.planId ?? normalizedPlanId ?? "FREE"),
-    subscriptionStatus: membership?.subscriptionStatus ?? SubscriptionStatus.ACTIVE,
+    subscriptionStatus: membership?.subscriptionStatus ?? "ACTIVE",
   });
 }

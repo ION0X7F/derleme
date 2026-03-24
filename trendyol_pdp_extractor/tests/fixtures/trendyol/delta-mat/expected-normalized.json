@@ -1,0 +1,25 @@
+{
+  "url": "https://www.trendyol.com/delta/konfor-zemin-10-mm-tasima-askili-pilates-minderi-yoga-mati-mor-p-3701455?boutiqueId=61",
+  "strict": {
+    "brand": "Delta",
+    "seller_name": "Delta Spor",
+    "merchant_id": 921,
+    "normalized_price": 497.89,
+    "question_count": 270,
+    "other_sellers_count": 3
+  },
+  "presence": [
+    "other_seller_offers",
+    "similar_product_candidates",
+    "review_snippets"
+  ],
+  "sources": {
+    "price": { "source": "html", "confidence": "high" },
+    "seller_name": { "source": "embedded_json", "confidence": "high" },
+    "question_count": { "source": "runtime_xhr", "confidence": "high" },
+    "other_sellers_count": { "source": "parser_inference", "confidence": "medium" }
+  },
+  "null_or_low_confidence": [
+    "model_code"
+  ]
+}

@@ -11,6 +11,8 @@ import type {
   ReviewSummary,
 } from "@/types/analysis";
 import type { TrendyolApiResult } from "@/lib/fetch-trendyol-api";
+import type { DebugTraceHandle } from "@/lib/debug-observability";
+import { traceEvent, traceMissingField } from "@/lib/debug-observability";
 
 type MissingFieldPriority = "critical" | "important" | "optional";
 
@@ -54,6 +56,18 @@ function pickNumber(...values: Array<number | null | undefined>) {
     }
   }
   return null;
+}
+
+function hasFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function hasNonEmptyArray(value: unknown): value is unknown[] {
+  return Array.isArray(value) && value.length > 0;
+}
+
+function hasMeaningfulObject(value: unknown) {
+  return Boolean(value) && typeof value === "object";
 }
 
 function pickStringArray(...values: Array<string[] | null | undefined>) {
@@ -713,7 +727,7 @@ export function completeMissingFields(params: CompleteMissingFieldsParams) {
   };
 
   const fillNumber = (field: keyof ExtractedProductFields, value: number | null, reason: string) => {
-    if (typeof completed[field] !== "number" && typeof value === "number" && Number.isFinite(value)) {
+    if (!hasFiniteNumber(completed[field]) && hasFiniteNumber(value)) {
       completed[field] = value as never;
       markField(String(field), reason);
     }
@@ -724,7 +738,7 @@ export function completeMissingFields(params: CompleteMissingFieldsParams) {
     value: string[] | null,
     reason: string
   ) => {
-    if (!Array.isArray(completed[field]) && Array.isArray(value) && value.length > 0) {
+    if (!hasNonEmptyArray(completed[field]) && hasNonEmptyArray(value)) {
       completed[field] = value as never;
       markField(String(field), reason);
     }
@@ -735,7 +749,7 @@ export function completeMissingFields(params: CompleteMissingFieldsParams) {
     value: ExtractedProductFields[K],
     reason: string
   ) => {
-    if (!completed[field] && value) {
+    if (!hasMeaningfulObject(completed[field]) && hasMeaningfulObject(value)) {
       completed[field] = value;
       markField(String(field), reason);
     }
@@ -841,6 +855,14 @@ export function completeMissingFields(params: CompleteMissingFieldsParams) {
       ? "trendyol api original price"
       : "html extractor"
   );
+
+  if (
+    hasFiniteNumber(completed.original_price) &&
+    hasFiniteNumber(completed.normalized_price) &&
+    completed.original_price < completed.normalized_price
+  ) {
+    completed.original_price = null;
+  }
 
   if (
     typeof completed.discount_rate !== "number" &&
@@ -1210,7 +1232,8 @@ export function completeMissingFields(params: CompleteMissingFieldsParams) {
  */
 export function completeMissingFieldsWithMetadata(
   params: CompleteMissingFieldsParams,
-  baseMetadata: Record<string, ExtractedFieldMetadata>
+  baseMetadata: Record<string, ExtractedFieldMetadata>,
+  trace?: DebugTraceHandle
 ): {
   extracted: ExtractedProductFields;
   report: MissingDataReport;
@@ -1218,6 +1241,7 @@ export function completeMissingFieldsWithMetadata(
 } {
   const result = completeMissingFields(params);
   const fieldMetadata = { ...baseMetadata };
+  const conservativeDerivedFields = new Set(["question_count", "model_code", "stock_quantity"]);
 
   // Update metadata for filled/derived fields
   for (const filledField of result.report.filledFields) {
@@ -1229,10 +1253,26 @@ export function completeMissingFieldsWithMetadata(
 
       fieldMetadata[filledField] = {
         source: isApiDerived ? "api" : "derived",
-        confidence: isApiDerived ? "high" : "medium",
+        confidence: isApiDerived
+          ? "high"
+          : conservativeDerivedFields.has(filledField)
+            ? "low"
+            : "medium",
         reason,
         timestamp: Date.now(),
       };
+
+      traceEvent(trace ?? null, {
+        stage: "merge",
+        code: "field_filled_from_fallback",
+        message: `${filledField} eksik oldugu icin fallback/derived kural ile dolduruldu.`,
+        field: filledField,
+        meta: {
+          source: fieldMetadata[filledField].source,
+          confidence: fieldMetadata[filledField].confidence,
+          reason,
+        },
+      });
     }
   }
 
@@ -1243,10 +1283,22 @@ export function completeMissingFieldsWithMetadata(
       const reason = rule.substring(strengthenedField.length + 4);
       fieldMetadata[strengthenedField] = {
         source: reason.includes("trendyol") ? "api" : "derived",
-        confidence: "medium",
+        confidence: conservativeDerivedFields.has(strengthenedField) ? "low" : "medium",
         reason,
         timestamp: Date.now(),
       };
+
+      traceEvent(trace ?? null, {
+        stage: "merge",
+        code: "field_strengthened",
+        message: `${strengthenedField} ek sinyallerle guclendirildi.`,
+        field: strengthenedField,
+        meta: {
+          source: fieldMetadata[strengthenedField].source,
+          confidence: fieldMetadata[strengthenedField].confidence,
+          reason,
+        },
+      });
     }
   }
 
@@ -1260,7 +1312,20 @@ export function completeMissingFieldsWithMetadata(
         timestamp: Date.now(),
       };
     }
+    traceMissingField(trace ?? null, blockedField, "unresolved critical field", true);
   }
+
+  traceEvent(trace ?? null, {
+    stage: "merge",
+    code: "missing_data_completion_summary",
+    message: "Eksik alan tamamlama ve metadata guncelleme adimi tamamlandi.",
+    meta: {
+      filledFields: result.report.filledFields,
+      strengthenedFields: result.report.strengthenedFields,
+      unresolvedCriticalFields: result.report.unresolvedCriticalFields,
+      appliedRulesCount: result.report.appliedRules.length,
+    },
+  });
 
   return {
     extracted: result.extracted,

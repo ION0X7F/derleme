@@ -1,0 +1,18 @@
+[
+  {
+    "url": "https://api.trendyol.com/coupons",
+    "json": {
+      "result": [
+        {
+          "collectId": "cp-1",
+          "discount": 200,
+          "discountType": "AMOUNT",
+          "lowerLimit": 1750,
+          "createdBy": "Seller Center",
+          "userMessages": [{ "message": "Kupon firsati var." }]
+        }
+      ]
+    }
+  }
+]
+

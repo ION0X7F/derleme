@@ -1,0 +1,30 @@
+[
+  {
+    "url": "https://api.trendyol.com/cross-promotions",
+    "json": {
+      "result": {
+        "crossPromotions": [
+          {
+            "id": "cross-1",
+            "selectionContent": {
+              "productName": "Banyo Seti",
+              "listingId": "banyo-main-listing",
+              "price": { "discountedPrice": 289.9 }
+            },
+            "awardContent": {
+              "productName": "Sivi Sabunluk",
+              "listingId": "award-1",
+              "price": { "discountedPrice": 79.9 }
+            },
+            "awardAmount": 20,
+            "awardAmountText": "20 TL avantaj",
+            "totalOrderAmount": 369.8,
+            "totalOrderAmountText": "Toplam 369,8 TL",
+            "awardType": "bundle"
+          }
+        ]
+      }
+    }
+  }
+]
+

@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { parseAnalysisSummary } from "@/lib/analysis-summary";
 import type {
@@ -10,6 +9,18 @@ import type {
   MissingDataReport,
 } from "@/types/analysis";
 
+const LEARNING_ENGINE_ENABLED = process.env.LEARNING_ENGINE_ENABLED === "1";
+
+export function getLearningEngineState() {
+  return {
+    enabled: LEARNING_ENGINE_ENABLED,
+    mode: LEARNING_ENGINE_ENABLED ? "active" : "safe_noop",
+    reason: LEARNING_ENGINE_ENABLED
+      ? "Learning engine runtime is enabled."
+      : "Learning engine is intentionally disabled to protect core deterministic analysis path.",
+  } as const;
+}
+
 type LearningMemoryRecord = Awaited<
   ReturnType<typeof prisma.learningMemory.findMany>
 >[number];
@@ -20,7 +31,7 @@ type RuleCandidate = {
   insight: string;
   confidence: number;
   supportCount: number;
-  metadata: Prisma.InputJsonValue;
+  metadata: Record<string, unknown> | null;
 };
 
 function round(value: number | null | undefined, digits = 2) {
@@ -207,7 +218,7 @@ function buildBenchmarkPayloadFromMemories(memories: LearningMemoryRecord[]) {
         .map((item) => cleanText(item.criticalDiagnosis))
         .filter((item): item is string => !!item)
         .slice(0, 5),
-    } as Prisma.InputJsonValue,
+    } as Record<string, unknown>,
   };
 }
 
@@ -435,12 +446,12 @@ async function rebuildCategoryKnowledge(platform: string, category: string) {
         category,
       },
     },
-    update: benchmarkPayload,
+    update: benchmarkPayload as any,
     create: {
       platform,
       category,
       ...benchmarkPayload,
-    },
+    } as any,
   });
 
   const rules = buildRuleCandidatesFromBenchmark(benchmarkPayload);
@@ -461,7 +472,7 @@ async function rebuildCategoryKnowledge(platform: string, category: string) {
         supportCount: rule.supportCount,
         metadata: rule.metadata,
         lastSeenAt: new Date(),
-      },
+      } as any,
       create: {
         platform,
         category,
@@ -472,7 +483,7 @@ async function rebuildCategoryKnowledge(platform: string, category: string) {
         supportCount: rule.supportCount,
         metadata: rule.metadata,
         lastSeenAt: new Date(),
-      },
+      } as any,
     });
   }
 }
@@ -487,6 +498,10 @@ export async function getLearningContext(params: {
   // MVP: Return minimal context without DB queries
   // Full learning engine disabled to reduce analysis latency and complexity
   // Can be re-enabled later for premium tiers
+  if (LEARNING_ENGINE_ENABLED) {
+    // Guarded future hook: even when runtime flag is enabled, we currently keep
+    // the helper mode conservative to avoid overriding the core deterministic path.
+  }
   
   return {
     benchmark: null,
@@ -510,6 +525,10 @@ export async function recordLearningArtifacts(params: {
   // MVP: Learning artifacts recording disabled
   // This reduces post-analysis latency and DB pressure
   // Can be re-enabled for future analytics/refinement
+  if (LEARNING_ENGINE_ENABLED) {
+    // Guarded future hook: keep no-op behavior until we explicitly open
+    // persistence gates with additional quality controls.
+  }
   
   // No-op for MVP
   return;

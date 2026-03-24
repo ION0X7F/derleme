@@ -1,0 +1,28 @@
+{
+  "product": {
+    "name": "Sevimli Oturan Figurler 4'lu Dekoratif Banyo Seti",
+    "brand": { "name": "Genel Markalar" },
+    "sku": "927845432",
+    "description": "Dekoratif banyo seti.",
+    "image": ["https://cdn.example.com/banyo-1.jpg"],
+    "ratingScore": { "averageRating": 4.83, "commentCount": 6 },
+    "favoriteCount": 450,
+    "merchantListing": {
+      "merchant": {
+        "name": "DEKOR EVIM",
+        "id": 556699,
+        "sellerScore": { "value": 9.4 },
+        "merchantBadges": [{ "type": "BADGE" }]
+      },
+      "winnerVariant": {
+        "listingId": "banyo-main-listing",
+        "price": { "discountedPrice": 289.9, "originalPrice": 329.9 },
+        "quantity": 120,
+        "freeCargo": true,
+        "fulfilmentType": "MP"
+      },
+      "promotions": [{ "name": "KUPONLU URUN" }]
+    }
+  }
+}
+

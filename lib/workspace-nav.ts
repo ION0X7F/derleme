@@ -19,7 +19,7 @@ export function getWorkspaceNav(params?: {
   }
 
   if (params?.includeAdmin) {
-    items.push({ href: "/admin", label: "Admin" });
+    items.push({ href: "/admin", label: "Admin Operasyon" });
   }
 
   return items;
@@ -27,10 +27,10 @@ export function getWorkspaceNav(params?: {
 
 export function getAdminNav(): NavItem[] {
   return [
-    { href: "/admin", label: "Genel Bakis" },
+    { href: "/admin", label: "Operasyon Ozeti" },
     { href: "/admin/users", label: "Kullanicilar" },
     { href: "/admin/plans", label: "Planlar" },
-    { href: "/admin/reports", label: "Raporlar" },
-    { href: "/admin/system", label: "Sistem" },
+    { href: "/admin/reports", label: "Rapor Operasyonu" },
+    { href: "/admin/system", label: "Sistem Sagligi" },
   ];
 }

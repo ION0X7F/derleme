@@ -1,0 +1,15 @@
+[
+  {
+    "url": "https://api.trendyol.com/questions",
+    "json": {
+      "questions": {
+        "totalElements": 12,
+        "content": [
+          { "text": "Son kullanma tarihi nedir?", "answer": { "text": "Yeni tarihli urun gonderilir." } },
+          { "text": "Orijinal urun mu?", "answer": { "text": "Evet, orijinal urundur." } }
+        ]
+      }
+    }
+  }
+]
+

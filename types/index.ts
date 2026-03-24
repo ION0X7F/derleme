@@ -56,6 +56,14 @@ type LearningStatusSummary = {
 type AnalysisTraceSummary = {
   version: number;
   mode: "deterministic" | "ai_enriched";
+  aiDecision?: {
+    eligible: boolean;
+    executed: boolean;
+    mode: "skip" | "cautious" | "full";
+    reason: string;
+    blockingFields: string[];
+    coverageTier: "strong" | "medium" | "weak";
+  } | null;
   primaryDiagnosis: string | null;
   primaryTheme:
     | "stock"
@@ -109,6 +117,64 @@ type AnalysisTraceSummary = {
     detail: string;
     status: "selected" | "considered" | "limited";
   }[];
+} | null;
+
+type AnalysisVisualsSummary = {
+  version: 1;
+  blocks: Array<{
+    key:
+      | "price_position"
+      | "sales_status"
+      | "growth_opportunity"
+      | "market_position"
+      | "market_interest"
+      | "interest_to_sales_funnel"
+      | "customer_trust"
+      | "page_strength"
+      | "main_challenges"
+      | "competitor_strength";
+    title: string;
+    chartType:
+      | "range_distribution"
+      | "segmented_meter"
+      | "gauge"
+      | "position_ladder"
+      | "score_bar"
+      | "funnel"
+      | "stacked_meter"
+      | "quality_indicator"
+      | "ranked_bars"
+      | "grouped_buckets";
+    availability: "ready" | "limited" | "hidden";
+    shortLabel?: string;
+    statusLabel?: string;
+    visible?: boolean;
+    description: string;
+    data: Record<string, unknown>;
+    reasonIfLimited?: string;
+  }>;
+} | null;
+
+type MarketOverviewSummary = {
+  salesStatus: {
+    level: string;
+    label: string;
+  };
+  marketPosition: {
+    level: string;
+    label: string;
+  };
+  growthOpportunity: {
+    level: string;
+    label: string;
+  };
+  priceAdvantage: {
+    level: string;
+    label: string;
+  };
+  relativeMarketStatus: string;
+  demandConfidence: string;
+  mainPressureAreas: string[];
 } | null;
 
 type ExtractedDataSummary = {
@@ -239,7 +305,21 @@ export type AnalysisResult = {
   coverage?: AnalysisCoverageSummary;
   missingDataReport?: MissingDataReportSummary;
   learningStatus?: LearningStatusSummary;
+  diagnostics?: {
+    totalMs: number;
+    fetchHtmlMs: number;
+    fetchApiMs: number;
+    extractionMs: number;
+    deterministicMs: number;
+    aiMs: number;
+  } | null;
   analysisTrace?: AnalysisTraceSummary;
+  analysisVisuals?: AnalysisVisualsSummary;
+  marketOverview?: MarketOverviewSummary;
+  aiCommentary?: {
+    mode: "deterministic" | "ai_enriched";
+    summary: string;
+  } | null;
   access?: ReportAccessState;
   teaserSections?: {
     key: string;
@@ -273,6 +353,12 @@ export type SavedReport = {
   derivedMetrics?: DerivedMetricsSummary;
   coverage?: AnalysisCoverageSummary;
   analysisTrace?: AnalysisTraceSummary;
+  analysisVisuals?: AnalysisVisualsSummary;
+  marketOverview?: MarketOverviewSummary;
+  aiCommentary?: {
+    mode: "deterministic" | "ai_enriched";
+    summary: string;
+  } | null;
   accessState?: Partial<NonNullable<ReportAccessState>> | null;
   extractedData: ExtractedDataSummary;
   suggestions: {

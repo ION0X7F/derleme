@@ -1,4 +1,9 @@
-import type { ExtractedProductFields, ExtractedFieldMetadata } from "@/types/analysis";
+import type {
+  ExtractedProductFields,
+  ExtractedFieldMetadata,
+} from "@/types/analysis";
+import type { DebugTraceHandle } from "@/lib/debug-observability";
+import { traceConflict, traceEvent, traceMissingField } from "@/lib/debug-observability";
 
 function cleanText(value: string | null | undefined) {
   if (!value) return null;
@@ -22,6 +27,35 @@ function isMeaningfulValue(value: unknown) {
   }
 
   return false;
+}
+
+function areComparableValuesDifferent(left: unknown, right: unknown) {
+  if (!isMeaningfulValue(left) || !isMeaningfulValue(right)) {
+    return false;
+  }
+
+  if (typeof left === "number" && typeof right === "number") {
+    return left !== right;
+  }
+
+  if (typeof left === "string" && typeof right === "string") {
+    return cleanText(left) !== cleanText(right);
+  }
+
+  if (typeof left === "boolean" && typeof right === "boolean") {
+    return left !== right;
+  }
+
+  if (Array.isArray(left) && Array.isArray(right)) {
+    if (left.length !== right.length) return true;
+    return left.some((item, index) => String(item) !== String(right[index]));
+  }
+
+  try {
+    return JSON.stringify(left) !== JSON.stringify(right);
+  } catch {
+    return true;
+  }
 }
 
 function normalizeFields(
@@ -52,6 +86,26 @@ function normalizeFields(
     category: cleanText(fields.category),
     platform: cleanText(fields.platform),
   };
+}
+
+function hasStrongPlatformSignal(fields: Partial<ExtractedProductFields>) {
+  const signalFields: Array<keyof ExtractedProductFields> = [
+    "brand",
+    "seller_name",
+    "price",
+    "normalized_price",
+    "image_count",
+    "rating_value",
+    "review_count",
+    "description_length",
+    "stock_status",
+  ];
+
+  const matchedSignals = signalFields.filter((key) =>
+    isMeaningfulValue(fields[key])
+  ).length;
+
+  return matchedSignals >= 2;
 }
 
 export function mergeExtractedFields(params: {
@@ -85,8 +139,12 @@ export function mergeExtractedFields(params: {
     merged.image_count = 0;
   }
 
-  if (!merged.extractor_status) {
-    merged.extractor_status = platform ? "ok" : "fallback";
+  if (platform) {
+    merged.extractor_status = hasStrongPlatformSignal(normalizedPlatformFields)
+      ? "ok"
+      : "partial";
+  } else if (!merged.extractor_status) {
+    merged.extractor_status = "fallback";
   }
 
   if (
@@ -113,14 +171,28 @@ export function mergeExtractedFieldsWithMetadata(params: {
   genericFields: ExtractedProductFields;
   platformFields: Partial<ExtractedProductFields>;
   platform: string | null;
+  trace?: DebugTraceHandle;
 }): {
   merged: ExtractedProductFields;
   fieldMetadata: Record<string, ExtractedFieldMetadata>;
 } {
-  const { genericFields, platformFields, platform } = params;
+  const { genericFields, platformFields, platform, trace } = params;
 
   const merged = mergeExtractedFields(params);
   const fieldMetadata: Record<string, ExtractedFieldMetadata> = {};
+  const watchedFields = new Set([
+    "normalized_price",
+    "original_price",
+    "review_count",
+    "rating_value",
+    "question_count",
+    "other_seller_offers",
+    "seller_name",
+    "seller_score",
+  ]);
+  let platformWins = 0;
+  let genericWins = 0;
+  let missingCount = 0;
 
   // Determine source for each field
   for (const [key, value] of Object.entries(merged)) {
@@ -139,13 +211,16 @@ export function mergeExtractedFieldsWithMetadata(params: {
     if (platformValue != null && isMeaningfulValue(platformValue)) {
       source = "platform";
       fallbackChain.push("platform");
+      platformWins += 1;
     } else if (genericValue != null && isMeaningfulValue(genericValue)) {
       source = "generic";
       fallbackChain.push("platform", "generic");
+      genericWins += 1;
     } else {
       // Field is null/missing
       source = "null";
       fallbackChain.push("platform", "generic");
+      missingCount += 1;
     }
 
     // Determine confidence
@@ -158,13 +233,69 @@ export function mergeExtractedFieldsWithMetadata(params: {
       confidence = "low"; // Field missing
     }
 
+    if (key === "model_code" && confidence === "high") {
+      confidence = "medium";
+    }
+
+    if (key === "question_count" && source !== "null") {
+      confidence = confidence === "high" ? "medium" : "low";
+    }
+
     fieldMetadata[key] = {
       source,
       confidence,
       timestamp: Date.now(),
       fallbackChain: fallbackChain.length > 1 ? fallbackChain : undefined,
+      reason:
+        source === "platform"
+          ? "platform extractor"
+          : source === "generic"
+            ? "generic html extractor"
+            : source === "null"
+              ? "field not found in platform/generic extraction"
+              : `${source} source`,
     };
+
+    if (
+      watchedFields.has(key) &&
+      platformValue != null &&
+      genericValue != null &&
+      isMeaningfulValue(platformValue) &&
+      isMeaningfulValue(genericValue) &&
+      areComparableValuesDifferent(platformValue, genericValue)
+    ) {
+      traceConflict(trace ?? null, {
+        field: key,
+        winner: "platform",
+        loser: "generic",
+        winnerValue: platformValue,
+        loserValue: genericValue,
+        reason: "platform extractor has precedence over generic extractor",
+      });
+    }
+
+    if (watchedFields.has(key) && source === "null") {
+      traceMissingField(trace ?? null, key, "field not found in platform/generic extraction", [
+        "normalized_price",
+        "review_count",
+        "rating_value",
+        "seller_name",
+      ].includes(key));
+    }
   }
+
+  traceEvent(trace ?? null, {
+    stage: "merge",
+    code: "merge_summary",
+    message: "Platform ve generic alanlar metadata ile birlestirildi.",
+    meta: {
+      platform,
+      platformWins,
+      genericWins,
+      missingCount,
+      extractorStatus: merged.extractor_status,
+    },
+  });
 
   return {
     merged,

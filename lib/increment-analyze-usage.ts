@@ -18,7 +18,7 @@ export async function incrementAnalyzeUsage(
   const periodKey = getMonthlyPeriodKey();
 
   if (params.type === "guest") {
-    await prisma.guestUsageRecord.upsert({
+    const record = await prisma.guestUsageRecord.upsert({
       where: {
         guestId_action_periodKey: {
           guestId: params.guestId,
@@ -39,10 +39,13 @@ export async function incrementAnalyzeUsage(
       },
     });
 
-    return;
+    return {
+      used: record.count,
+      periodKey,
+    } as const;
   }
 
-  await prisma.userUsageRecord.upsert({
+  const record = await prisma.userUsageRecord.upsert({
     where: {
       userId_action_periodKey: {
         userId: params.userId,
@@ -62,4 +65,9 @@ export async function incrementAnalyzeUsage(
       count: 1,
     },
   });
+
+  return {
+    used: record.count,
+    periodKey,
+  } as const;
 }

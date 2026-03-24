@@ -1,6 +1,7 @@
-import { PlanCode, SubscriptionStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isUnlimitedUser } from "@/lib/is-unlimited-user";
+import type { RuntimePlanCode } from "@/lib/plans";
+type SubscriptionStatusValue = "ACTIVE" | "TRIALING" | "CANCELED" | "EXPIRED";
 
 /**
  * Single source of truth for user plan determination.
@@ -16,15 +17,12 @@ import { isUnlimitedUser } from "@/lib/is-unlimited-user";
  * - Transparent, testable, easy to audit
  */
 
-const ENTITLED_STATUSES = new Set<SubscriptionStatus>([
-  SubscriptionStatus.ACTIVE,
-  SubscriptionStatus.TRIALING,
-]);
+const ENTITLED_STATUSES = new Set<SubscriptionStatusValue>(["ACTIVE", "TRIALING"]);
 
 export async function resolvePlanForUser(
   userId: string,
   email?: string | null
-): Promise<PlanCode> {
+): Promise<RuntimePlanCode> {
   // Step 1: Check unlimited user override (no DB query, ENV only)
   if (email && isUnlimitedUser(email)) {
     return "PREMIUM"; // Enterprise tier mapped to PREMIUM in schema
@@ -33,7 +31,8 @@ export async function resolvePlanForUser(
   // Step 2: Query subscription (only source of truth for regular users)
   const subscription = await prisma.subscription.findUnique({
     where: { userId },
-    include: {
+    select: {
+      status: true,
       plan: {
         select: {
           code: true,
@@ -52,7 +51,7 @@ export async function resolvePlanForUser(
   }
 
   // Step 4: Default to FREE
-  return PlanCode.FREE;
+  return "FREE";
 }
 
 /**
@@ -78,7 +77,8 @@ export async function resolvePlanFullContext(
   // Query subscription
   const subscription = await prisma.subscription.findUnique({
     where: { userId },
-    include: {
+    select: {
+      status: true,
       plan: {
         select: {
           code: true,
@@ -89,7 +89,7 @@ export async function resolvePlanFullContext(
   });
 
   const hasEntitled = subscription && ENTITLED_STATUSES.has(subscription.status);
-  const planCode = hasEntitled && subscription.plan?.code ? subscription.plan.code : PlanCode.FREE;
+  const planCode = hasEntitled && subscription.plan?.code ? subscription.plan.code : "FREE";
 
   return {
     planCode,

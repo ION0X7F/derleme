@@ -1,0 +1,65 @@
+{
+  "product": {
+    "name": "Konfor Zemin 10 mm Tasima Askili Pilates Minderi Yoga Mati-MOR",
+    "brand": { "name": "Delta" },
+    "sku": "MNDR-FOAM10MM-TNO922",
+    "description": "10 mm pilates minderi.",
+    "image": [
+      "https://cdn.example.com/delta-1.jpg",
+      "https://cdn.example.com/delta-2.jpg",
+      "https://cdn.example.com/delta-3.jpg"
+    ],
+    "ratingScore": { "averageRating": 4.45, "commentCount": 3461 },
+    "favoriteCount": 102860,
+    "merchantListing": {
+      "merchant": {
+        "name": "Delta Spor",
+        "id": 921,
+        "sellerScore": { "value": 9.0 },
+        "merchantBadges": [{ "type": "BADGE" }]
+      },
+      "winnerVariant": {
+        "listingId": "delta-main-listing",
+        "price": { "discountedPrice": 549.0, "originalPrice": 549.0 },
+        "quantity": 1719,
+        "freeCargo": true,
+        "rushDeliveryDuration": 1,
+        "fulfilmentType": "MP"
+      },
+      "otherMerchants": [
+        {
+          "name": "Delta Spor",
+          "id": 921,
+          "variants": [{ "listingId": "delta-seller-1", "fulfilmentType": "MP" }],
+          "price": { "discountedPrice": 549.0, "originalPrice": 549.0 },
+          "sellerScore": { "value": 9.3 },
+          "merchantBadges": [{ "type": "MARKER" }],
+          "rushDelivery": true,
+          "url": "/delta/konfor-zemin-p-3701455?merchantId=921"
+        },
+        {
+          "name": "Fitnesspor",
+          "id": 111551,
+          "variants": [{ "listingId": "delta-seller-2", "fulfilmentType": "MP" }],
+          "price": { "discountedPrice": 568.0, "originalPrice": 568.0 },
+          "sellerScore": { "value": 9.2 },
+          "merchantBadges": [{ "type": "BADGE" }],
+          "rushDelivery": true,
+          "url": "/delta/konfor-zemin-p-3701455?merchantId=111551"
+        },
+        {
+          "name": "AKSA SPOR",
+          "id": 115620,
+          "variants": [{ "listingId": "delta-seller-3", "fulfilmentType": "MP" }],
+          "price": { "discountedPrice": 649.0, "originalPrice": 649.0 },
+          "sellerScore": { "value": 9.7 },
+          "merchantBadges": [{ "type": "BADGE" }],
+          "rushDelivery": true,
+          "url": "/delta/konfor-zemin-p-3701455?merchantId=115620"
+        }
+      ],
+      "promotions": [{ "name": "10 Adede %10" }]
+    }
+  }
+}
+

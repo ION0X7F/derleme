@@ -1,23 +1,38 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
-import {
-  buildAnalysisAccessState,
-  resolveAccessPlan,
-} from "@/lib/analysis-access";
-import { resolvePlanForUser } from "@/lib/resolve-plan";
+import { buildAnalysisAccessState } from "@/lib/analysis-access";
+import { resolveUserAnalysisContext } from "@/lib/analysis-user-context";
+import type { AnalyzeLimitResult } from "@/lib/check-analyze-limit";
 import { sanitizeAnalysisTraceForAccess } from "@/lib/analysis-trace";
-import { getOrCreateGuestId } from "@/lib/guest";
-import { checkAnalyzeLimit } from "@/lib/check-analyze-limit";
+import { beginAnalyzeRequestGuard } from "@/lib/analyze-request-guard";
+import {
+  logAnalyzeEvent,
+  logAnalyzeLimitReached,
+  logAnalyzeThrottled,
+} from "@/lib/analysis-observability";
+import { attachReportVersionMeta } from "@/lib/report-versioning";
+import {
+  resolveGuestAnalyzeUsageContext,
+  resolveUserAnalyzeUsageContext,
+} from "@/lib/analyze-usage-context";
+import {
+  buildAnalyzeLimitReachedResponse,
+  buildAnalyzeThrottledResponse,
+} from "@/lib/analyze-error-response";
 import { incrementAnalyzeUsage } from "@/lib/increment-analyze-usage";
-import { isUnlimitedUser } from "@/lib/is-unlimited-user";
+import { createRequestId } from "@/lib/request-id";
+import {
+  projectUsageAfterIncrement,
+} from "@/lib/analyze-usage-snapshot";
+import { buildAnalysisDecisionSummary } from "@/lib/analysis-decision-summary";
 import { recordLearningArtifacts } from "@/lib/learning-engine";
+import { buildStoredAnalysisPayload } from "@/lib/report-storage";
 import {
   AnalysisPipelineError,
   runAnalysisPipeline,
 } from "@/lib/run-analysis";
 import { validateProductUrl } from "@/lib/url-validation";
+import { createAnalyzeReport } from "@/lib/report-detail-query";
 import type {
   AnalysisAccessState,
   AnalysisSectionLock,
@@ -27,6 +42,10 @@ import type {
 
 function trimArray<T>(items: T[], limit: number) {
   return items.slice(0, limit);
+}
+
+function toDbJson<T>(value: T) {
+  return value as T & object;
 }
 
 function buildTeasers(
@@ -174,6 +193,18 @@ function shapeAnalysisForAccess(
       category
     ),
     analysisTrace: sanitizeAnalysisTraceForAccess(analysis.analysisTrace, access.plan),
+    analysisVisuals: analysis.analysisVisuals ?? null,
+    marketOverview:
+      access.plan === "guest" ? null : analysis.marketOverview ?? null,
+    marketComparison:
+      access.plan === "guest" ? null : analysis.marketComparison ?? null,
+    aiCommentary:
+      access.plan === "guest"
+        ? null
+        : analysis.aiCommentary ?? {
+            mode: "deterministic",
+            summary: analysis.summary,
+          },
     strengths,
     weaknesses,
     suggestions,
@@ -184,9 +215,34 @@ function shapeAnalysisForAccess(
 }
 
 export async function POST(req: Request) {
+  const requestId = createRequestId("req");
   try {
     const session = await auth();
-    const body = await req.json();
+    let body: { url?: unknown };
+    try {
+      body = (await req.json()) as { url?: unknown };
+    } catch {
+      return NextResponse.json(
+        {
+          requestId,
+          error: "INVALID_REQUEST_BODY",
+          message: "Gecersiz istek govdesi.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json(
+        {
+          requestId,
+          error: "INVALID_REQUEST_BODY",
+          message: "Gecersiz istek govdesi.",
+        },
+        { status: 400 }
+      );
+    }
+
     const rawUrl = typeof body?.url === "string" ? body.url : "";
     const validatedUrl = validateProductUrl(rawUrl, {
       allowedPlatforms: ["trendyol"],
@@ -194,8 +250,18 @@ export async function POST(req: Request) {
     });
 
     if (!validatedUrl.ok) {
+      logAnalyzeEvent({
+        level: "warn",
+        stage: "url_validation",
+        requestId,
+        actor: session?.user?.id ? `user:${session.user.id}` : "guest:unknown",
+        url: rawUrl,
+        message: validatedUrl.message,
+        extra: { code: validatedUrl.code },
+      });
       return NextResponse.json(
         {
+          requestId,
           error: validatedUrl.code,
           message: validatedUrl.message,
         },
@@ -205,71 +271,68 @@ export async function POST(req: Request) {
 
     const url = validatedUrl.normalizedUrl;
     
-    // Single source of truth: subscription-based plan resolution
-    let planCode: string | null = null;
-    if (session?.user?.id) {
-      planCode = await resolvePlanForUser(session.user.id, session.user.email);
-    }
-    
-    // Unlimited override check (ENV based, no DB query)
-    const unlimited = session?.user?.email ? isUnlimitedUser(session.user.email) : false;
-    
-    const accessPlan = resolveAccessPlan({
-      sessionUserId: session?.user?.id,
-      userPlan: planCode,
-      unlimited,
-    });
-    const access = buildAnalysisAccessState(accessPlan);
+    const userAnalysisContext = session?.user?.id
+      ? await resolveUserAnalysisContext({
+          userId: session.user.id,
+          email: session.user.email,
+        })
+      : null;
+    const unlimited = userAnalysisContext?.unlimited ?? false;
+    const userMonthlyLimit = userAnalysisContext?.monthlyLimit ?? 10;
+    const accessPlan = userAnalysisContext?.accessPlan ?? "guest";
+    const access = userAnalysisContext?.access ?? buildAnalysisAccessState("guest");
 
-    let limitInfo:
-      | {
-          allowed: boolean;
-          used: number;
-          limit: number;
-          remaining: number;
-          periodKey: string;
-          periodType: string;
-        }
-      | Awaited<ReturnType<typeof checkAnalyzeLimit>>;
-
-    let usageTarget:
-      | { type: "guest"; guestId: string }
-      | { type: "user"; userId: string };
-
-    if (session?.user?.id) {
-      usageTarget = { type: "user", userId: session.user.id };
-
-      if (unlimited) {
-        limitInfo = {
-          allowed: true,
-          used: 0,
-          limit: 999999,
-          remaining: 999999,
-          periodKey: "unlimited",
-          periodType: "lifetime",
-        };
-      } else {
-        limitInfo = await checkAnalyzeLimit({ type: "user", userId: session.user.id });
-      }
-    } else {
-      const guestId = await getOrCreateGuestId();
-      usageTarget = { type: "guest", guestId };
-      limitInfo = await checkAnalyzeLimit({ type: "guest", guestId });
-    }
+    const usageContext = session?.user?.id
+      ? await resolveUserAnalyzeUsageContext({
+          userId: session.user.id,
+          monthlyLimit: userMonthlyLimit,
+          unlimited,
+        })
+      : await resolveGuestAnalyzeUsageContext();
+    const usageTarget = usageContext.usageTarget;
+    const limitInfo = usageContext.usageWindow;
+    const actor = usageContext.actor;
 
     if (!limitInfo.allowed) {
-      return NextResponse.json(
-        {
-          error: "LIMIT_REACHED",
-          message:
-            usageTarget.type === "guest"
-              ? "Guest analiz limitine ulastiniz. Devam etmek icin kayit olun."
-              : "Aylik analiz limitine ulastiniz.",
-          usage: limitInfo,
-        },
-        { status: 429 }
-      );
+      logAnalyzeLimitReached({
+        requestId,
+        actor,
+        url,
+        stage: "limit_check",
+        usage: limitInfo,
+      });
+      return buildAnalyzeLimitReachedResponse({
+        requestId,
+        usage: limitInfo,
+        actorType: usageTarget.type,
+      });
     }
+
+    const guard = beginAnalyzeRequestGuard({ actor, url });
+    if (!guard.allowed) {
+      logAnalyzeThrottled({
+        requestId,
+        actor,
+        url,
+        stage: "abuse_guard",
+        reason: guard.reason,
+        retryAfterSeconds: guard.retryAfterSeconds,
+      });
+      return buildAnalyzeThrottledResponse({
+        requestId,
+        reason: guard.reason,
+        retryAfterSeconds: guard.retryAfterSeconds,
+      });
+    }
+
+    logAnalyzeEvent({
+      stage: "pipeline_start",
+      requestId,
+      actor,
+      url,
+      message: "Analyze pipeline basladi",
+      extra: { accessPlan, unlimited },
+    });
 
     try {
       const pipeline = await runAnalysisPipeline({
@@ -278,14 +341,27 @@ export async function POST(req: Request) {
         learningSourceType: "real",
       });
 
-      const { analysis, category, platform, learningStatus, missingDataReport } =
+      const {
+        analysis,
+        category,
+        platform,
+        learningStatus,
+        missingDataReport,
+        diagnostics,
+      } =
         pipeline;
       const shapedResult = shapeAnalysisForAccess(analysis, access, category);
+      const decisionSummary = buildAnalysisDecisionSummary({
+        analysisTrace: shapedResult.analysisTrace,
+        dataSource: shapedResult.dataSource,
+      });
 
-      let savedReport = null;
+      let savedReport: Awaited<ReturnType<typeof createAnalyzeReport>> | null =
+        null;
+      const storedPayload = buildStoredAnalysisPayload(analysis);
 
       if (usageTarget.type === "user") {
-        savedReport = await prisma.report.create({
+        savedReport = await createAnalyzeReport({
           data: {
             guestId: null,
             user: {
@@ -303,23 +379,31 @@ export async function POST(req: Request) {
             priceCompetitiveness: shapedResult.priceCompetitiveness,
             summary: shapedResult.summary,
             dataSource: shapedResult.dataSource,
-            extractedData: shapedResult.extractedData as Prisma.InputJsonValue,
+            extractedData: toDbJson(storedPayload.extractedData),
             derivedMetrics:
-              shapedResult.derivedMetrics === null
-                ? Prisma.JsonNull
-                : (shapedResult.derivedMetrics as Prisma.InputJsonValue),
+              storedPayload.derivedMetrics === null
+                ? null
+                : toDbJson(storedPayload.derivedMetrics),
             coverage:
               shapedResult.coverage === null
-                ? Prisma.JsonNull
-                : (shapedResult.coverage as Prisma.InputJsonValue),
-            accessState: access as Prisma.InputJsonValue,
-            suggestions: shapedResult.suggestions as Prisma.InputJsonValue,
-            priorityActions: shapedResult.priorityActions as Prisma.InputJsonValue,
+                ? null
+                : toDbJson(shapedResult.coverage),
+            accessState: toDbJson(
+              attachReportVersionMeta({
+                accessState: access as unknown as Record<string, unknown>,
+                previousReportId: null,
+                rootReportId: null,
+                generation: 0,
+                trigger: "analyze",
+              })
+            ),
+            suggestions: toDbJson(shapedResult.suggestions),
+            priorityActions: toDbJson(shapedResult.priorityActions),
             analysisTrace:
               shapedResult.analysisTrace === null
-                ? Prisma.JsonNull
-                : (shapedResult.analysisTrace as Prisma.InputJsonValue),
-          },
+                ? null
+                : toDbJson(shapedResult.analysisTrace),
+          } as any,
         });
       }
 
@@ -339,40 +423,70 @@ export async function POST(req: Request) {
         console.error("Learning memory update failed:", learningError);
       }
 
+      let updatedUsage = limitInfo;
       if (!unlimited) {
-        await incrementAnalyzeUsage(usageTarget);
+        const incremented = await incrementAnalyzeUsage(usageTarget);
+        updatedUsage = projectUsageAfterIncrement(
+          limitInfo as AnalyzeLimitResult,
+          incremented.used
+        );
       }
-
-      const updatedUsage =
-        unlimited && usageTarget.type === "user"
-          ? {
-              allowed: true,
-              used: 0,
-              limit: 999999,
-              remaining: 999999,
-              periodKey: "unlimited",
-              periodType: "lifetime",
-            }
-          : await checkAnalyzeLimit(usageTarget);
+      const reportPreview = savedReport
+        ? {
+            id: savedReport.id,
+            url: savedReport.url,
+            overallScore: savedReport.overallScore,
+            createdAt: savedReport.createdAt,
+          }
+        : null;
+      logAnalyzeEvent({
+        stage: "pipeline_success",
+        requestId,
+        actor,
+        url,
+        message: "Analyze pipeline basariyla tamamlandi",
+        trace: shapedResult.analysisTrace,
+        extra: {
+          autoSaved: usageTarget.type === "user",
+          overallScore: shapedResult.overallScore,
+          dataSource: shapedResult.dataSource,
+          decisionSummary,
+          runtimeMs: diagnostics.totalMs,
+        },
+      });
 
       return NextResponse.json(
         {
           success: true,
+          requestId,
           result: {
             ...shapedResult,
             missingDataReport,
             learningStatus,
+            diagnostics,
             url,
+            decisionSummary,
           },
-          report: savedReport,
+          report: reportPreview,
+          reportId: reportPreview?.id ?? null,
           usage: updatedUsage,
           autoSaved: usageTarget.type === "user",
         }
       );
     } catch (error) {
       if (error instanceof AnalysisPipelineError) {
+        logAnalyzeEvent({
+          level: "warn",
+          stage: "pipeline_error",
+          requestId,
+          actor,
+          url,
+          message: error.message,
+          extra: { code: error.code, detail: error.detail },
+        });
         return NextResponse.json(
           {
+            requestId,
             error: error.code,
             message: error.message,
             detail: error.detail,
@@ -381,12 +495,34 @@ export async function POST(req: Request) {
         );
       }
 
+      logAnalyzeEvent({
+        level: "error",
+        stage: "pipeline_unhandled_error",
+        requestId,
+        actor,
+        url,
+        message: "Pipeline icinde beklenmeyen hata olustu",
+        extra: {
+          detail: error instanceof Error ? error.message : String(error),
+        },
+      });
       throw error;
+    } finally {
+      guard.release();
     }
   } catch (error) {
+    logAnalyzeEvent({
+      level: "error",
+      stage: "analyze_handler_error",
+      requestId,
+      actor: "unknown",
+      message: "Analyze handler hata verdi",
+      extra: { detail: error instanceof Error ? error.message : String(error) },
+    });
     console.error("Analyze POST error:", error);
     return NextResponse.json(
       {
+        requestId,
         error: "INTERNAL_SERVER_ERROR",
         message: "Analiz sirasinda bir hata olustu.",
         detail: error instanceof Error ? error.message : String(error),

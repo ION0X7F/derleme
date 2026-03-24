@@ -1,0 +1,14 @@
+[
+  {
+    "url": "https://api.trendyol.com/questions",
+    "json": {
+      "questions": {
+        "totalElements": 80,
+        "content": [
+          { "text": "Kurulum dahil mi?", "answer": { "text": "Yetkili servis kurulum yapar." } }
+        ]
+      }
+    }
+  }
+]
+

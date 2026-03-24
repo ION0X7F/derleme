@@ -1,0 +1,14 @@
+[
+  {
+    "url": "https://api.trendyol.com/reco-products?recoType=similar",
+    "json": {
+      "result": {
+        "products": [
+          { "name": "Delta Konfor Zemin 15 mm", "url": "/delta/konfor-zemin-15-mm-p-52140", "id": 52140, "prices": { "discountedPrice": { "value": 590.0 }, "currency": "TRY" }, "ratingScore": { "averageRating": 4.5, "totalCount": 1200 }, "images": ["https://cdn.example.com/sim-1.jpg"] },
+          { "name": "Yukon Pilates ve Yoga Mati 7 mm", "url": "/yukon/pilates-ve-yoga-mati-7-mm-p-39631179", "id": 39631179, "prices": { "discountedPrice": { "value": 420.0 }, "currency": "TRY" }, "ratingScore": { "averageRating": 4.3, "totalCount": 320 }, "images": ["https://cdn.example.com/sim-2.jpg"] }
+        ]
+      }
+    }
+  }
+]
+

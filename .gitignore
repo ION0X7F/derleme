@@ -31,6 +31,11 @@ yarn-error.log*
 .pnpm-debug.log*
 .next-dev-*.log
 .tmp-next-dev*.log
+.tmp-public-tunnel.log
+tmp-*.html
+tmp-*.json
+tmp_*.html
+tmp_*.json
 
 # env files (can opt-in for committing if needed)
 .env*
@@ -48,8 +53,15 @@ yarn-error.log*
 *.db-shm
 *.db-wal
 
+# generated diagnostics and lab outputs
+/logs/
+/artifacts/ai-decision/
+/artifacts/analysis-quality/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
 /app/generated/prisma
+
+.vercel

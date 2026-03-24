@@ -1,4 +1,5 @@
 import { buildAnalysisTrace } from "@/lib/analysis-trace";
+import { buildAnalysisVisuals } from "@/lib/analysis-visuals";
 import type {
   AccessPlan,
   AnalysisSuggestion,
@@ -8,6 +9,8 @@ import type {
   DerivedMetric,
   DerivedMetrics,
   ExtractedProductFields,
+  MarketComparisonInsights,
+  MarketOverviewSummary,
   PriorityAction,
 } from "@/types/analysis";
 
@@ -37,6 +40,43 @@ function clampScore(value: number) {
 
 function hasText(value: string | null | undefined) {
   return !!value && value.trim().length > 0;
+}
+
+function average(values: number[]) {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function getFallbackEvidenceFactor(input: ConsolidatedAnalysisInput) {
+  const coreConfidence = average(
+    [
+      input.title.confidence,
+      input.price.confidence,
+      input.imageCount.confidence,
+      input.descriptionLength.confidence,
+      input.reviewCount.confidence,
+      input.sellerScore.confidence,
+    ].filter((value) => Number.isFinite(value))
+  );
+
+  const extractorStatus = input._raw.extractor_status ?? "fallback";
+  let extractorFactor = 1;
+  if (extractorStatus === "partial") extractorFactor = 0.88;
+  if (extractorStatus === "fallback") extractorFactor = 0.74;
+  if (extractorStatus === "blocked") extractorFactor = 0.55;
+
+  return Math.max(0.5, Math.min(1, coreConfidence * extractorFactor + 0.15));
+}
+
+function hasReliableQuestionSignal(extracted: ExtractedProductFields) {
+  const count = extracted.question_count;
+  if (typeof count !== "number" || count <= 0) return false;
+
+  const qaSample = Array.isArray(extracted.qa_snippets)
+    ? extracted.qa_snippets.length
+    : 0;
+
+  return qaSample > 0 || extracted.has_faq === true || count >= 5;
 }
 
 function getOtherSellerScoreGap(extracted: ExtractedProductFields) {
@@ -306,6 +346,7 @@ function buildMetric(score: number | null, evidence: string[]): DerivedMetric {
 function getCompletenessScore(input: ConsolidatedAnalysisInput) {
   let score = 0;
   const extracted = input._raw; // for fields not yet in ConsolidatedAnalysisInput
+  const fallbackEvidenceFactor = getFallbackEvidenceFactor(input);
 
   score += hasText(input.title.value) ? 8 * input.title.confidence : 0;
   score += hasText(input.brand.value) ? 8 * input.brand.confidence : 0;
@@ -348,26 +389,26 @@ function getCompletenessScore(input: ConsolidatedAnalysisInput) {
     : 0;
 
   // Fields still using raw extracted data
-  if (hasText(extracted.meta_description)) score += 6;
-  if (hasText(extracted.h1)) score += 6;
-  if (hasText(extracted.sku)) score += 4;
-  if (hasText(extracted.mpn)) score += 4;
-  if (hasText(extracted.gtin)) score += 5;
-  if (typeof extracted.question_count === "number") score += 2;
-  if (typeof extracted.favorite_count === "number") score += 2;
-  if (extracted.has_add_to_cart) score += 5;
-  if (extracted.has_shipping_info) score += 4;
-  if (extracted.has_return_info) score += 4;
-  if (extracted.has_specs) score += 6;
-  if (extracted.has_faq) score += 2;
-  if (extracted.has_video) score += 2;
+  if (hasText(extracted.meta_description)) score += 6 * fallbackEvidenceFactor;
+  if (hasText(extracted.h1)) score += 6 * fallbackEvidenceFactor;
+  if (hasText(extracted.sku)) score += 4 * fallbackEvidenceFactor;
+  if (hasText(extracted.mpn)) score += 4 * fallbackEvidenceFactor;
+  if (hasText(extracted.gtin)) score += 5 * fallbackEvidenceFactor;
+  if (hasReliableQuestionSignal(extracted)) score += 2 * fallbackEvidenceFactor;
+  if (typeof extracted.favorite_count === "number") score += 2 * fallbackEvidenceFactor;
+  if (extracted.has_add_to_cart) score += 5 * fallbackEvidenceFactor;
+  if (extracted.has_shipping_info) score += 4 * fallbackEvidenceFactor;
+  if (extracted.has_return_info) score += 4 * fallbackEvidenceFactor;
+  if (extracted.has_specs) score += 6 * fallbackEvidenceFactor;
+  if (extracted.has_faq) score += 2 * fallbackEvidenceFactor;
+  if (extracted.has_video) score += 2 * fallbackEvidenceFactor;
   if (
     Array.isArray(extracted.other_seller_offers) &&
     extracted.other_seller_offers.length > 0
   ) {
-    score += 4;
+    score += 4 * fallbackEvidenceFactor;
   }
-  if (hasText(extracted.stock_status)) score += 2;
+  if (hasText(extracted.stock_status)) score += 2 * fallbackEvidenceFactor;
   if (extracted.extractor_status === "ok") score += 5;
   if (extracted.extractor_status === "partial") score += 2;
   if (extracted.extractor_status === "blocked") score -= 8;
@@ -378,6 +419,7 @@ function getCompletenessScore(input: ConsolidatedAnalysisInput) {
 function getSeoScore(input: ConsolidatedAnalysisInput) {
   let score = 0;
   const extracted = input._raw; // for fields not yet in ConsolidatedAnalysisInput
+  const fallbackEvidenceFactor = getFallbackEvidenceFactor(input);
 
   score += hasText(input.title.value) ? 25 * input.title.confidence : 0;
   score += hasText(input.brand.value) ? 10 * input.brand.confidence : 0;
@@ -393,9 +435,9 @@ function getSeoScore(input: ConsolidatedAnalysisInput) {
       : 0;
 
   // Fields still using raw extracted data during transition
-  if (hasText(extracted.meta_description)) score += 15;
-  if (hasText(extracted.h1)) score += 15;
-  if (extracted.has_specs) score += 5;
+  if (hasText(extracted.meta_description)) score += 15 * fallbackEvidenceFactor;
+  if (hasText(extracted.h1)) score += 15 * fallbackEvidenceFactor;
+  if (extracted.has_specs) score += 5 * fallbackEvidenceFactor;
 
   return clampScore(score);
 }
@@ -406,6 +448,7 @@ function getConversionScore(input: ConsolidatedAnalysisInput) {
   const reviewThemes = extractReviewThemes(extracted);
   const lowRatedRatio = getLowRatedSampleRatio(extracted);
   const sampledReviewCount = extracted.review_summary?.sampled_count ?? 0;
+  const fallbackEvidenceFactor = getFallbackEvidenceFactor(input);
 
   score +=
     typeof input.price.value === "number" ? 15 * input.price.confidence : 0;
@@ -429,10 +472,10 @@ function getConversionScore(input: ConsolidatedAnalysisInput) {
       : 0;
 
   // Logic still dependent on old structure
-  if (extracted.has_add_to_cart) score += 20;
-  if ((extracted.favorite_count || 0) > 0) score += 5;
-  if (extracted.has_shipping_info) score += 10;
-  if (extracted.has_return_info) score += 10;
+  if (extracted.has_add_to_cart) score += 20 * fallbackEvidenceFactor;
+  if ((extracted.favorite_count || 0) > 0) score += 5 * fallbackEvidenceFactor;
+  if (extracted.has_shipping_info) score += 10 * fallbackEvidenceFactor;
+  if (extracted.has_return_info) score += 10 * fallbackEvidenceFactor;
 
   if (lowRatedRatio != null) {
     if (lowRatedRatio >= 0.5) {
@@ -524,7 +567,7 @@ function buildProductQualityMetric(extracted: ExtractedProductFields): DerivedMe
     evidence.push("Sıkça Sorulan Sorular (SSS) bölümü mevcut.");
   }
 
-  if (typeof extracted.question_count === "number" && extracted.question_count > 0) {
+  if (hasReliableQuestionSignal(extracted)) {
     score += 8;
     evidence.push("Soru-Cevap bölümü aktif.");
   }
@@ -612,10 +655,10 @@ function buildSellerTrustMetric(extracted: ExtractedProductFields): DerivedMetri
     evidence.push("Diğer satıcıların güven seviyesi daha güçlü olabilir.");
   }
 
-  if (typeof extracted.question_count === "number" && extracted.question_count >= 5) {
+  if (hasReliableQuestionSignal(extracted) && (extracted.question_count ?? 0) >= 5) {
     score += 8;
     evidence.push("Soru-cevap hacmi güven sinyali oluşturuyor.");
-  } else if (typeof extracted.question_count === "number" && extracted.question_count > 0) {
+  } else if (hasReliableQuestionSignal(extracted)) {
     score += 4;
     evidence.push("Temel soru-cevap sinyali mevcut.");
   }
@@ -805,7 +848,7 @@ function getAvailableFields(extracted: ExtractedProductFields) {
       Array.isArray(extracted.review_snippets) && extracted.review_snippets.length > 0,
     ],
     ["review_summary", !!extracted.review_summary],
-    ["question_count", typeof extracted.question_count === "number"],
+    ["question_count", hasReliableQuestionSignal(extracted)],
     ["description_length", typeof extracted.description_length === "number"],
     ["bullet_point_count", typeof extracted.bullet_point_count === "number"],
     ["has_shipping_info", typeof extracted.has_shipping_info === "boolean"],
@@ -1119,9 +1162,191 @@ function getWeaknesses(extracted: ExtractedProductFields, metrics: DerivedMetric
   return [...new Set(weaknesses)].slice(0, 5);
 }
 
+function getSuggestionThemeByKey(key: string): "content" | "trust" | "market" | "general" {
+  if (
+    key === "expand-description" ||
+    key === "add-specs" ||
+    key === "increase-images" ||
+    key === "add-video"
+  ) {
+    return "content";
+  }
+
+  if (
+    key === "fix-low-rating" ||
+    key === "address-review-themes" ||
+    key === "increase-social-proof" ||
+    key === "improve-seller-trust-score" ||
+    key === "close-competitor-trust-gap"
+  ) {
+    return "trust";
+  }
+
+  if (
+    key === "respond-to-lower-priced-competitors" ||
+    key === "evaluate-shipping-advantage" ||
+    key === "improve-delivery-competitiveness" ||
+    key === "improve-delivery-promise"
+  ) {
+    return "market";
+  }
+
+  return "general";
+}
+
+function suggestionWeight(
+  suggestion: AnalysisSuggestion,
+  metrics: DerivedMetrics
+) {
+  const severityWeight =
+    suggestion.severity === "high" ? 30 : suggestion.severity === "medium" ? 20 : 10;
+  const theme = getSuggestionThemeByKey(suggestion.key);
+  const themeWeight =
+    theme === "content"
+      ? metrics.productQuality.label === "weak"
+        ? 20
+        : 8
+      : theme === "trust"
+        ? metrics.sellerTrust.label === "weak"
+          ? 20
+          : 8
+        : theme === "market"
+          ? metrics.marketPosition.label === "weak"
+            ? 20
+            : 8
+          : 5;
+
+  return severityWeight + themeWeight;
+}
+
+function toSalesStatusLabel(level?: MarketComparisonInsights["userEstimatedSalesLevel"]) {
+  switch (level) {
+    case "very_low":
+      return "cok dusuk";
+    case "low":
+      return "dusuk";
+    case "medium":
+      return "orta";
+    case "good":
+      return "iyi";
+    case "high":
+      return "guclu";
+    default:
+      return "net degil";
+  }
+}
+
+function toMarketPositionLabel(level?: MarketComparisonInsights["marketPosition"]) {
+  switch (level) {
+    case "leading":
+      return "onde";
+    case "strong":
+      return "guclu";
+    case "average":
+      return "ortada";
+    case "lagging":
+      return "geride";
+    default:
+      return "net degil";
+  }
+}
+
+function toGrowthLabel(level?: MarketComparisonInsights["growthOpportunityLevel"]) {
+  switch (level) {
+    case "low":
+      return "dusuk firsat";
+    case "medium":
+      return "orta firsat";
+    case "high":
+      return "guclu firsat";
+    case "very_high":
+      return "cok guclu firsat";
+    default:
+      return "net degil";
+  }
+}
+
+function toPriceAdvantageLabel(level?: MarketComparisonInsights["competitorSummary"]["priceCompetitiveness"]) {
+  switch (level) {
+    case "strong_advantage":
+      return "fiyat avantaji guclu";
+    case "neutral":
+      return "fiyat avantaji orta";
+    case "disadvantage":
+      return "fiyat avantaji zayif";
+    default:
+      return "fiyat avantaji net degil";
+  }
+}
+
+function toPressureLabel(issue: string) {
+  switch (issue) {
+    case "price":
+      return "fiyat baskisi";
+    case "trust":
+      return "guven baskisi";
+    case "listing":
+      return "sayfa kalitesi baskisi";
+    case "visibility":
+      return "gorunurluk baskisi";
+    case "demand":
+      return "talep baskisi";
+    default:
+      return "karisik baski";
+  }
+}
+
+function buildMarketOverview(
+  input: ConsolidatedAnalysisInput
+): MarketOverviewSummary | null {
+  const market = input.marketComparison;
+  if (!market) return null;
+
+  const salesLabel = toSalesStatusLabel(market.userEstimatedSalesLevel);
+  const positionLabel = toMarketPositionLabel(market.marketPosition);
+  const growthLabel = toGrowthLabel(market.growthOpportunityLevel);
+  const priceAdvantageLabel = toPriceAdvantageLabel(
+    market.competitorSummary.priceCompetitiveness
+  );
+
+  let relativeMarketStatus = market.demandVerdict.result;
+  if (!relativeMarketStatus) {
+    relativeMarketStatus = "Pazar konumu net degil.";
+  }
+
+  const mainPressureAreas =
+    (market.mainIssues ?? [])
+      .filter((item) => item !== "unclear")
+      .map((item) => toPressureLabel(item))
+      .slice(0, 3);
+
+  return {
+    salesStatus: {
+      level: market.userEstimatedSalesLevel,
+      label: salesLabel,
+    },
+    marketPosition: {
+      level: market.marketPosition,
+      label: positionLabel,
+    },
+    growthOpportunity: {
+      level: market.growthOpportunityLevel,
+      label: growthLabel,
+    },
+    priceAdvantage: {
+      level: market.competitorSummary.priceCompetitiveness ?? "unclear",
+      label: priceAdvantageLabel,
+    },
+    relativeMarketStatus,
+    demandConfidence: market.demandVerdict.confidence,
+    mainPressureAreas,
+  };
+}
+
 function getSuggestions(
   extracted: ExtractedProductFields,
-  metrics: DerivedMetrics
+  metrics: DerivedMetrics,
+  market: MarketComparisonInsights | null | undefined
 ): AnalysisSuggestion[] {
   const suggestions: AnalysisSuggestion[] = [];
   const reviewThemes = extractReviewThemes(extracted);
@@ -1305,18 +1530,82 @@ function getSuggestions(
     });
   }
 
-  // Remove duplicates by key
+  if (market?.primaryIssue === "price") {
+    suggestions.push({
+      key: "market-price-pressure",
+      severity: "high",
+      title: "Fiyat/teklif gucunu one alin",
+      detail:
+        "Pazarda fiyat baskisi yuksek gorunuyor. Fiyati, kuponu veya kargo avantajini birlikte optimize ederek teklifinizi guclendirin.",
+    });
+  }
+
+  if (market?.primaryIssue === "trust") {
+    suggestions.push({
+      key: "market-trust-pressure",
+      severity: "high",
+      title: "Musteri guvenini one alin",
+      detail:
+        "Guven baskisi yuksek. Satici puani, yorum kalitesi ve iade/teslimat netligi gibi guven sinyallerini guclendirin.",
+    });
+  }
+
+  if (market?.primaryIssue === "listing") {
+    suggestions.push({
+      key: "market-listing-pressure",
+      severity: "medium",
+      title: "Sayfa kalitesini one alin",
+      detail:
+        "Sayfa icerigi baskin sorun olarak gorunuyor. Baslik, aciklama ve gorselleri daha net ve ikna edici hale getirin.",
+    });
+  }
+
+  if (market?.marketDemandSignal === "low") {
+    suggestions.push({
+      key: "market-low-demand-cautious",
+      severity: "low",
+      title: "Talep sinyali zayif, adimlari temkinli planlayin",
+      detail:
+        "Talep dusuk oldugu icin buyuk fiyat kirilimlari yerine once icerik, guven ve kampanya testleri ile olcumlu ilerleyin.",
+    });
+  }
+
   const uniqueSuggestions = suggestions.filter(
     (v, i, a) => a.findIndex((t) => t.key === v.key) === i
   );
 
-  return uniqueSuggestions.slice(0, 6);
+  const ranked = uniqueSuggestions
+    .map((item) => ({
+      item,
+      theme: getSuggestionThemeByKey(item.key),
+      weight: suggestionWeight(item, metrics),
+    }))
+    .sort((left, right) => right.weight - left.weight);
+
+  const selected: AnalysisSuggestion[] = [];
+  const selectedThemes = new Set<string>();
+
+  for (const candidate of ranked) {
+    if (selected.length >= 6) break;
+    if (candidate.theme !== "general" && selectedThemes.has(candidate.theme)) continue;
+    selected.push(candidate.item);
+    selectedThemes.add(candidate.theme);
+  }
+
+  for (const candidate of ranked) {
+    if (selected.length >= 6) break;
+    if (selected.some((item) => item.key === candidate.item.key)) continue;
+    selected.push(candidate.item);
+  }
+
+  return selected.slice(0, 6);
 }
 
 export function buildPriorityActions(
   extracted: ExtractedProductFields,
   metrics: DerivedMetrics,
-  suggestions: AnalysisSuggestion[]
+  suggestions: AnalysisSuggestion[],
+  market?: MarketComparisonInsights | null
 ): PriorityAction[] {
   const base: Array<{ title: string; detail: string; weight: number; key: string }> = [];
   const lowRatedRatio = getLowRatedSampleRatio(extracted);
@@ -1333,6 +1622,36 @@ export function buildPriorityActions(
       detail:
         "Fiyat, kargo ve kampanya avantajlarınız rakipler arasında belirgin değil. Bu sinyalleri güçlendirmek, dönüşüm oranını en hızlı etkileyecek adımdır.",
       weight: 100,
+    });
+  }
+
+  if (market?.primaryIssue === "price") {
+    pushAction({
+      key: "priority-market-price-pressure",
+      title: "Oncelik: Fiyat ve teklif gucunu artirin",
+      detail:
+        "Pazar verisi fiyat baskisinin one ciktigini gosteriyor. Fiyat, kupon ve kargo teklifini birlikte optimize edin.",
+      weight: 102,
+    });
+  }
+
+  if (market?.primaryIssue === "trust") {
+    pushAction({
+      key: "priority-market-trust-pressure",
+      title: "Oncelik: Guven sinyallerini guclendirin",
+      detail:
+        "Pazar verisi guven baskisini isaret ediyor. Yorum kalitesi, satici puani ve iade/teslimat netligi odak alaniniz olmali.",
+      weight: 101,
+    });
+  }
+
+  if (market?.primaryIssue === "listing") {
+    pushAction({
+      key: "priority-market-listing-pressure",
+      title: "Oncelik: Sayfa kalitesini iyilestirin",
+      detail:
+        "Baskin sorun sayfa kalitesi gorunuyor. Baslik, aciklama ve gorselleri guclendirerek donusumu destekleyin.",
+      weight: 96,
     });
   }
 
@@ -1370,15 +1689,15 @@ export function buildPriorityActions(
     });
   }
 
-  // Add relevant high-severity suggestions as priority actions
+  // Add suggestion-backed priorities with metric-aware weight.
   suggestions
-    .filter((s) => s.severity === "high")
+    .filter((s) => s.severity !== "low")
     .forEach((s) => {
       pushAction({
         key: s.key,
         title: s.title,
         detail: s.detail,
-        weight: 80,
+        weight: 60 + suggestionWeight(s, metrics),
       });
     });
 
@@ -1461,15 +1780,16 @@ function getPriceCompetitiveness(
 
 function buildSummary(params: {
   platform: string | null;
+  consolidatedInput: ConsolidatedAnalysisInput;
   extracted: ExtractedProductFields;
   derivedMetrics: DerivedMetrics;
 }) {
-  const { extracted, derivedMetrics } = params;
+  const { consolidatedInput, extracted, derivedMetrics } = params;
 
   const parts: string[] = [];
   const reviewRiskSummary = getReviewRiskSummary(extracted);
 
-  const weakPoints = [];
+  const weakPoints: string[] = [];
   if (derivedMetrics.productQuality.label === "weak") {
     weakPoints.push("ürün içeriği");
   }
@@ -1528,6 +1848,85 @@ function buildSummary(params: {
     parts.push("Sayfa yapısı nedeniyle bazı kritik veriler okunamadı, bu nedenle analiz kapsamı sınırlıdır.");
   }
 
+  const reliableCoreFields = [
+    consolidatedInput.title,
+    consolidatedInput.price,
+    consolidatedInput.imageCount,
+    consolidatedInput.descriptionLength,
+    consolidatedInput.reviewCount,
+    consolidatedInput.sellerScore,
+  ].filter((field) => field.value !== null && field.confidence >= 0.65).length;
+
+  if (
+    consolidatedInput.title.confidence < 0.45 ||
+    consolidatedInput.price.confidence < 0.45
+  ) {
+    parts.push(
+      "Temel urun verileri sinirli guvenle okundugu icin yorumlar temkinli tutuldu."
+    );
+  } else if (reliableCoreFields <= 2) {
+    parts.push(
+      "Kritik verilerin bir kismi orta veya dusuk guvenli oldugu icin analiz ozeti daha temkinli tutuldu."
+    );
+  }
+
+  return parts.filter(Boolean).join(" ");
+}
+
+function buildSummaryWithMarket(params: {
+  consolidatedInput: ConsolidatedAnalysisInput;
+  extracted: ExtractedProductFields;
+  derivedMetrics: DerivedMetrics;
+  marketOverview: MarketOverviewSummary | null;
+}) {
+  const { consolidatedInput, extracted, derivedMetrics, marketOverview } = params;
+  const parts: string[] = [];
+
+  const weakPoints: string[] = [];
+  if (derivedMetrics.productQuality.label === "weak") weakPoints.push("urun icerigi");
+  if (derivedMetrics.sellerTrust.label === "weak") weakPoints.push("satici guvenilirligi");
+  if (derivedMetrics.marketPosition.label === "weak") weakPoints.push("pazar konumu");
+
+  if (marketOverview?.relativeMarketStatus) {
+    parts.push(marketOverview.relativeMarketStatus);
+    parts.push(`Guven: ${marketOverview.demandConfidence}.`);
+    parts.push(
+      `Satis durumu ${marketOverview.salesStatus.label}, pazar konumu ${marketOverview.marketPosition.label}, buyume gorunumu ${marketOverview.growthOpportunity.label}.`
+    );
+    parts.push(`Fiyat resmi: ${marketOverview.priceAdvantage.label}.`);
+  } else if (weakPoints.length > 0) {
+    parts.push(
+      `Analiz, ozellikle ${weakPoints.join(
+        " ve "
+      )} alanlarinda belirgin iyilestirme firsati oldugunu gosteriyor.`
+    );
+  } else {
+    parts.push("Urun sayfasi genel olarak dengeli bir gorunum veriyor.");
+  }
+
+  const reviewRiskSummary = getReviewRiskSummary(extracted);
+  if (reviewRiskSummary) {
+    parts.push(reviewRiskSummary);
+  }
+
+  const reliableCoreFields = [
+    consolidatedInput.title,
+    consolidatedInput.price,
+    consolidatedInput.imageCount,
+    consolidatedInput.descriptionLength,
+    consolidatedInput.reviewCount,
+    consolidatedInput.sellerScore,
+  ].filter((field) => field.value !== null && field.confidence >= 0.65).length;
+
+  if (
+    consolidatedInput.title.confidence < 0.45 ||
+    consolidatedInput.price.confidence < 0.45
+  ) {
+    parts.push("Temel urun verileri sinirli guvenle okundugu icin yorumlar temkinli tutuldu.");
+  } else if (reliableCoreFields <= 2) {
+    parts.push("Kritik verilerin bir kismi orta veya dusuk guvenli oldugu icin analiz ozeti daha temkinli kaldi.");
+  }
+
   return parts.filter(Boolean).join(" ");
 }
 
@@ -1548,15 +1947,26 @@ export function buildAnalysis({
   );
 
   const derivedMetrics = buildDerivedMetrics(extracted);
+  const marketOverview = buildMarketOverview(consolidatedInput);
   const strengths = getStrengths(extracted, derivedMetrics);
   const weaknesses = getWeaknesses(extracted, derivedMetrics);
-  const suggestions = getSuggestions(extracted, derivedMetrics);
-  const priorityActions = buildPriorityActions(extracted, derivedMetrics, suggestions);
-
-  const summary = buildSummary({
-    platform,
+  const suggestions = getSuggestions(
     extracted,
     derivedMetrics,
+    consolidatedInput.marketComparison
+  );
+  const priorityActions = buildPriorityActions(
+    extracted,
+    derivedMetrics,
+    suggestions,
+    consolidatedInput.marketComparison
+  );
+
+  const summary = buildSummaryWithMarket({
+    consolidatedInput,
+    extracted,
+    derivedMetrics,
+    marketOverview,
   });
   const decisionSupportPacket = buildDecisionSupportPacket({
     extracted,
@@ -1574,6 +1984,7 @@ export function buildAnalysis({
     conversionScore,
     overallScore,
   });
+  const analysisVisuals = buildAnalysisVisuals(consolidatedInput);
 
   return {
     summary,
@@ -1588,6 +1999,13 @@ export function buildAnalysis({
     weaknesses,
     suggestions,
     priorityActions,
+    analysisVisuals,
+    marketOverview: marketOverview ?? undefined,
+    marketComparison: consolidatedInput.marketComparison ?? null,
+    aiCommentary: {
+      mode: "deterministic",
+      summary,
+    },
     analysisTrace,
     priceCompetitiveness: getPriceCompetitiveness(extracted),
     dataSource: "real-extraction",

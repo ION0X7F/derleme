@@ -16,6 +16,7 @@ import type { AiEligibilityResult, AiEligibilityLevel } from "@/lib/ai-eligibili
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 // ... (rest of the types and constants are the same)
 type SupportedDependency =
@@ -418,32 +419,75 @@ function ensureStructuredSummary(params: {
   fallbackSummary: string;
   learningContext?: LearningContext | null;
 }) {
-  const normalized = humanizeAiText(
-    params.summary
-      .replace(/\r/g, "")
-      .replace(/[ \t]+/g, " ")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim()
-  );
-  const fallbackNormalized = humanizeAiText(params.fallbackSummary);
-  const parsed = parseAnalysisSummary(normalized);
+  const toClean = (value: string) =>
+    humanizeAiText(
+      value
+        .replace(/\r/g, "")
+        .replace(/[ \t]+/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim()
+    );
 
-  if (!parsed.hasStructuredSummary) {
-    return fallbackNormalized;
+  const normalized = toClean(params.summary);
+  const fallbackNormalized = toClean(params.fallbackSummary);
+  const candidate = containsSuspiciousSummaryArtifacts(normalized)
+    ? fallbackNormalized
+    : normalized;
+
+  const blockedTerms = [
+    /\bdemand\b/gi,
+    /\bcapture\b/gi,
+    /\bsocial proof\b/gi,
+    /\bbottleneck\b/gi,
+    /\bconversion\b/gi,
+    /\bmomentum\b/gi,
+  ];
+
+  let safe = candidate;
+  for (const pattern of blockedTerms) {
+    safe = safe.replace(pattern, "");
   }
 
-  if (containsSuspiciousSummaryArtifacts(normalized)) {
-    return fallbackNormalized;
+  safe = safe
+    .replace(/\[(KRITIK TESHIS|VERI CARPISTIRMA|STRATEJIK RECETE|SISTEM OGRENISI)\]:?/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  const paragraphCandidates = safe
+    .split(/\n{2,}/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const sourceParagraphs =
+    paragraphCandidates.length >= 3
+      ? paragraphCandidates
+      : safe
+          .split(/(?<=[.!?])\s+/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+  const paragraphs: string[] = [];
+  for (const item of sourceParagraphs) {
+    if (!item) continue;
+    paragraphs.push(item);
+    if (paragraphs.length >= 5) break;
   }
 
-  if (normalized.includes("[SISTEM OGRENISI]:")) {
-    return normalized;
+  if (paragraphs.length < 3) {
+    const fallbackParts = fallbackNormalized
+      .split(/(?<=[.!?])\s+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    for (const item of fallbackParts) {
+      if (paragraphs.length >= 3) break;
+      if (paragraphs.includes(item)) continue;
+      paragraphs.push(item);
+    }
   }
 
-  return `${normalized}\n[SISTEM OGRENISI]: ${
-    params.learningContext?.systemLearning ||
-    "Bu kategoride yeterli tarihsel ogrenim birikmedigi icin sistem ilk benchmark setini olusturuyor."
-  }`;
+  return paragraphs
+    .slice(0, Math.min(5, Math.max(3, paragraphs.length)))
+    .join("\n\n");
 }
 
 function getScoreGuardrail(level: AiEligibilityLevel) {
@@ -621,10 +665,7 @@ function buildSignalDigest(params: {
 function buildDataQualitySummary(
   input: ConsolidatedAnalysisInput
 ): string {
-  const quality_signals: string[] = [];
-
-  // Iterate over a curated list of important fields for brevity
-  const importantFields: Array<keyof ConsolidatedAnalysisInput> = [
+  const importantFields = [
     "title",
     "price",
     "brand",
@@ -633,26 +674,283 @@ function buildDataQualitySummary(
     "imageCount",
     "sellerScore",
     "descriptionLength",
-  ];
+  ] as const satisfies ReadonlyArray<keyof ConsolidatedAnalysisInput>;
+
+  const fieldLabel: Record<(typeof importantFields)[number], string> = {
+    title: "baslik",
+    price: "fiyat",
+    brand: "marka",
+    reviewCount: "yorum sayisi",
+    ratingValue: "puan",
+    imageCount: "gorsel",
+    sellerScore: "satici puani",
+    descriptionLength: "aciklama",
+  };
+
+  const qualitySignals: string[] = [];
+  const lowConfidence: string[] = [];
+  const missing: string[] = [];
 
   for (const key of importantFields) {
     const field = input[key] as DataField<string | number | boolean>;
     if (!field) continue;
 
+    if (field.value === null) {
+      missing.push(fieldLabel[key]);
+      continue;
+    }
+
     if (field.confidence >= 0.9) {
-      quality_signals.push(`${key}: yuksek guvenilirlik (${field.source})`);
+      qualitySignals.push(`${fieldLabel[key]}: yuksek guven (${field.source})`);
     } else if (field.confidence >= 0.5) {
-      quality_signals.push(`${key}: orta guvenilirlik (${field.source})`);
-    } else if (field.value !== null && field.confidence > 0) {
-      quality_signals.push(`${key}: dusuk guvenilirlik (${field.source})`);
+      qualitySignals.push(`${fieldLabel[key]}: orta guven (${field.source})`);
+    } else {
+      lowConfidence.push(fieldLabel[key]);
     }
   }
 
-  if (quality_signals.length === 0) {
+  if (qualitySignals.length === 0) {
     return "Veri kalitesi sinyalleri hesaplanamadi.";
   }
 
-  return `Guvenilirlik Raporu: ${quality_signals.join(", ")}.`;
+  const parts = [`Guvenilirlik: ${qualitySignals.join(", ")}.`];
+
+  if (lowConfidence.length > 0) {
+    parts.push(`Temkinli alanlar: ${lowConfidence.join(", ")}.`);
+  }
+
+  if (missing.length > 0) {
+    parts.push(`Eksik alanlar: ${missing.join(", ")}.`);
+  }
+
+  return parts.join(" ");
+}
+
+function buildAiMarketContext(input: ConsolidatedAnalysisInput) {
+  const market = input.marketComparison;
+  const safeList = (items: unknown[]) =>
+    items
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      .slice(0, 3);
+
+  if (!market) {
+    return {
+      sales_status: "net degil",
+      market_position: "net degil",
+      growth_opportunity: "net degil",
+      price_advantage: "net degil",
+      customer_trust: "net degil",
+      page_strength: "net degil",
+      main_pressure_areas: [] as string[],
+      competitor_context: "rakip verisi sinirli",
+      uncertainty: "market verisi sinirli oldugu icin yorumlar temkinli kalmali",
+    };
+  }
+
+  const customerTrust = input.sellerScore.value != null
+    ? input.sellerScore.value >= 8.8
+      ? "guclu"
+      : input.sellerScore.value >= 8
+        ? "orta"
+        : "zayif"
+    : "net degil";
+
+  const pageStrengthParts = [
+    typeof input.title.value === "string" && input.title.value.trim().length >= 20 ? 1 : 0,
+    (input.descriptionLength.value ?? 0) >= 140 ? 1 : 0,
+    (input.imageCount.value ?? 0) >= 4 ? 1 : 0,
+  ];
+  const pageStrengthScore = pageStrengthParts.reduce((sum, value) => sum + value, 0);
+  const pageStrength =
+    pageStrengthScore >= 3 ? "guclu" : pageStrengthScore >= 2 ? "orta" : "zayif";
+
+  return {
+    sales_status: market.userEstimatedSalesLevel,
+    market_position: market.marketPosition,
+    growth_opportunity: market.growthOpportunityLevel,
+    price_advantage: market.competitorSummary.priceCompetitiveness ?? "unclear",
+    customer_trust: customerTrust,
+    page_strength: pageStrength,
+    main_pressure_areas: safeList(market.mainIssues.map((item) => String(item))),
+    competitor_context: `rakip_sayisi=${market.competitorSummary.competitorCount ?? 0}, en_guclu_rakip_satis=${market.strongestCompetitorSalesLevel}`,
+    uncertainty:
+      packetLikeConfidence(input) < 0.58
+        ? "veri guveni dusuk, kesin yargidan kacinin"
+        : "veri guveni orta-yuksek",
+  };
+}
+
+function packetLikeConfidence(input: ConsolidatedAnalysisInput) {
+  const fields = [
+    input.title.confidence,
+    input.price.confidence,
+    input.reviewCount.confidence,
+    input.ratingValue.confidence,
+    input.sellerScore.confidence,
+    input.descriptionLength.confidence,
+    input.imageCount.confidence,
+  ].filter((value) => Number.isFinite(value));
+  if (fields.length === 0) return 0.4;
+  return fields.reduce((sum, value) => sum + value, 0) / fields.length;
+}
+
+function toSalesNarrativeLabel(level: string | null | undefined) {
+  switch (level) {
+    case "high":
+      return "guclu";
+    case "good":
+      return "iyi";
+    case "medium":
+      return "orta";
+    case "low":
+      return "dusuk";
+    case "very_low":
+      return "cok dusuk";
+    default:
+      return "net degil";
+  }
+}
+
+function toPositionNarrativeLabel(level: string | null | undefined) {
+  switch (level) {
+    case "leading":
+      return "onde";
+    case "strong":
+      return "guclu";
+    case "average":
+      return "ortada";
+    case "lagging":
+      return "geride";
+    default:
+      return "net degil";
+  }
+}
+
+function toGrowthNarrativeLabel(level: string | null | undefined) {
+  switch (level) {
+    case "very_high":
+      return "cok guclu";
+    case "high":
+      return "guclu";
+    case "medium":
+      return "orta";
+    case "low":
+      return "sinirli";
+    default:
+      return "net degil";
+  }
+}
+
+function toIssueNarrative(issue: string | null | undefined) {
+  switch (issue) {
+    case "price":
+      return "fiyat/teklif";
+    case "trust":
+      return "musteri guveni";
+    case "listing":
+      return "sayfa gucu";
+    case "visibility":
+      return "gorunurluk";
+    case "demand":
+      return "urune ilgi";
+    default:
+      return "net degil";
+  }
+}
+
+function buildAlignedParagraphs(
+  input: ConsolidatedAnalysisInput,
+  confidence: number
+) {
+  const market = input.marketComparison;
+  if (!market) {
+    return [
+      "Urun icin temel sinyaller okunuyor, ancak pazar karsilastirma verisi sinirli oldugu icin yorumlar temkinli tutuldu.",
+      "Diger magazalara gore net konum ve buyume alani bu veride kesinlesmiyor.",
+      "Bu nedenle once fiyat, musteri guveni ve sayfa gucunu birlikte guclendirip tekrar olcum yapmak daha dogru olur.",
+    ];
+  }
+
+  const sales = toSalesNarrativeLabel(market.userEstimatedSalesLevel);
+  const position = toPositionNarrativeLabel(market.marketPosition);
+  const growth = toGrowthNarrativeLabel(market.growthOpportunityLevel);
+  const strongest = toSalesNarrativeLabel(market.strongestCompetitorSalesLevel);
+  const primaryIssue = toIssueNarrative(market.primaryIssue);
+  const secondary = (market.mainIssues || [])
+    .map((item) => toIssueNarrative(item))
+    .filter((item) => item !== "net degil")
+    .slice(0, 2);
+
+  const p1 =
+    market.userEstimatedSalesLevel === "good" || market.userEstimatedSalesLevel === "high"
+      ? `Urun su an ${sales} seviyede satis aliyor olabilir, ancak bu seviye pazarin zirvesi anlamina gelmeyebilir.`
+      : market.userEstimatedSalesLevel === "medium"
+        ? "Urun su an orta seviyede ilerliyor ve daha yukari cikmak icin belirgin alan barindiriyor."
+        : market.userEstimatedSalesLevel === "low" || market.userEstimatedSalesLevel === "very_low"
+          ? "Urun su an zayif satis sinyali veriyor; bu nedenle kararlar daha temkinli alinmali."
+          : "Satis seviyesi net degil, bu nedenle yorumlar temkinli tutuldu.";
+
+  const p2 = `Diger magazalara gore konumun ${position}; buyume firsati ${growth} gorunuyor. En guclu rakiplerde satis seviyesi ${strongest} bandinda.`;
+
+  const p3 =
+    primaryIssue !== "net degil"
+      ? `En baskin engel ${primaryIssue}. ${secondary.length ? `Ek baski alanlari: ${secondary.join(" ve ")}.` : ""}`.trim()
+      : "Baski alanlari sinirli veri nedeniyle netlesmiyor; fiyat, guven ve sayfa gucu birlikte izlenmeli.";
+
+  const p4 =
+    primaryIssue === "fiyat/teklif"
+      ? "Ilk adimda fiyat, kupon ve kargo teklifini birlikte optimize etmek daha hizli etki verebilir."
+      : primaryIssue === "musteri guveni"
+        ? "Ilk adimda yorum kalitesi, satici puani ve iade/teslimat netligini guclendirmek daha dogru olur."
+        : primaryIssue === "sayfa gucu"
+          ? "Ilk adimda baslik, aciklama ve gorselleri netlestirerek karar anini guclendirmek gerekir."
+          : "Ilk adimda fiyat, guven ve sayfa gucu tarafinda kucuk ama olculebilir denemelerle ilerlemek en guvenli yaklasim olur.";
+
+  if (confidence < 0.58) {
+    return [p1, p2, `${p3} Veri sinirli oldugu icin kesin yargidan kacinildi.`];
+  }
+
+  return [p1, p2, p3, p4];
+}
+
+function alignSummaryWithMarket(params: {
+  summary: string;
+  fallbackSummary: string;
+  input: ConsolidatedAnalysisInput;
+  eligibility: AiEligibilityResult;
+}) {
+  const normalized = ensureStructuredSummary({
+    summary: params.summary,
+    fallbackSummary: params.fallbackSummary,
+    learningContext: null,
+  });
+  const confidence = packetLikeConfidence(params.input);
+  const market = params.input.marketComparison;
+  const paragraphs = normalized
+    .split(/\n{2,}/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const contradictionText = normalizeComparableText(paragraphs.join(" "));
+  const salesLevel = market?.userEstimatedSalesLevel ?? "unclear";
+  const saysWeak = /(zayif satis|satislar zayif|cok dusuk satis)/.test(contradictionText);
+  const saysStrong = /(guclu satis|guclu gidiyor|cok iyi satis)/.test(contradictionText);
+  const contradiction =
+    ((salesLevel === "good" || salesLevel === "high") && saysWeak) ||
+    ((salesLevel === "low" || salesLevel === "very_low") && saysStrong);
+
+  const mustRebuild =
+    paragraphs.length < 3 ||
+    paragraphs.length > 5 ||
+    contradiction ||
+    !/pazar|magaza|rakip/.test(contradictionText) ||
+    !/buyume|firsat/.test(contradictionText);
+
+  if (!mustRebuild) return paragraphs.slice(0, 5).join("\n\n");
+
+  const rebuilt = buildAlignedParagraphs(params.input, confidence);
+  const limit = params.eligibility.level === "medium" ? 4 : 5;
+  return rebuilt.slice(0, limit).join("\n\n");
 }
 
 function buildPrompt(params: {
@@ -680,10 +978,12 @@ function buildPrompt(params: {
     learningContext,
     missingDataReport,
   });
+  const marketContext = buildAiMarketContext(consolidatedInput);
   const payload = {
     url,
     supported_dependencies: SUPPORTED_DEPENDENCIES,
     packet,
+    market_context: marketContext,
     signal_digest: signalDigest,
     learning_context: learningContext ?? null,
     missing_data_report: missingDataReport ?? null,
@@ -691,80 +991,33 @@ function buildPrompt(params: {
 
   const dataQualitySummary = buildDataQualitySummary(consolidatedInput);
 
-  const confidenceWarning = eligibility.level === 'medium'
-    ? `VERI KALITESI UYARISI:
-Sana saglanan verilerin bir kismi dusuk veya orta guvenilirlikli kaynaklardan geliyor (ortalama guven skoru: ${eligibility.score.toFixed(2)}).
-Bu nedenle, cikarimlarini yaparken daha temkinli ol. Sadece yuksek guvenilirlikli verilere dayanarak kesin ifadeler kullan, geri kalaninda 'mevcut veriler isiginda...' gibi daha yumusak bir dil kullan.`
-    : '';
+  const confidenceWarning = eligibility.level === "medium"
+    ? `Veri guveni orta seviyede (${eligibility.score.toFixed(2)}). Kesin yargi yerine temkinli ve net ifadeler kullan.`
+    : `Veri guveni gorece daha yuksek (${eligibility.score.toFixed(2)}). Yine de asiri iddiadan kacinin.`;
 
   return `
-Sen Trendyol ekosisteminde uzmanlasmis veri odakli bir "Pazar Yeri Stratejistisin".
-Gorevin, sana saglanan karar destek paketini capraz sorgulama yontemiyle analiz edip "Neden satamiyorum?" sorusuna net cevap vermek.
+Sen Trendyol urun analizi yapan bir yardimci asistansin.
+Amacin: sabit iskelet ile dinamik icerik uretmek.
 
 VERI KALITESI OZETI:
 ${dataQualitySummary}
-Bu ozeti dikkate al. Yuksek guvenilirlikli verilere oncelik ver. Dusuk guvenilirlikli verilere dayali cikarimlar yapmaktan kacinin.
-
 ${confidenceWarning}
 
-ANALIZ AKISI:
-1. Temel Varlik ve Erisilebilirlik:
-- stock_status, stock_quantity, normalized_price, other_sellers_summary.min_price, other_sellers_summary.avg_price alanlarini kontrol et.
-- Urun stokta degilse bunu tek basina kritik teshis yap.
-- Fiyat rakip min veya rakip ortalamasinin cok ustundeyse bunu kritik bariyer olarak one al.
-
-2. Algoritmik Gorunurluk:
-- title, h1, description_length, bullet_point_count, has_specs alanlarini capraz sorgula.
-- Baslik varken aciklama ve ozellik alani zayifsa "trafik var ama ikna yetersiz" mantigini kur.
-
-3. Guven ve Sosyal Kanit:
-- seller_score, review_count, rating_value, favorite_count, review_summary, review_themes alanlarini capraz sorgula.
-- Favori yuksek ama review_count veya review_summary zayifsa "ilgi var ama sepet bariyeri var" teshisi kur.
-
-4. Kritik Surtunme Analizi:
-- normalized_price vs shipping_days vs delivery_type vs other_sellers_summary vs other_seller_offers capraz sorgusunu yap.
-- Urun fiyat avantajliysa ama teslimat yavas veya rakipte hizli teslimat fazlaysa bunu acikca yaz.
-- Rakipler daha ucuzsa fiyat baskisini acikca yaz.
-
-5. Kendi Kendine Ogrenme ve Adaptasyon:
-- learning_context icindeki benchmark, rules ve memorySnippets alanlarini kullan.
-- signal_digest.critical_candidates alanini ana darbozag aday listesi olarak kullan.
-- signal_digest.benchmark_deltas ve signal_digest.top_rules alanlarini veri carpistirma bolumune sadece gercek destek varsa dahil et.
-- Kategori benchmark'i varsa sabit esik kullanma; urunu kategori ortalamasi ve basarili orneklerle karsilastir.
-- is_best_seller veya best_seller_rank sinyali varsa bunu ogretmen verisi gibi yorumla.
-- Pahali ama guclu yorum/guven/hizli teslimat kombinasyonu varsa telafi faktorunu acikca not et.
-- Her ucuz urunun kazanmadigini kabul et; guven zayifsa fiyat avantaji etkisiz kalabilir.
-
-6. Eksik Veri Disiplini:
-- missing_data_report.after.unresolvedReasons alanini oku.
-- Bir alan eksikse ve o alan kararin merkezindeyse bunu acikca "Veri yetersizligi nedeniyle bu alan analiz disi birakildi." diye yaz.
-- Eksik olan alanlar icin yorum yapma, tahmin uretme.
-
 CIKTI KURALLARI:
-1. Sadece eldeki veriye dayan.
-2. Tahmin etme, uydurma yapma.
-3. Eksik veri varsa ilgili alanda acikca "Veri yetersizligi nedeniyle bu alan analiz disi birakildi." de.
-4. "Bence", "gorunuyor", "olabilir" gibi zayif ifadeler kullanma. "Veriler gosteriyor ki..." diliyle kesin konus.
-5. Summary alani tam olarak su 3 bloktan olussun:
-[KRITIK TESHIS]: ...
-[VERI CARPISTIRMA]: ...
-[STRATEJIK RECETE]:
-1. ...
-2. ...
-3. ...
-6. strengths en fazla 4 madde olsun.
-7. weaknesses en fazla 5 madde olsun.
-8. suggestions tam 3 maddeye yakin kalsin; en fazla 5 olabilir ama once en kritik 3 aksiyonu ver.
-9. Her weakness ve suggestion icin depends_on doldurmak zorunlu.
-10. depends_on icine sadece supported_dependencies listesindeki alanlari yaz.
-11. Bir weakness veya suggestion ilgili veriye dayanmiyorsa o maddeyi hic yazma.
-12. Summary icindeki KRITIK TESHIS tek ana darbozagi secsin.
-13. VERI CARPISTIRMA bolumu en az iki veri grubunu birbirine karsilastirsin.
-14. STRATEJIK RECETE maddeleri aksiyon odakli ve oncelik sirali olsun.
-15. Summary sonuna su blok eklenmek zorunda:
-[SISTEM OGRENISI]: ...
-16. learning_context.benchmark?.sampleSize dusukse kesin kural yazma; "veri yetersizligi" de.
-17. packet.coverage.confidence dusukse skor ve iddialari asiri uclara tasima.
+1) summary tam 3 ila 5 kisa paragraf olsun.
+2) summary icinde baslik, madde imi veya sabit etiket kullanma.
+3) Paragraf sirasini koru:
+   - 1. paragraf: genel durum (urun ne durumda)
+   - 2. paragraf: diger magazalara gore durum + buyume firsati
+   - 3. paragraf: en olasi baski alanlari (fiyat avantaji, musteri guveni, sayfa gucu vb.)
+   - 4. paragraf: oncelikli yapilacaklar (gerekiyorsa)
+4) Urun satis aliyor olabilecek bir seviyedeyse negatif acilis yapma.
+5) Teknik jargon, hikaye anlatimi ve pazarlama dili kullanma.
+6) Su kelimeleri kullanma: demand, capture, social proof, bottleneck, conversion, momentum.
+7) Su sade ifadeleri tercih et: urune ilgi, satis durumu, musteri guveni, diger magazalara gore durum, fiyat avantaji, sayfa gucu, buyume firsati, en buyuk engel.
+8) Veri zayifsa daha kisa ve daha temkinli yaz; kesin iddialardan kacinin.
+9) strengths en fazla 4, weaknesses en fazla 5, suggestions en fazla 5 olsun.
+10) weaknesses ve suggestions ogelerinde depends_on alanini doldur.
 
 Veri:
 ${JSON.stringify(payload)}
@@ -797,6 +1050,32 @@ Su JSON semasina tam uy:
 
 function cleanJsonText(text: string) {
   return text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+}
+
+function parseAiJson(text: string): unknown {
+  const cleaned = cleanJsonText(text);
+  const candidates = [cleaned];
+
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    candidates.push(cleaned.slice(firstBrace, lastBrace + 1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      try {
+        const withoutTrailingCommas = candidate.replace(/,\s*([}\]])/g, "$1");
+        return JSON.parse(withoutTrailingCommas);
+      } catch {
+        // Try the next candidate.
+      }
+    }
+  }
+
+  throw new SyntaxError("AI response could not be parsed as JSON.");
 }
 
 function asStringArray(value: unknown, limit: number) {
@@ -990,35 +1269,15 @@ function sanitizeAiResult(raw: unknown): RawAiAnalysisResult | null {
   };
 }
 
-function postProcessAiResult(
-  result: RawAiAnalysisResult,
-  extracted: ExtractedProductFields,
-  fallback: AiAnalysisResult,
-  eligibility: AiEligibilityResult,
-  learningContext?: LearningContext | null
-): AiAnalysisResult {
-  // For medium confidence, we rely more on the deterministic fallback
-  if (eligibility.level === "medium") {
-     const mergedSuggestions = dedupeSuggestions(
-      [...fallback.suggestions, ...result.suggestions.map(s => ({...s, title: humanizeAiText(s.title), detail: humanizeAiText(s.detail)}))],
-      5
-    );
-    return {
-       ...fallback,
-       summary: syncStructuredSummaryWithSuggestions({
-          summary: fallback.summary, // prioritize deterministic summary
-          fallbackSummary: result.summary,
-          suggestions: mergedSuggestions,
-          systemLearning: learningContext?.systemLearning,
-       }) || fallback.summary,
-       suggestions: mergedSuggestions,
-    }
-  }
-
-  const validatedAiSuggestions = dedupeSuggestions(
-    result.suggestions
+function collectEvidenceFilteredSuggestions(params: {
+  suggestions: AiSuggestionItem[];
+  extracted: ExtractedProductFields;
+  limit: number;
+}) {
+  return dedupeSuggestions(
+    params.suggestions
       .filter((item) =>
-        item.depends_on.every((dependency) => hasDependencyData(dependency, extracted))
+        item.depends_on.every((dependency) => hasDependencyData(dependency, params.extracted))
       )
       .map((item) => ({
         key: item.key,
@@ -1026,9 +1285,54 @@ function postProcessAiResult(
         title: humanizeAiText(item.title),
         detail: humanizeAiText(item.detail),
       }))
-      .slice(0, 5),
-    5
+      .slice(0, params.limit),
+    params.limit
   );
+}
+
+function postProcessAiResult(
+  result: RawAiAnalysisResult,
+  extracted: ExtractedProductFields,
+  fallback: AiAnalysisResult,
+  consolidatedInput: ConsolidatedAnalysisInput,
+  eligibility: AiEligibilityResult,
+  learningContext?: LearningContext | null
+): AiAnalysisResult {
+  const suggestionLimit = eligibility.guidance.maxSuggestions;
+  // For medium confidence, we rely more on the deterministic fallback
+  if (eligibility.level === "medium") {
+    const evidenceFilteredAiSuggestions = collectEvidenceFilteredSuggestions({
+      suggestions: result.suggestions,
+      extracted,
+      limit: suggestionLimit,
+    });
+
+    const mergedSuggestions = dedupeSuggestions(
+      [...fallback.suggestions, ...evidenceFilteredAiSuggestions],
+      suggestionLimit
+    );
+
+    return {
+      ...fallback,
+      summary: alignSummaryWithMarket({
+        summary: ensureStructuredSummary({
+          summary: result.summary,
+          fallbackSummary: fallback.summary,
+          learningContext,
+        }),
+        fallbackSummary: fallback.summary,
+        input: consolidatedInput,
+        eligibility,
+      }),
+      suggestions: mergedSuggestions,
+    };
+  }
+
+  const validatedAiSuggestions = collectEvidenceFilteredSuggestions({
+    suggestions: result.suggestions,
+    extracted,
+    limit: suggestionLimit,
+  });
 
   const weaknesses = dedupeStrings(
     [
@@ -1045,7 +1349,7 @@ function postProcessAiResult(
 
   const mergedSuggestions = dedupeSuggestions(
     [...fallback.suggestions, ...validatedAiSuggestions],
-    5
+    suggestionLimit
   );
   const prioritizedSuggestions = prioritizeThemeAlignedSuggestions(
     mergedSuggestions,
@@ -1053,7 +1357,7 @@ function postProcessAiResult(
     result.summary
   );
   const suggestions = fallback.suggestions[0]
-    ? dedupeSuggestions([fallback.suggestions[0], ...prioritizedSuggestions], 5)
+    ? dedupeSuggestions([fallback.suggestions[0], ...prioritizedSuggestions], suggestionLimit)
     : prioritizedSuggestions;
 
   const ensuredSummary = ensureStructuredSummary({
@@ -1061,13 +1365,12 @@ function postProcessAiResult(
     fallbackSummary: fallback.summary,
     learningContext,
   });
-  const summary =
-    syncStructuredSummaryWithSuggestions({
-      summary: ensuredSummary,
-      fallbackSummary: fallback.summary,
-      suggestions,
-      systemLearning: learningContext?.systemLearning,
-    }) || ensuredSummary;
+  const summary = alignSummaryWithMarket({
+    summary: ensuredSummary,
+    fallbackSummary: fallback.summary,
+    input: consolidatedInput,
+    eligibility,
+  });
   const safeSummary = containsSuspiciousSummaryArtifacts(summary)
     ? fallback.summary
     : summary;
@@ -1076,9 +1379,14 @@ function postProcessAiResult(
   )
     ? fallback.suggestions
     : suggestions;
+  const shouldKeepDeterministicSummary =
+    fallback.suggestions.length === 0 &&
+    fallback.overall_score >= 75 &&
+    fallback.seo_score >= 70 &&
+    fallback.conversion_score >= 70;
 
   return {
-    summary: safeSummary,
+    summary: shouldKeepDeterministicSummary ? fallback.summary : safeSummary,
     strengths: dedupeStrings(
       [...result.strengths.map((item) => humanizeAiText(item)), ...fallback.strengths],
       4
@@ -1527,13 +1835,16 @@ function buildStrategicSections(params: {
 }
 
 function buildDeterministicFallback(params: {
+  consolidatedInput: ConsolidatedAnalysisInput;
   packet: DecisionSupportPacket;
   extracted: ExtractedProductFields;
   learningContext?: LearningContext | null;
   missingDataReport?: MissingDataReport | null;
   baseline?: AiBaselineContext | null;
+  eligibility: AiEligibilityResult;
 }) {
   const strategic = buildStrategicSections(params);
+  const suggestionLimit = params.eligibility.guidance.maxSuggestions;
   const suggestions = prioritizeThemeAlignedSuggestions(
     dedupeSuggestions(
       [
@@ -1550,18 +1861,21 @@ function buildDeterministicFallback(params: {
           detail: item.detail,
         })) as AiAnalysisResult["suggestions"]),
       ],
-      5
+      suggestionLimit
     ),
     strategic.summary,
     params.baseline?.summary ?? null
-  );
-  const summary =
-    syncStructuredSummaryWithSuggestions({
+  ).slice(0, suggestionLimit);
+  const summary = alignSummaryWithMarket({
+    summary: ensureStructuredSummary({
       summary: strategic.summary,
-      fallbackSummary: params.baseline?.summary,
-      suggestions,
-      systemLearning: params.learningContext?.systemLearning,
-    }) || strategic.summary;
+      fallbackSummary: params.baseline?.summary ?? strategic.summary,
+      learningContext: params.learningContext,
+    }) || strategic.summary,
+    fallbackSummary: params.baseline?.summary ?? strategic.summary,
+    input: params.consolidatedInput,
+    eligibility: params.eligibility,
+  });
 
   return {
     summary,
@@ -1622,7 +1936,7 @@ export async function analyzeWithAi(params: {
     }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: geminiModel,
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.1,
@@ -1631,8 +1945,7 @@ export async function analyzeWithAi(params: {
 
     const prompt = buildPrompt(params);
     const result = await model.generateContent(prompt);
-    const text = cleanJsonText(result.response.text());
-    const parsed = JSON.parse(text) as unknown;
+    const parsed = parseAiJson(result.response.text()) as unknown;
     const sanitized = sanitizeAiResult(parsed);
 
     if (!sanitized) {
@@ -1643,6 +1956,7 @@ export async function analyzeWithAi(params: {
       sanitized,
       params.extracted,
       fallback,
+      params.consolidatedInput,
       params.eligibility,
       params.learningContext
     );

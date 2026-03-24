@@ -1,67 +1,69 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
-import { sanitizeStoredReportForAccess } from "@/lib/report-access";
+import { logAnalyzeEvent } from "@/lib/analysis-observability";
+import { createRequestId } from "@/lib/request-id";
+import { loadReportListForUser } from "@/lib/report-list-service";
 
-export async function GET() {
+export async function GET(req: Request) {
+  const requestId = createRequestId("rlist");
   try {
     const session = await auth();
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: "Yetkisiz erisim." }, { status: 401 });
+      logAnalyzeEvent({
+        level: "warn",
+        stage: "reports_list_unauthorized",
+        requestId,
+        actor: "unknown",
+        message: "Rapor listesi icin oturumsuz erisim denemesi",
+      });
+      return NextResponse.json({ requestId, error: "Yetkisiz erisim." }, { status: 401 });
     }
-
-    const user = await prisma.user.findUnique({
-      where: {
-        id: session.user.id,
-      },
-      include: {
-        subscription: {
-          include: {
-            plan: true,
-          },
-        },
-      },
-    });
-
-    const historyLimit = user?.subscription?.plan?.reportsHistoryLimit ?? 5;
-
-    const reports = await prisma.report.findMany({
-      where: {
+    const actor = `user:${session.user.id}`;
+    const { detailMode, historyLimit, take, cursor, reports } =
+      await loadReportListForUser({
+        req,
         userId: session.user.id,
-      },
-      orderBy: { createdAt: "desc" },
-      take: historyLimit > 0 ? historyLimit : 100,
-      select: {
-        id: true,
-        url: true,
-        platform: true,
-        category: true,
-        seoScore: true,
-        dataCompletenessScore: true,
-        conversionScore: true,
-        overallScore: true,
-        priceCompetitiveness: true,
-        summary: true,
-        dataSource: true,
-        derivedMetrics: true,
-        coverage: true,
-        accessState: true,
-        priorityActions: true,
-        suggestions: true,
-        analysisTrace: true,
-        extractedData: true,
-        createdAt: true,
+      });
+
+    logAnalyzeEvent({
+      stage: "reports_list_success",
+      requestId,
+      actor,
+      message: "Rapor listesi basariyla yuklendi",
+      extra: {
+        historyLimit,
+        take,
+        cursor,
+        detailMode,
+        returned: reports.length,
       },
     });
 
     return NextResponse.json({
       success: true,
+      requestId,
       historyLimit,
-      reports: reports.map((report) => sanitizeStoredReportForAccess(report)),
+      paging: {
+        cursor,
+        take,
+        nextCursor: reports.length === take ? cursor + take : null,
+      },
+      reports,
     });
   } catch (err) {
+    logAnalyzeEvent({
+      level: "error",
+      stage: "reports_list_unhandled_error",
+      requestId,
+      actor: "unknown",
+      message: "Rapor listesi yuklenirken beklenmeyen hata",
+      extra: { detail: err instanceof Error ? err.message : String(err) },
+    });
     console.error("[reports/list] Error:", err);
-    return NextResponse.json({ error: "Raporlar yuklenemedi." }, { status: 500 });
+    return NextResponse.json(
+      { requestId, error: "Raporlar yuklenemedi." },
+      { status: 500 }
+    );
   }
 }

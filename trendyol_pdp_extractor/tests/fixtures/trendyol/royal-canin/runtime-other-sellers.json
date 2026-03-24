@@ -1,0 +1,31 @@
+[
+  {
+    "url": "https://api.trendyol.com/other-sellers",
+    "json": {
+      "result": {
+        "otherSellers": [
+          {
+            "name": "Er pet",
+            "sellerId": 1001,
+            "listingId": "other-1",
+            "price": { "discountedPrice": 6145.0, "originalPrice": 6145.0 },
+            "sellerScore": 9.4,
+            "sellerBadges": [{ "type": "BADGE" }],
+            "isFastDelivery": true,
+            "url": "/royal-canin/sterilised-37-p-73292418?merchantId=1001"
+          },
+          {
+            "name": "Pet Store",
+            "sellerId": 1002,
+            "listingId": "other-2",
+            "price": { "discountedPrice": 6199.0, "originalPrice": 6199.0 },
+            "sellerScore": 9.1,
+            "sellerBadges": [{ "type": "BADGE" }],
+            "url": "/royal-canin/sterilised-37-p-73292418?merchantId=1002"
+          }
+        ]
+      }
+    }
+  }
+]
+

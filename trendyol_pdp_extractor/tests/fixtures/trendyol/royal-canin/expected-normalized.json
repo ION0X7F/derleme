@@ -1,0 +1,26 @@
+{
+  "url": "https://www.trendyol.com/royal-canin/sterilised-37-kisirlastirilmis-yetiskin-kedi-mamasi-15-kg-p-73292418",
+  "strict": {
+    "brand": "Royal Canin",
+    "seller_name": "RIOBONGO",
+    "merchant_id": 776130,
+    "listing_id": "7a3633b207a0868f0fed52c3539077a4",
+    "normalized_price": 6136.0,
+    "question_count": 12,
+    "other_sellers_count": 2
+  },
+  "presence": [
+    "other_seller_offers",
+    "qa_snippets",
+    "review_snippets"
+  ],
+  "sources": {
+    "price": { "source": "html", "confidence": "high" },
+    "seller_name": { "source": "embedded_json", "confidence": "high" },
+    "question_count": { "source": "runtime_xhr", "confidence": "high" },
+    "model_code": { "source": "not_found", "confidence": "none" }
+  },
+  "null_or_low_confidence": [
+    "model_code"
+  ]
+}

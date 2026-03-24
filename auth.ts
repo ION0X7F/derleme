@@ -1,10 +1,73 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
+import GitHub from "next-auth/providers/github";
+import Discord from "next-auth/providers/discord";
 import bcrypt from "bcryptjs";
+import {
+  isDiscordAuthConfigured,
+  isGithubAuthConfigured,
+  isGoogleAuthConfigured,
+} from "@/lib/auth-provider-config";
 import { prisma } from "@/lib/prisma";
+import { resolveAuthRedirectUrl } from "@/lib/auth-callback";
 import { resolvePlanForUser } from "@/lib/resolve-plan";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+async function ensureOAuthUser(params: {
+  email: string;
+  name?: string | null;
+}) {
+  const freePlan = await prisma.plan.upsert({
+    where: { code: "FREE" },
+    update: {},
+    create: {
+      code: "FREE",
+      name: "Free",
+      description: "Temel Trendyol analizi",
+      monthlyAnalysisLimit: 10,
+      reportsHistoryLimit: 5,
+      canExportReports: false,
+      canUseAdvancedAi: false,
+      canReanalyze: false,
+      priceMonthly: 0,
+      isActive: true,
+    },
+  });
+
+  const dbUser = await prisma.user.upsert({
+    where: { email: params.email },
+    update: {
+      name: params.name || undefined,
+    },
+    create: {
+      email: params.email,
+      name: params.name || null,
+      passwordHash: null,
+      plan: "FREE",
+    },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+    },
+  });
+
+  await prisma.subscription.upsert({
+    where: { userId: dbUser.id },
+    update: {},
+    create: {
+      userId: dbUser.id,
+      planId: freePlan.id,
+      status: "ACTIVE",
+      variant: "FREE",
+    },
+  });
+
+  return dbUser;
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
@@ -57,9 +120,60 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         };
       },
     }),
+    ...(isGoogleAuthConfigured()
+      ? [
+          Google({
+            clientId: process.env.GOOGLE_CLIENT_ID,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          }),
+        ]
+      : []),
+    ...(isGithubAuthConfigured()
+      ? [
+          GitHub({
+            clientId: process.env.GITHUB_ID,
+            clientSecret: process.env.GITHUB_SECRET,
+          }),
+        ]
+      : []),
+    ...(isDiscordAuthConfigured()
+      ? [
+          Discord({
+            clientId: process.env.DISCORD_CLIENT_ID,
+            clientSecret: process.env.DISCORD_CLIENT_SECRET,
+          }),
+        ]
+      : []),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
+      if (
+        account?.provider &&
+        account.provider !== "credentials"
+      ) {
+        const email = String(user?.email ?? token.email ?? "")
+          .trim()
+          .toLowerCase();
+
+        if (!email || !EMAIL_PATTERN.test(email)) {
+          return token;
+        }
+
+        const dbUser = await ensureOAuthUser({
+          email,
+          name: user?.name || null,
+        });
+
+        const planCode = await resolvePlanForUser(dbUser.id, email);
+
+        token.id = dbUser.id;
+        token.role = dbUser.role;
+        token.plan = planCode;
+        token.email = dbUser.email;
+        token.name = dbUser.name ?? token.name;
+        return token;
+      }
+
       if (user) {
         // Sign-in: use plan from authorize() (already resolved from subscription)
         token.id = user.id;
@@ -80,6 +194,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.plan = String(token.plan ?? "FREE");
       }
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      return resolveAuthRedirectUrl(url, baseUrl);
     },
   },
 });

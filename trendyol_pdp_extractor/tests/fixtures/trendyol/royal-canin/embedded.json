@@ -1,0 +1,33 @@
+{
+  "product": {
+    "name": "Royal Canin Sterilised 37 Kisirlastirilmis Yetiskin Kedi Mamasi 15 kg",
+    "brand": { "name": "Royal Canin" },
+    "sku": "73292418",
+    "description": "Kisirlastirilmis yetiskin kediler icin kuru mama.",
+    "image": [
+      "https://cdn.example.com/royal-1.jpg",
+      "https://cdn.example.com/royal-2.jpg"
+    ],
+    "aggregateRating": { "ratingValue": 4.93, "reviewCount": 20 },
+    "offers": { "price": 6145.0, "priceCurrency": "TRY" },
+    "favoriteCount": 837,
+    "ratingScore": { "averageRating": 4.93, "commentCount": 20 },
+    "merchantListing": {
+      "merchant": {
+        "name": "RIOBONGO",
+        "id": 776130,
+        "sellerScore": { "value": 9.7 },
+        "merchantBadges": [{ "type": "BADGE" }]
+      },
+      "winnerVariant": {
+        "listingId": "7a3633b207a0868f0fed52c3539077a4",
+        "price": { "discountedPrice": 6145.0, "originalPrice": 6145.0 },
+        "quantity": 60,
+        "freeCargo": true,
+        "rushDeliveryDuration": 1,
+        "fulfilmentType": "MP"
+      }
+    }
+  }
+}
+

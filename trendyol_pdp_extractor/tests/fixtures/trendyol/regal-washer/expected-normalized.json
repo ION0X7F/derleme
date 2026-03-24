@@ -1,0 +1,28 @@
+{
+  "url": "https://www.trendyol.com/regal/cm-60100-camasir-makinesi-p-917432292?boutiqueId=61&merchantId=144831",
+  "strict": {
+    "brand": "Regal",
+    "seller_name": "Regal Kurumsal Mağaza",
+    "merchant_id": 144831,
+    "normalized_price": 13999.0,
+    "question_count": 80
+  },
+  "presence": [
+    "similar_product_candidates",
+    "qa_snippets"
+  ],
+  "absence": [
+    "other_seller_offers"
+  ],
+  "sources": {
+    "price": { "source": "html", "confidence": "high" },
+    "seller_name": { "source": "embedded_json", "confidence": "high" },
+    "question_count": { "source": "runtime_xhr", "confidence": "high" },
+    "other_sellers_count": { "source": "not_found", "confidence": "none" },
+    "similar_product_candidates": { "source": "runtime_xhr", "confidence": "medium" }
+  },
+  "null_or_low_confidence": [
+    "model_code",
+    "other_sellers_count"
+  ]
+}

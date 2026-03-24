@@ -1,0 +1,20 @@
+[
+  {
+    "url": "https://api.trendyol.com/reviews",
+    "json": {
+      "result": {
+        "reviews": [
+          { "comment": "Kedim cok sevdi", "rate": 5 },
+          { "comment": "Paketleme guzeldi", "rate": 5 }
+        ],
+        "summary": {
+          "averageRating": 4.93,
+          "totalCommentCount": 20,
+          "totalRatingCount": 20,
+          "tags": [{ "name": "kaliteli" }, { "name": "hizli kargo" }]
+        }
+      }
+    }
+  }
+]
+

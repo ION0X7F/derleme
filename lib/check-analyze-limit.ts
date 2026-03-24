@@ -10,9 +10,10 @@ type CheckAnalyzeLimitParams =
   | {
       type: "user";
       userId: string;
+      monthlyLimitOverride?: number | null;
     };
 
-type LimitResult = {
+export type AnalyzeLimitResult = {
   allowed: boolean;
   used: number;
   limit: number;
@@ -23,7 +24,7 @@ type LimitResult = {
 
 export async function checkAnalyzeLimit(
   params: CheckAnalyzeLimitParams
-): Promise<LimitResult> {
+): Promise<AnalyzeLimitResult> {
   const action = "analyze";
   const periodKey = getMonthlyPeriodKey();
 
@@ -51,36 +52,48 @@ export async function checkAnalyzeLimit(
     };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: params.userId },
-    include: {
-      subscription: {
-        include: {
-          plan: true,
+  let monthlyLimit =
+    typeof params.monthlyLimitOverride === "number" &&
+    Number.isFinite(params.monthlyLimitOverride) &&
+    params.monthlyLimitOverride > 0
+      ? Math.floor(params.monthlyLimitOverride)
+      : 10;
+
+  if (params.monthlyLimitOverride == null) {
+    const user = await prisma.user.findUnique({
+      where: { id: params.userId },
+      select: {
+        subscription: {
+          select: {
+            status: true,
+            plan: {
+              select: {
+                monthlyAnalysisLimit: true,
+              },
+            },
+          },
         },
       },
-    },
-  });
+    });
 
-  if (!user) {
-    return {
-      allowed: false,
-      used: 0,
-      limit: 0,
-      remaining: 0,
-      periodKey,
-      periodType: "monthly",
-    };
-  }
+    if (!user) {
+      return {
+        allowed: false,
+        used: 0,
+        limit: 0,
+        remaining: 0,
+        periodKey,
+        periodType: "monthly",
+      };
+    }
 
-  let monthlyLimit = 10;
-
-  if (
-    user.subscription &&
-    (user.subscription.status === "ACTIVE" ||
-      user.subscription.status === "TRIALING")
-  ) {
-    monthlyLimit = user.subscription.plan.monthlyAnalysisLimit;
+    if (
+      user.subscription &&
+      (user.subscription.status === "ACTIVE" ||
+        user.subscription.status === "TRIALING")
+    ) {
+      monthlyLimit = user.subscription.plan.monthlyAnalysisLimit;
+    }
   }
 
   const record = await prisma.userUsageRecord.findUnique({

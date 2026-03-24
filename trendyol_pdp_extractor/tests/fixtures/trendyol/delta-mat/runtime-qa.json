@@ -1,0 +1,15 @@
+[
+  {
+    "url": "https://api.trendyol.com/questions",
+    "json": {
+      "questions": {
+        "totalElements": 270,
+        "content": [
+          { "text": "Kayiyor mu?", "answer": { "text": "Kaymaz zeminlidir." } },
+          { "text": "Kalınlığı kaç mm?", "answer": { "text": "10 mm kalinliktedir." } }
+        ]
+      }
+    }
+  }
+]
+

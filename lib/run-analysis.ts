@@ -1,4 +1,5 @@
 import { analyzeWithAi } from "@/lib/ai-analysis";
+import { evaluateAnalysisContract } from "@/lib/analysis-contract";
 import { buildAnalysisTrace } from "@/lib/analysis-trace";
 import { buildAnalysis, buildPriorityActions } from "@/lib/build-analysis";
 import { detectCategory } from "@/lib/detect-category";
@@ -12,6 +13,7 @@ import { mergeExtractedFieldsWithMetadata } from "@/lib/extractors/merge-extract
 import { fetchPageHtml } from "@/lib/fetch-page-html";
 import { fetchTrendyolApi } from "@/lib/fetch-trendyol-api";
 import { isAiAnalysisEligible } from "@/lib/ai-eligibility";
+import { createDebugTrace, emitDebugTrace, traceEvent } from "@/lib/debug-observability";
 import { getLearningContext } from "@/lib/learning-engine";
 import {
   completeMissingFieldsWithMetadata,
@@ -56,6 +58,14 @@ export type AnalysisPipelineResult = {
   learningContext: LearningContext;
   learningStatus: LearningStatus;
   missingDataReport: MissingDataReport;
+  diagnostics: {
+    totalMs: number;
+    fetchHtmlMs: number;
+    fetchApiMs: number;
+    extractionMs: number;
+    deterministicMs: number;
+    aiMs: number;
+  };
 };
 
 function hasText(value: string | null | undefined) {
@@ -86,12 +96,69 @@ const CRITICAL_FIELDS = [
 export async function runAnalysisPipeline(
   params: RunAnalysisPipelineParams
 ): Promise<AnalysisPipelineResult> {
+  const pipelineStartedAt = Date.now();
+  const isTrendyol = params.url.toLocaleLowerCase("tr-TR").includes("trendyol.com");
+  const debugTrace = createDebugTrace({
+    pipeline: "run-analysis",
+    url: params.url,
+    platform: isTrendyol ? "trendyol" : null,
+  });
   let html = "";
+  let fetchHtmlMs = 0;
+  let fetchApiMs = 0;
+  let extractionMs = 0;
+  let deterministicMs = 0;
+  let aiMs = 0;
+
+  const htmlFetchStartedAt = Date.now();
+  const htmlPromise = fetchPageHtml(params.url);
+  const apiFetchStartedAt = Date.now();
+  const trendyolApiPromise = isTrendyol
+    ? fetchTrendyolApi(params.url).finally(() => {
+        fetchApiMs = Date.now() - apiFetchStartedAt;
+      })
+    : Promise.resolve(null);
+
+  let trendyolApiData: Awaited<ReturnType<typeof fetchTrendyolApi>> = null;
 
   try {
-    html = await fetchPageHtml(params.url);
+    [html, trendyolApiData] = await Promise.all([htmlPromise, trendyolApiPromise]);
+    fetchHtmlMs = Date.now() - htmlFetchStartedAt;
+    traceEvent(debugTrace, {
+      stage: "fetch",
+      code: "fetch_html_success",
+      message: "HTML fetch tamamlandi.",
+      meta: {
+        fetchHtmlMs,
+        htmlLength: html.length,
+      },
+    });
+    traceEvent(debugTrace, {
+      stage: "fetch",
+      code: "fetch_api_summary",
+      message: isTrendyol
+        ? "Trendyol API denemesi tamamlandi."
+        : "Platform API adimi atlandi.",
+      meta: {
+        isTrendyol,
+        fetchApiMs,
+        apiSellerFound: Boolean(trendyolApiData?.seller),
+        otherSellerCount: trendyolApiData?.other_sellers?.length ?? 0,
+      },
+    });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
+    fetchHtmlMs = Date.now() - htmlFetchStartedAt;
+    traceEvent(debugTrace, {
+      stage: "fetch",
+      level: "warn",
+      code: "fetch_failed",
+      message: "Fetch asamasi basarisiz oldu.",
+      meta: {
+        fetchHtmlMs,
+        detail,
+      },
+    });
     throw new AnalysisPipelineError(
       "FETCH_FAILED",
       "Sayfa icerigi alinamadi. URL'yi kontrol edin.",
@@ -100,21 +167,26 @@ export async function runAnalysisPipeline(
   }
 
   if (!html || html.trim().length === 0) {
+    traceEvent(debugTrace, {
+      stage: "fetch",
+      level: "warn",
+      code: "empty_html",
+      message: "HTML bos geldi.",
+    });
     throw new AnalysisPipelineError(
       "EMPTY_HTML",
       "Sayfa icerigi alinamadi."
     );
   }
 
-  const trendyolApiData = params.url
-    .toLocaleLowerCase("tr-TR")
-    .includes("trendyol.com")
-    ? await fetchTrendyolApi(params.url)
-    : null;
+  if (!isTrendyol) {
+    fetchApiMs = 0;
+  }
 
   // Adım 1: Veri Çıkarma, Birleştirme ve Zenginleştirme
   // Bu blok, HTML'den ve (varsa) API'den gelen verileri birleştirerek nihai "extracted" nesnesini oluşturur.
   // Öncelik sırası (API > Platform HTML > Genel HTML) bu adımların içindeki fonksiyonlarda yönetilir.
+  const extractionStartedAt = Date.now();
   const {
     extracted,
     fieldMetadata,
@@ -134,6 +206,7 @@ export async function runAnalysisPipeline(
       genericFields: htmlExtraction.genericFields,
       platformFields: htmlExtraction.platformFields,
       platform: htmlExtraction.platform,
+      trace: debugTrace,
     });
 
     const finalExtractionResult = (() => {
@@ -142,18 +215,26 @@ export async function runAnalysisPipeline(
       if (trendyolApiData) {
         const apiSeller = trendyolApiData.seller;
         if (apiSeller) {
-          mergedWithHtml.seller_score =
-            apiSeller.seller_score ?? mergedWithHtml.seller_score;
-          mergedWithHtml.seller_name =
-            apiSeller.seller_name ?? mergedWithHtml.seller_name;
-          mergedWithHtml.official_seller =
-            apiSeller.is_official ?? mergedWithHtml.official_seller;
-          mergedWithHtml.has_free_shipping =
-            apiSeller.has_free_shipping ?? mergedWithHtml.has_free_shipping;
-          mergedWithHtml.listing_id =
-            apiSeller.listing_id ?? mergedWithHtml.listing_id;
-          mergedWithHtml.merchant_id =
-            apiSeller.merchant_id ?? mergedWithHtml.merchant_id;
+          const applyApiField = <K extends keyof typeof mergedWithHtml>(
+            key: K,
+            apiValue: (typeof mergedWithHtml)[K]
+          ) => {
+            if (apiValue == null) return;
+            mergedWithHtml[key] = apiValue;
+            initialMetadata[String(key)] = {
+              source: "api",
+              confidence: "high",
+              timestamp: Date.now(),
+              reason: "trendyol api seller payload",
+            };
+          };
+
+          applyApiField("seller_score", apiSeller.seller_score);
+          applyApiField("seller_name", apiSeller.seller_name);
+          applyApiField("official_seller", apiSeller.is_official);
+          applyApiField("has_free_shipping", apiSeller.has_free_shipping);
+          applyApiField("listing_id", apiSeller.listing_id);
+          applyApiField("merchant_id", apiSeller.merchant_id);
         }
       }
 
@@ -166,7 +247,8 @@ export async function runAnalysisPipeline(
           platformFields: htmlExtraction.platformFields,
           trendyolApiData,
         },
-        initialMetadata
+        initialMetadata,
+        debugTrace
       );
     })();
 
@@ -176,9 +258,22 @@ export async function runAnalysisPipeline(
       report: finalExtractionResult.report,
     };
   })();
+  extractionMs = Date.now() - extractionStartedAt;
 
   // Adım 1.5: Veri Konsolidasyon Katmanı
-  const consolidatedInput = prepareAnalysisInput(extracted, fieldMetadata);
+  traceEvent(debugTrace, {
+    stage: "parse",
+    code: "extraction_summary",
+    message: "Extraction ve eksik alan tamamlama asamalari tamamlandi.",
+    meta: {
+      extractionMs,
+      extractorStatus: extracted.extractor_status,
+      filledFields: missingDataReport.filledFields.length,
+      strengthenedFields: missingDataReport.strengthenedFields.length,
+      unresolvedCriticalFields: missingDataReport.unresolvedCriticalFields,
+    },
+  });
+  const consolidatedInput = prepareAnalysisInput(extracted, fieldMetadata, debugTrace);
 
   // Adım 2: Extractor Sağlık Raporu Oluşturma
   const extractorHealth = buildExtractorHealthReport({
@@ -209,6 +304,7 @@ export async function runAnalysisPipeline(
     }) ||
     "General";
 
+  const deterministicStartedAt = Date.now();
   const analysis = buildAnalysis({
     platform,
     url: params.url,
@@ -219,10 +315,25 @@ export async function runAnalysisPipeline(
     },
     planContext: params.planContext ?? "pro",
   });
+  deterministicMs = Date.now() - deterministicStartedAt;
+  traceEvent(debugTrace, {
+    stage: "analysis",
+    code: "build_analysis_completed",
+    message: "Deterministic analysis tamamlandi.",
+    meta: {
+      deterministicMs,
+      overallScore: analysis.overallScore,
+      seoScore: analysis.seoScore,
+      conversionScore: analysis.conversionScore,
+      comparisonMode: consolidatedInput.marketComparison?.comparisonMode ?? null,
+    },
+  });
 
   // Phase 1: Attach metadata to analysis result
   analysis._fieldMetadata = fieldMetadata;
+  analysis._normalizedFieldMetadata = consolidatedInput._fieldMetadata;
   analysis.extractorHealth = extractorHealth;
+  analysis.debugTrace = null;
 
   // Log health score (for debugging)
   if (process.env.NODE_ENV === "development") {
@@ -241,24 +352,32 @@ export async function runAnalysisPipeline(
     includeSynthetic: params.includeSyntheticLearning,
   });
 
-  let aiResult = null;
+  let aiResult: Awaited<ReturnType<typeof analyzeWithAi>> = null;
   const aiEligibility = isAiAnalysisEligible(consolidatedInput);
+  const contract = evaluateAnalysisContract({
+    input: consolidatedInput,
+    aiEligibility,
+  });
 
   if (process.env.NODE_ENV === "development") {
-    console.log(`[AI Eligibility] ${aiEligibility.reason}`);
+    console.log(
+      `[AI Eligibility] ${aiEligibility.reason} | contract: ${contract.aiDecision.reason}`
+    );
   }
 
   // AI, veri kalitesine göre çalıştırılır.
   // Bu, AI'ın eksik veya zayıf veriyle hatalı yorumlar üretmesini engeller.
-  if (aiEligibility.eligible) {
-        aiResult = await analyzeWithAi({
+  const shouldRunAi = contract.aiDecision.executed;
+
+  if (shouldRunAi) {
+    const aiStartedAt = Date.now();
+    aiResult = await analyzeWithAi({
       consolidatedInput,
       packet: {
         ...analysis.decisionSupportPacket,
-        // Update packet's confidence to reflect the new, more accurate score
         coverage: {
           ...analysis.decisionSupportPacket.coverage,
-          confidence: aiEligibility.level === 'high' ? 'high' : 'medium',
+          confidence: contract.confidence,
         }
       },
       extracted: analysis.extractedData,
@@ -276,46 +395,92 @@ export async function runAnalysisPipeline(
       },
       eligibility: aiEligibility,
     });
+    aiMs = Date.now() - aiStartedAt;
+    traceEvent(debugTrace, {
+      stage: "analysis",
+      code: "ai_analysis_completed",
+      message: "AI enrichment calisti.",
+      meta: {
+        aiMs,
+        eligible: aiEligibility.eligible,
+        contractMode: contract.aiDecision.mode,
+      },
+    });
   }
 
   if (aiResult) {
-    if (hasText(aiResult.summary)) {
+    if (aiEligibility.guidance.allowNarrativeExpansion && hasText(aiResult.summary)) {
       analysis.summary = aiResult.summary;
     }
 
-    if (aiResult.strengths.length > 0) {
+    if (
+      aiEligibility.guidance.allowStrengthWeaknessRewrite &&
+      aiResult.strengths.length > 0
+    ) {
       analysis.strengths = aiResult.strengths;
     }
 
-    if (aiResult.weaknesses.length > 0) {
+    if (
+      aiEligibility.guidance.allowStrengthWeaknessRewrite &&
+      aiResult.weaknesses.length > 0
+    ) {
       analysis.weaknesses = aiResult.weaknesses;
     }
 
     if (aiResult.suggestions.length > 0) {
-      analysis.suggestions = aiResult.suggestions;
+      analysis.suggestions = aiResult.suggestions.slice(
+        0,
+        aiEligibility.guidance.maxSuggestions
+      );
     }
 
     analysis.priorityActions = buildPriorityActions(
       analysis.extractedData,
       analysis.derivedMetrics,
-      analysis.suggestions
+      analysis.suggestions,
+      consolidatedInput.marketComparison
     );
 
-    if (shouldUseAiScore(aiResult.seo_score, analysis.seoScore)) {
+    if (
+      aiEligibility.guidance.allowScoreOverrides &&
+      shouldUseAiScore(aiResult.seo_score, analysis.seoScore)
+    ) {
       analysis.seoScore = aiResult.seo_score;
     }
 
-    if (shouldUseAiScore(aiResult.conversion_score, analysis.conversionScore)) {
+    if (
+      aiEligibility.guidance.allowScoreOverrides &&
+      shouldUseAiScore(aiResult.conversion_score, analysis.conversionScore)
+    ) {
       analysis.conversionScore = aiResult.conversion_score;
     }
 
-    if (shouldUseAiScore(aiResult.overall_score, analysis.overallScore)) {
+    if (
+      aiEligibility.guidance.allowScoreOverrides &&
+      shouldUseAiScore(aiResult.overall_score, analysis.overallScore)
+    ) {
       analysis.overallScore = aiResult.overall_score;
     }
+
+    analysis.aiCommentary = {
+      mode: "ai_enriched",
+      summary: analysis.summary,
+    };
   }
 
   analysis.analysisTrace = buildAnalysisTrace({
     mode: aiResult ? "ai_enriched" : "deterministic",
+    aiDecision: {
+      eligible: aiEligibility.eligible,
+      executed: shouldRunAi,
+      mode: contract.aiDecision.mode,
+      reason: contract.aiDecision.reason,
+      blockingFields:
+        contract.blockingFields.length > 0
+          ? contract.blockingFields
+          : aiEligibility.blockingFields,
+      coverageTier: contract.coverageTier,
+    },
     summary: analysis.summary,
     suggestions: analysis.suggestions,
     packet: analysis.decisionSupportPacket,
@@ -327,6 +492,7 @@ export async function runAnalysisPipeline(
     learningContext,
     missingDataReport: missingDataReport,
   });
+  analysis.debugTrace = emitDebugTrace(debugTrace, "SellBoostInternalTrace");
 
   return {
     platform,
@@ -335,5 +501,13 @@ export async function runAnalysisPipeline(
     learningContext,
     learningStatus,
     missingDataReport: missingDataReport,
+    diagnostics: {
+      totalMs: Date.now() - pipelineStartedAt,
+      fetchHtmlMs,
+      fetchApiMs,
+      extractionMs,
+      deterministicMs,
+      aiMs,
+    },
   };
 }

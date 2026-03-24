@@ -1,0 +1,20 @@
+[
+  {
+    "url": "https://api.trendyol.com/reviews",
+    "json": {
+      "result": {
+        "reviews": [
+          { "comment": "Kaliteli urun", "rate": 5 },
+          { "comment": "Hizli teslimat", "rate": 5 }
+        ],
+        "summary": {
+          "averageRating": 4.45,
+          "totalCommentCount": 3461,
+          "totalRatingCount": 3461,
+          "tags": [{ "name": "kaliteli" }, { "name": "hizli kargo" }]
+        }
+      }
+    }
+  }
+]
+

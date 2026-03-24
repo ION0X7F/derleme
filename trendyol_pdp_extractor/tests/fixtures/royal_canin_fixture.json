@@ -1,0 +1,65 @@
+{
+  "url": "https://www.trendyol.com/royal-canin/sterilised-37-kisirlastirilmis-yetiskin-kedi-mamasi-15-kg-p-73292418",
+  "html": "<html><head><title>Royal Canin Sterilised 37 Kisirlastirilmis Yetiskin Kedi Mamasi 15 kg - Fiyati, Yorumlari</title><script type=\"application/ld+json\">{\"@type\":\"Product\",\"name\":\"Royal Canin Sterilised 37 Kisirlastirilmis Yetiskin Kedi Mamasi 15 kg\",\"brand\":{\"name\":\"Royal Canin\"},\"sku\":\"73292418\",\"description\":\"Kisirlastirilmis yetiskin kediler icin kuru mama.\",\"image\":[\"https://cdn.example.com/1.jpg\",\"https://cdn.example.com/2.jpg\"],\"aggregateRating\":{\"ratingValue\":4.93,\"reviewCount\":20},\"offers\":{\"price\":6136.0,\"priceCurrency\":\"TRY\"}}</script></head><body><h1>Royal Canin Sterilised 37 Kisirlastirilmis Yetiskin Kedi Mamasi 15 kg</h1><nav aria-label=\"breadcrumb\"><a>Supermarket</a><a>Pet Shop</a><a>Kedi Kuru Mamasi</a></nav><div id=\"product-description\"><ul><li>Yetiskin kedi mamasi</li><li>15 kg paket</li></ul></div><div data-testid=\"seller-name\">RIOBONGO</div><div data-testid=\"price-current-price\">6.136,00 TL</div></body></html>",
+  "request_logs": [
+    {
+      "url": "https://apigw.trendyol.com/discovery-web-productgw-service/api/product-detail/v2/73292418",
+      "method": "GET",
+      "status": 200,
+      "content_type": "application/json",
+      "json": {
+        "result": {
+          "product": {
+            "favoriteCount": 837,
+            "questionCount": 12,
+            "price": {
+              "discountedPrice": 6136.0,
+              "originalPrice": 6299.0
+            },
+            "seller": {
+              "sellerId": 776130,
+              "name": "RIOBONGO",
+              "sellerScore": 9.7,
+              "isOfficial": true,
+              "listingId": "7a3633b207a0868f0fed52c3539077a4",
+              "sellerBadges": [
+                { "type": "BADGE" }
+              ]
+            },
+            "otherSellers": [
+              {
+                "sellerId": 278054,
+                "name": "Er pet",
+                "sellerScore": 9.9,
+                "isOfficial": false,
+                "isFastDelivery": true,
+                "listingId": "cf67521e79a259efa151cfe3d076a16d",
+                "url": "/royal-canin/sterilised-37-kisirlastirilmis-yetiskin-kedi-mamasi-15-kg-p-73292418?merchantId=278054",
+                "price": {
+                  "discountedPrice": 6140.0,
+                  "originalPrice": 6140.0
+                },
+                "sellerBadges": [
+                  { "type": "BADGE" }
+                ]
+              },
+              {
+                "sellerId": 994931,
+                "name": "Aslan PetVet",
+                "sellerScore": 8.5,
+                "isOfficial": false,
+                "isFastDelivery": true,
+                "listingId": "721b00a5c5958cb7b082fb50805a950e",
+                "url": "/royal-canin/sterilised-37-kisirlastirilmis-yetiskin-kedi-mamasi-15-kg-p-73292418?merchantId=994931",
+                "price": {
+                  "discountedPrice": 6145.0,
+                  "originalPrice": 6145.0
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

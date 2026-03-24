@@ -584,6 +584,7 @@ function buildDecisionFlow(params: {
 
 export function buildAnalysisTrace(params: {
   mode: "deterministic" | "ai_enriched";
+  aiDecision?: AnalysisTrace["aiDecision"];
   summary: string | null | undefined;
   suggestions: AnalysisSuggestion[];
   packet: DecisionSupportPacket;
@@ -617,6 +618,7 @@ export function buildAnalysisTrace(params: {
   return {
     version: 2,
     mode: params.mode,
+    aiDecision: params.aiDecision ?? null,
     primaryDiagnosis,
     primaryTheme: inferPrimaryTheme(primaryDiagnosis, topSignals),
     confidence: params.packet.coverage.confidence,
@@ -653,6 +655,12 @@ export function sanitizeAnalysisTraceForAccess(
     return {
       version: trace.version,
       mode: trace.mode,
+      aiDecision: trace.aiDecision
+        ? {
+            ...trace.aiDecision,
+            blockingFields: trace.aiDecision.blockingFields.slice(0, 2),
+          }
+        : null,
       primaryDiagnosis: trace.primaryDiagnosis,
       primaryTheme: trace.primaryTheme,
       confidence: trace.confidence,
@@ -670,6 +678,12 @@ export function sanitizeAnalysisTraceForAccess(
   if (plan === "free") {
     return {
       ...trace,
+      aiDecision: trace.aiDecision
+        ? {
+            ...trace.aiDecision,
+            blockingFields: trace.aiDecision.blockingFields.slice(0, 4),
+          }
+        : null,
       metricSnapshot: trace.metricSnapshot.slice(0, 3),
       topSignals: trace.topSignals.slice(0, 3),
       benchmarkSignals: trace.benchmarkSignals.slice(0, 1),

@@ -1,11 +1,10 @@
 import {
-  PlanCode,
-  SubscriptionStatus,
-  type SubscriptionPlanVariant,
   type UserRole,
 } from "@prisma/client";
-import { resolveAppPlanId } from "@/lib/plans";
+import { resolveAppPlanId, type RuntimePlanCode } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
+type SubscriptionStatusValue = "ACTIVE" | "TRIALING" | "CANCELED" | "EXPIRED";
+type SubscriptionPlanVariantValue = "FREE" | "PRO_MONTHLY" | "PRO_YEARLY" | "TEAM";
 
 /**
  * @deprecated Use resolvePlanForUser() from lib/resolve-plan.ts instead.
@@ -13,29 +12,26 @@ import { prisma } from "@/lib/prisma";
  * Only kept for backward compatibility during transition period.
  */
 
-const ENTITLED_SUBSCRIPTION_STATUSES = new Set<SubscriptionStatus>([
-  SubscriptionStatus.ACTIVE,
-  SubscriptionStatus.TRIALING,
-]);
+const ENTITLED_SUBSCRIPTION_STATUSES = new Set<SubscriptionStatusValue>(["ACTIVE", "TRIALING"]);
 
 type MembershipRecord = {
-  plan?: PlanCode | null;
+  plan?: RuntimePlanCode | null;
   subscription?: {
-    status?: SubscriptionStatus | null;
-    variant?: SubscriptionPlanVariant | null;
+    status?: SubscriptionStatusValue | null;
+    variant?: SubscriptionPlanVariantValue | null;
     plan?: {
-      code?: PlanCode | null;
+      code?: RuntimePlanCode | null;
       name?: string | null;
       monthlyAnalysisLimit?: number | null;
     } | null;
   } | null;
 };
 
-export function hasEntitledSubscription(status?: SubscriptionStatus | null) {
+export function hasEntitledSubscription(status?: SubscriptionStatusValue | null) {
   return !!status && ENTITLED_SUBSCRIPTION_STATUSES.has(status);
 }
 
-export function getEffectivePlanCodeFromRecord(record: MembershipRecord): PlanCode {
+export function getEffectivePlanCodeFromRecord(record: MembershipRecord): RuntimePlanCode {
   /**
    * @deprecated Use resolvePlanForUser() from lib/resolve-plan.ts instead.
    * This function will be removed after migration to subscription-only plan determination.
@@ -47,7 +43,7 @@ export function getEffectivePlanCodeFromRecord(record: MembershipRecord): PlanCo
     return record.subscription.plan.code;
   }
 
-  return record.plan ?? PlanCode.FREE;
+  return record.plan ?? "FREE";
 }
 
 export function getEffectivePlanNameFromRecord(record: MembershipRecord) {
@@ -58,7 +54,7 @@ export function getEffectivePlanNameFromRecord(record: MembershipRecord) {
     return record.subscription.plan.name;
   }
 
-  return getEffectivePlanCodeFromRecord(record) === PlanCode.PREMIUM ? "Pro" : "Free";
+  return getEffectivePlanCodeFromRecord(record) === "PREMIUM" ? "Pro" : "Free";
 }
 
 export function getEffectivePlanVariantFromRecord(record: MembershipRecord) {
@@ -69,15 +65,15 @@ export function getEffectivePlanVariantFromRecord(record: MembershipRecord) {
   });
 }
 
-export function getMembershipStatusLabel(status?: SubscriptionStatus | null) {
+export function getMembershipStatusLabel(status?: SubscriptionStatusValue | null) {
   switch (status) {
-    case SubscriptionStatus.ACTIVE:
+    case "ACTIVE":
       return "Aktif";
-    case SubscriptionStatus.TRIALING:
+    case "TRIALING":
       return "Deneme";
-    case SubscriptionStatus.CANCELED:
+    case "CANCELED":
       return "Iptal";
-    case SubscriptionStatus.EXPIRED:
+    case "EXPIRED":
       return "Suresi doldu";
     default:
       return "Kayit yok";

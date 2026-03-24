@@ -1,0 +1,23 @@
+{
+  "url": "https://www.trendyol.com/genel-markalar/sevimli-oturan-figurler-4-lu-dekoratif-banyo-seti-p-927845432?boutiqueId=61&merchantId=556699",
+  "strict": {
+    "brand": "Genel Markalar",
+    "seller_name": "DEKOR EVIM",
+    "merchant_id": 556699,
+    "normalized_price": 289.9
+  },
+  "presence": [
+    "coupon_offers",
+    "cross_promotions",
+    "promotion_labels"
+  ],
+  "sources": {
+    "price": { "source": "html", "confidence": "high" },
+    "seller_name": { "source": "embedded_json", "confidence": "high" },
+    "coupon_offers": { "source": "runtime_xhr", "confidence": "high" },
+    "cross_promotions": { "source": "runtime_xhr", "confidence": "high" }
+  },
+  "null_or_low_confidence": [
+    "model_code"
+  ]
+}
