@@ -15,6 +15,8 @@ import { fetchTrendyolApi } from "@/lib/fetch-trendyol-api";
 import { isAiAnalysisEligible } from "@/lib/ai-eligibility";
 import { createDebugTrace, emitDebugTrace, traceEvent } from "@/lib/debug-observability";
 import { getLearningContext } from "@/lib/learning-engine";
+import { fetchTrendyolReviewAnalysis } from "@/lib/trendyol-review-analysis";
+import { enrichTrendyolScorecardWithAi } from "@/lib/trendyol-scorecard";
 import {
   completeMissingFieldsWithMetadata,
   getLearningStatus,
@@ -23,6 +25,7 @@ import { prepareAnalysisInput } from "./prepare-analysis-input";
 import type {
   AccessPlan,
   BuildAnalysisResult,
+  CategoryAverages,
   LearningContext,
   LearningStatus,
   MissingDataReport,
@@ -63,6 +66,7 @@ export type AnalysisPipelineResult = {
     fetchHtmlMs: number;
     fetchApiMs: number;
     extractionMs: number;
+    reviewAnalysisMs: number;
     deterministicMs: number;
     aiMs: number;
   };
@@ -76,6 +80,53 @@ function shouldUseAiScore(aiScore: number, fallbackScore: number) {
   if (!Number.isFinite(aiScore)) return false;
   if (aiScore <= 0 && fallbackScore > 0) return false;
   return true;
+}
+
+function buildAiPriorityActionsFromSuggestions(
+  suggestions: Array<{ title: string; detail: string }> | null | undefined
+) {
+  if (!Array.isArray(suggestions)) return [];
+
+  return suggestions
+    .filter(
+      (item): item is { title: string; detail: string } =>
+        !!item &&
+        typeof item.title === "string" &&
+        item.title.trim().length > 0 &&
+        typeof item.detail === "string" &&
+        item.detail.trim().length > 0
+    )
+    .slice(0, 10)
+    .map((item, index) => ({
+      priority: index + 1,
+      title: item.title.trim(),
+      detail: item.detail.trim(),
+    }));
+}
+
+function buildCategoryAverages(
+  learningContext: LearningContext | null | undefined
+): CategoryAverages | null {
+  const benchmark = learningContext?.benchmark;
+  if (!benchmark || benchmark.sampleSize <= 0) return null;
+
+  return {
+    source: "learning_benchmark",
+    sampleSize: benchmark.sampleSize,
+    imageCount: benchmark.avgImageCount,
+    descriptionLength: benchmark.avgDescriptionLength,
+    ratingValue: benchmark.avgRatingValue,
+    sellerScore: benchmark.avgSellerScore,
+    price: benchmark.avgPrice,
+    reviewCount: benchmark.avgReviewCount,
+    favoriteCount: benchmark.avgFavoriteCount,
+    shippingDays: benchmark.avgShippingDays,
+    otherSellersCount: benchmark.avgOtherSellersCount,
+    freeShippingRate: benchmark.freeShippingRate,
+    fastDeliveryRate: benchmark.fastDeliveryRate,
+    hasVideoRate: benchmark.hasVideoRate,
+    officialSellerRate: benchmark.officialSellerRate,
+  };
 }
 
 const CRITICAL_FIELDS = [
@@ -107,6 +158,7 @@ export async function runAnalysisPipeline(
   let fetchHtmlMs = 0;
   let fetchApiMs = 0;
   let extractionMs = 0;
+  let reviewAnalysisMs = 0;
   let deterministicMs = 0;
   let aiMs = 0;
 
@@ -267,6 +319,7 @@ export async function runAnalysisPipeline(
     message: "Extraction ve eksik alan tamamlama asamalari tamamlandi.",
     meta: {
       extractionMs,
+      reviewAnalysisMs,
       extractorStatus: extracted.extractor_status,
       filledFields: missingDataReport.filledFields.length,
       strengthenedFields: missingDataReport.strengthenedFields.length,
@@ -303,6 +356,61 @@ export async function runAnalysisPipeline(
       product_name: extracted.product_name,
     }) ||
     "General";
+
+  if (isTrendyol) {
+    const reviewStartedAt = Date.now();
+    try {
+      const reviewAnalysis = await fetchTrendyolReviewAnalysis({
+        url: params.url,
+        merchantId: extracted.merchant_id ?? null,
+        sellerName: extracted.seller_name ?? null,
+        otherSellersCount: extracted.other_sellers_count ?? null,
+      });
+
+      if (reviewAnalysis) {
+        extracted.review_analysis = reviewAnalysis;
+        extracted.review_records = reviewAnalysis.general?.recent_reviews ?? null;
+        extracted.rating_value =
+          extracted.rating_value ?? reviewAnalysis.general?.average_rating ?? null;
+        extracted.review_count =
+          extracted.review_count ?? reviewAnalysis.general?.total_comment_count ?? null;
+        extracted.rating_breakdown =
+          extracted.rating_breakdown ?? reviewAnalysis.general?.rating_breakdown ?? null;
+        extracted.review_summary =
+          extracted.review_summary ?? reviewAnalysis.general?.review_summary ?? null;
+        extracted.review_themes =
+          extracted.review_themes ?? reviewAnalysis.general?.review_themes ?? null;
+        extracted.top_positive_review_hits =
+          extracted.top_positive_review_hits ??
+          reviewAnalysis.general?.top_positive_review_hits ??
+          null;
+        extracted.top_negative_review_hits =
+          extracted.top_negative_review_hits ??
+          reviewAnalysis.general?.top_negative_review_hits ??
+          null;
+        if (!extracted.review_snippets && reviewAnalysis.general?.recent_reviews?.length) {
+          extracted.review_snippets = reviewAnalysis.general.recent_reviews
+            .slice(0, 8)
+            .map((review) => ({
+              rating: review.rating,
+              text: review.text,
+            }));
+        }
+      }
+    } catch (error) {
+      traceEvent(debugTrace, {
+        stage: "parse",
+        level: "warn",
+        code: "review_analysis_failed",
+        message: "Trendyol review analysis ek adimi basarisiz oldu.",
+        meta: {
+          detail: error instanceof Error ? error.message : String(error),
+        },
+      });
+    } finally {
+      reviewAnalysisMs = Date.now() - reviewStartedAt;
+    }
+  }
 
   const deterministicStartedAt = Date.now();
   const analysis = buildAnalysis({
@@ -351,6 +459,28 @@ export async function runAnalysisPipeline(
     extracted: analysis.extractedData,
     includeSynthetic: params.includeSyntheticLearning,
   });
+
+  analysis.categoryAverages = buildCategoryAverages(learningContext);
+
+  if (analysis.trendyolScorecard) {
+    analysis.trendyolScorecard = await enrichTrendyolScorecardWithAi({
+      extracted: analysis.extractedData,
+      scorecard: analysis.trendyolScorecard,
+    });
+    analysis.seoScore = analysis.trendyolScorecard.searchVisibility.score;
+    analysis.conversionScore = analysis.trendyolScorecard.conversionPotential.score;
+    analysis.overallScore = Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(
+          analysis.trendyolScorecard.overall.score * 0.65 +
+            analysis.dataCompletenessScore * 0.2 +
+            analysis.conversionScore * 0.15
+        )
+      )
+    );
+  }
 
   let aiResult: Awaited<ReturnType<typeof analyzeWithAi>> = null;
   const aiEligibility = isAiAnalysisEligible(consolidatedInput);
@@ -434,12 +564,19 @@ export async function runAnalysisPipeline(
       );
     }
 
-    analysis.priorityActions = buildPriorityActions(
-      analysis.extractedData,
-      analysis.derivedMetrics,
-      analysis.suggestions,
-      consolidatedInput.marketComparison
+    const aiPriorityActions = buildAiPriorityActionsFromSuggestions(
+      analysis.suggestions
     );
+
+    analysis.priorityActions =
+      aiPriorityActions.length > 0
+        ? aiPriorityActions
+        : buildPriorityActions(
+            analysis.extractedData,
+            analysis.derivedMetrics,
+            analysis.suggestions,
+            consolidatedInput.marketComparison
+          );
 
     if (
       aiEligibility.guidance.allowScoreOverrides &&
@@ -466,6 +603,22 @@ export async function runAnalysisPipeline(
       mode: "ai_enriched",
       summary: analysis.summary,
     };
+  }
+
+  if (analysis.trendyolScorecard) {
+    analysis.seoScore = analysis.trendyolScorecard.searchVisibility.score;
+    analysis.conversionScore = analysis.trendyolScorecard.conversionPotential.score;
+    analysis.overallScore = Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(
+          analysis.trendyolScorecard.overall.score * 0.65 +
+            analysis.dataCompletenessScore * 0.2 +
+            analysis.conversionScore * 0.15
+        )
+      )
+    );
   }
 
   analysis.analysisTrace = buildAnalysisTrace({
@@ -506,6 +659,7 @@ export async function runAnalysisPipeline(
       fetchHtmlMs,
       fetchApiMs,
       extractionMs,
+      reviewAnalysisMs,
       deterministicMs,
       aiMs,
     },

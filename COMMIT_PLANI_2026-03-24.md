@@ -1,4 +1,4 @@
-# SellBoost Commit Plan
+﻿# Commit Planı
 
 Tarih: 24 Mart 2026
 
@@ -169,3 +169,5 @@ Bu planin ardindan en mantikli sonraki adim:
 3. Basarisiz olan testleri tek tek kapatmak
 
 Yani artik "temizlik" fazindan "kalite kapisi" fazina gecebiliriz.
+
+

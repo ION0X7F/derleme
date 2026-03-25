@@ -91,7 +91,7 @@ const FULL_GUIDANCE: AiGuidance = {
   allowNarrativeExpansion: true,
   allowStrengthWeaknessRewrite: true,
   allowScoreOverrides: true,
-  maxSuggestions: 5,
+  maxSuggestions: 10,
   coverageConfidence: "high",
 };
 

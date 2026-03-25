@@ -87,6 +87,8 @@ export function createExtracted(
     extractor_status: "ok",
     platform: TEST_PLATFORM,
     ...overrides,
+    meta_description_source: overrides.meta_description_source ?? "meta_description",
+    search_snippet_fallback: overrides.search_snippet_fallback ?? null,
   };
 }
 

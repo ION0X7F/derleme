@@ -10,6 +10,127 @@ type DerivedMetricsSummary = {
   marketPosition?: DerivedMetricSummary;
 } | null;
 
+type TrendyolKeywordInsightSummary = {
+  primaryKeyword: string | null;
+  secondaryKeywords: string[];
+  source: "deterministic" | "ai_enriched";
+  confidence: "high" | "medium" | "low";
+  entities: {
+    productType: string | null;
+    problemOrNeed: string | null;
+    targetAudience: string | null;
+    format: string | null;
+    attributes: string[];
+    useCases: string[];
+  };
+  suggestedTitle: string | null;
+};
+
+type TrendyolScoreDimensionSummary = {
+  score: number;
+  label: "strong" | "medium" | "weak" | "unclear";
+  evidence: string[];
+};
+
+type TrendyolScorecardSummary = {
+  keywordInsight: TrendyolKeywordInsightSummary;
+  contentFit: TrendyolScoreDimensionSummary;
+  listingQuality: TrendyolScoreDimensionSummary;
+  commercialStrength: TrendyolScoreDimensionSummary;
+  performanceSignal: TrendyolScoreDimensionSummary;
+  operationalTrust: TrendyolScoreDimensionSummary;
+  searchVisibility: TrendyolScoreDimensionSummary;
+  conversionPotential: TrendyolScoreDimensionSummary;
+  overall: TrendyolScoreDimensionSummary;
+  issues: {
+    key: string;
+    severity: "high" | "medium" | "low";
+    title: string;
+    detail: string;
+  }[];
+  recommendations: {
+    key: string;
+    priority: "high" | "medium" | "low";
+    title: string;
+    detail: string;
+  }[];
+} | null;
+
+type CategoryAveragesSummary = {
+  source: "learning_benchmark";
+  sampleSize: number;
+  imageCount: number | null;
+  descriptionLength: number | null;
+  ratingValue: number | null;
+  sellerScore: number | null;
+  price: number | null;
+  reviewCount: number | null;
+  favoriteCount: number | null;
+  shippingDays: number | null;
+  otherSellersCount: number | null;
+  freeShippingRate: number | null;
+  fastDeliveryRate: number | null;
+  hasVideoRate: number | null;
+  officialSellerRate: number | null;
+} | null;
+
+type ReviewRecordDetailedSummary = {
+  rating: number | null;
+  text: string | null;
+  created_at: string | null;
+  seller_name: string | null;
+};
+
+type ReviewScopeAnalysisSummary = {
+  scope: "product" | "seller";
+  seller_name: string | null;
+  average_rating: number | null;
+  total_comment_count: number | null;
+  total_rating_count: number | null;
+  rating_breakdown: {
+    one_star: number | null;
+    two_star: number | null;
+    three_star: number | null;
+    four_star: number | null;
+    five_star: number | null;
+    total: number | null;
+  } | null;
+  review_summary: {
+    sampled_count: number;
+    low_rated_count: number;
+    positive_count: number;
+    negative_count: number;
+  } | null;
+  review_themes: {
+    positive: string[];
+    negative: string[];
+  } | null;
+  top_positive_review_hits: {
+    label: string;
+    count: number;
+  }[] | null;
+  top_negative_review_hits: {
+    label: string;
+    count: number;
+  }[] | null;
+  monthly_trend: {
+    month: string;
+    count: number;
+    low_rated_count: number;
+    average_rating: number | null;
+  }[] | null;
+  recent_reviews: ReviewRecordDetailedSummary[] | null;
+} | null;
+
+type ReviewAnalysisSummary = {
+  is_single_seller: boolean;
+  seller_filter_available: boolean;
+  seller_id: number | null;
+  seller_name: string | null;
+  general: ReviewScopeAnalysisSummary;
+  seller: ReviewScopeAnalysisSummary;
+} | null;
+
 type ReportAccessState = {
   plan: string;
   lockedSections: string[];
@@ -180,10 +301,18 @@ type MarketOverviewSummary = {
 type ExtractedDataSummary = {
   title?: string;
   meta_description?: string;
+  meta_description_source?: string | null;
+  search_snippet_fallback?: string | null;
   h1?: string;
+  raw_h1?: string | null;
+  resolved_primary_heading?: string | null;
+  heading_source?: string | null;
   brand?: string | null;
   product_name?: string | null;
   model_code?: string | null;
+  sku_source?: string | null;
+  mpn_source?: string | null;
+  gtin_source?: string | null;
   category?: string | null;
   price?: string;
   normalized_price?: number | null;
@@ -205,6 +334,7 @@ type ExtractedDataSummary = {
     rating: number | null;
     text: string | null;
   }[] | null;
+  review_records?: ReviewRecordDetailedSummary[] | null;
   qa_snippets?: {
     question: string | null;
     answer: string | null;
@@ -227,6 +357,7 @@ type ExtractedDataSummary = {
     label: string;
     count: number;
   }[] | null;
+  review_analysis?: ReviewAnalysisSummary;
   question_count?: number | null;
   bullet_point_count?: number | null;
   variant_count?: number | null;
@@ -302,6 +433,9 @@ export type AnalysisResult = {
   summary: string | null;
   dataSource: "real" | "fallback" | string | null;
   derivedMetrics?: DerivedMetricsSummary;
+  trendyolScorecard?: TrendyolScorecardSummary;
+  categoryAverages?: CategoryAveragesSummary;
+  reviewAnalysis?: ReviewAnalysisSummary;
   coverage?: AnalysisCoverageSummary;
   missingDataReport?: MissingDataReportSummary;
   learningStatus?: LearningStatusSummary;
@@ -310,6 +444,7 @@ export type AnalysisResult = {
     fetchHtmlMs: number;
     fetchApiMs: number;
     extractionMs: number;
+    reviewAnalysisMs: number;
     deterministicMs: number;
     aiMs: number;
   } | null;
@@ -351,6 +486,9 @@ export type SavedReport = {
   summary: string | null;
   dataSource: string | null;
   derivedMetrics?: DerivedMetricsSummary;
+  trendyolScorecard?: TrendyolScorecardSummary;
+  categoryAverages?: CategoryAveragesSummary;
+  reviewAnalysis?: ReviewAnalysisSummary;
   coverage?: AnalysisCoverageSummary;
   analysisTrace?: AnalysisTraceSummary;
   analysisVisuals?: AnalysisVisualsSummary;

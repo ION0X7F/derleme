@@ -285,6 +285,7 @@ export function buildStoredAnalysisPayload(analysis: BuildAnalysisResult) {
       extractedData: analysis.extractedData,
       normalizedFieldMetadata: analysis._normalizedFieldMetadata,
     }),
+    categoryAverages: analysis.categoryAverages ?? null,
     derivedMetrics: buildStoredDerivedMetrics({
       derivedMetrics: analysis.derivedMetrics,
       marketComparison: analysis.marketComparison ?? null,

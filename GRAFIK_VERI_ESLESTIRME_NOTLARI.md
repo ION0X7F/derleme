@@ -1,4 +1,4 @@
-# Grafik Veri Eşleştirme Notları
+﻿# Grafik Veri Eşleştirme Notları
 
 ## Doğrudan bağlanabilecekler
 
@@ -29,9 +29,9 @@
 | Talep Endeksi | `favorite_count`, `review_count`, `question_count`, `rating_value`, `marketOverview` | Tahmini bağlanır | Gerçek satış verisi değil |
 | Satış Hacmi Tahmini | `marketComparison.userEstimatedSalesLevel`, `estimatedSalesRange` varsa | Tahmini bağlanır | Gerçek değil, model veya türetim |
 | Pazar Payı | `marketPosition`, `salesStatus`, benzer ürün karşılaştırması | Tahmini bağlanır | Kesin veri değil |
-| Kampanya Etkisi | kampanya / promosyon alanları sınırlı | Zayıf | Şimdilik demo veya basit tahmin |
+| Kampanya Etkisi | kampanya / promosyon alanları sınırlı | Zayıf | Åimdilik demo veya basit tahmin |
 
-## Şu an bağlanamayacaklar
+## Åu an bağlanamayacaklar
 
 | Grafik / Blok | Sebep |
 |---|---|
@@ -49,3 +49,61 @@
 4. İçerik ve güven grafikleri
 5. Aksiyon listesi
 6. Talep / tahmin tarafı
+
+## Puanlama Karari
+
+Puanlama sistemi artik sadece `var / yok` mantigi ile calismamali. Her veri alani icin once gercek veri yakalama, sonra alternatif kaynaklardan kontrollu tamamlama, sonra da kaynak guvenine gore agirlikli katki mantigi uygulanmali.
+
+Temel prensipler:
+
+- Veri varsa, hangi kaynaktan geldigi tutulur.
+- Kaynak ne kadar guvenilirse skora katkisi o kadar yuksek olur.
+- Dusuk guvenli fallback veriler tam puan getirmez.
+- Veri hic yoksa uydurma yapilmaz.
+- Veri yoksa alan ceza almaz; sadece bonus katki olusmaz.
+- Nihai skor, dogruluk + kaynak guveni + agirlikli katki mantigiyla hesaplanir.
+
+Genel kaynak sirasi:
+
+1. Dogrudan ve yapisal kaynaklar
+2. Embedded state / JSON bloklari
+3. Teknik tablo / etiketli alanlar
+4. Gorunur fallback alanlar
+5. Dusuk guvenli parser / heuristik fallback
+
+Genel guven seviyeleri:
+
+- Yuksek guven: tam katki
+- Orta guven: azaltilmis katki
+- Dusuk guven: sinirli katki
+- Bulunamadi: notr
+
+Bu model ilk asamada su alanlara uygulanmistir:
+
+- `meta_description`
+- `h1 / resolved_primary_heading`
+- `sku / mpn / gtin`
+- `has_specs`
+- `has_video`
+- `has_faq`
+- `question_count`
+- `favorite_count`
+- `has_add_to_cart`
+- `has_shipping_info`
+- `has_return_info`
+- `stock_status`
+- `seller_name`
+- `seller_badges`
+- `official_seller`
+- `has_brand_page`
+- `has_free_shipping`
+- `has_campaign`
+- `shipping_days`
+- `delivery_type`
+- `other_seller_offers`
+
+Sonuc:
+
+Puanlama sistemi artik sadece veri varligina degil, verinin guvenilirligine de bakar. Boylece sistem daha aciklanabilir, daha adil ve daha gercekci bir skor uretir.
+
+

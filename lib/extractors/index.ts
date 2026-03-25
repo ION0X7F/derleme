@@ -448,6 +448,9 @@ function normalizePlatformFields(
     title: cleanText(fields.title),
     meta_description: cleanText(fields.meta_description),
     h1: cleanText(fields.h1),
+    raw_h1: cleanText(fields.raw_h1),
+    resolved_primary_heading: cleanText(fields.resolved_primary_heading),
+    heading_source: cleanText(fields.heading_source),
 
     brand: cleanText(fields.brand),
     product_name: cleanText(fields.product_name),
@@ -523,7 +526,26 @@ function mergeExtractedFields(params: {
       platformFields.meta_description,
       basicFields.meta_description
     ),
+    meta_description_source: pickString(
+      platformFields.meta_description_source,
+      basicFields.meta_description_source
+    ),
+    search_snippet_fallback: pickString(
+      platformFields.search_snippet_fallback,
+      basicFields.search_snippet_fallback
+    ),
     h1: pickString(platformFields.h1, basicFields.h1),
+    raw_h1: pickString(platformFields.raw_h1, basicFields.raw_h1),
+    resolved_primary_heading: pickString(
+      platformFields.resolved_primary_heading,
+      basicFields.resolved_primary_heading,
+      platformFields.h1,
+      basicFields.h1
+    ),
+    heading_source: pickString(
+      platformFields.heading_source,
+      basicFields.heading_source
+    ),
 
     brand: pickString(platformFields.brand, basicFields.brand),
     product_name: pickString(platformFields.product_name, basicFields.product_name),
@@ -533,8 +555,11 @@ function mergeExtractedFields(params: {
     ),
 
     sku: pickString(platformFields.sku, basicFields.sku),
+    sku_source: pickString(platformFields.sku_source, basicFields.sku_source),
     mpn: pickString(platformFields.mpn, basicFields.mpn),
+    mpn_source: pickString(platformFields.mpn_source, basicFields.mpn_source),
     gtin: pickString(platformFields.gtin, basicFields.gtin),
+    gtin_source: pickString(platformFields.gtin_source, basicFields.gtin_source),
 
     price: mergedPrice,
     normalized_price: parseNormalizedPrice(mergedPrice),

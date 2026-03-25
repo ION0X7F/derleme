@@ -1,5 +1,6 @@
 import { buildAnalysisTrace } from "@/lib/analysis-trace";
 import { buildAnalysisVisuals } from "@/lib/analysis-visuals";
+import { buildTrendyolScorecard } from "@/lib/trendyol-scorecard";
 import type {
   AccessPlan,
   AnalysisSuggestion,
@@ -11,6 +12,7 @@ import type {
   ExtractedProductFields,
   MarketComparisonInsights,
   MarketOverviewSummary,
+  NormalizedFieldMetadata,
   PriorityAction,
 } from "@/types/analysis";
 
@@ -40,6 +42,182 @@ function clampScore(value: number) {
 
 function hasText(value: string | null | undefined) {
   return !!value && value.trim().length > 0;
+}
+
+function hasPresentValue(value: unknown) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return hasText(value);
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
+
+function getNormalizedMetadataWeight(metadata?: NormalizedFieldMetadata) {
+  if (!metadata) return 0.4;
+
+  const sourceWeight =
+    metadata.source === "runtime_xhr"
+      ? 0.94
+      : metadata.source === "embedded_json"
+      ? 0.9
+      : metadata.source === "html"
+      ? 0.78
+      : metadata.source === "keyword_search"
+      ? 0.5
+      : metadata.source === "derived_from_similar_products"
+      ? 0.48
+      : metadata.source === "parser_inference"
+      ? 0.56
+      : 0;
+
+  const confidenceWeight =
+    metadata.confidence === "high"
+      ? 0.95
+      : metadata.confidence === "medium"
+      ? 0.75
+      : metadata.confidence === "low"
+      ? 0.5
+      : 0;
+
+  const fallbackPenalty =
+    (metadata.fallbackChain?.length ?? 0) > 2
+      ? Math.max(0, ((metadata.fallbackChain?.length ?? 0) - 2) * 0.06)
+      : 0;
+  const derivationPenalty = metadata.derivedFrom?.length ? 0.04 : 0;
+
+  return Math.max(
+    0,
+    Math.min(1, Math.min(sourceWeight, confidenceWeight) - fallbackPenalty - derivationPenalty)
+  );
+}
+
+function getRawFieldTrustWeight(
+  input: ConsolidatedAnalysisInput,
+  fieldName: keyof ExtractedProductFields
+) {
+  return getNormalizedMetadataWeight(input._fieldMetadata?.[fieldName]);
+}
+
+function getWeightedRawPresenceScore(
+  input: ConsolidatedAnalysisInput,
+  fieldName: keyof ExtractedProductFields,
+  value: unknown,
+  baseScore: number
+) {
+  if (!hasPresentValue(value)) return 0;
+  return baseScore * getRawFieldTrustWeight(input, fieldName);
+}
+
+function getMetaDescriptionSourceWeight(extracted: ExtractedProductFields) {
+  if (!hasText(extracted.meta_description)) return 0;
+
+  switch (extracted.meta_description_source) {
+    case "meta_description":
+    case "og_description":
+    case "twitter_description":
+    case "itemprop_description":
+      return 1;
+    case "jsonld_description":
+    case "itemprop_text":
+      return 0.7;
+    case "visible_description_fallback":
+      return 0.4;
+    default:
+      return 0;
+  }
+}
+
+function getWeightedMetaDescriptionScore(
+  extracted: ExtractedProductFields,
+  baseScore: number
+) {
+  return baseScore * getMetaDescriptionSourceWeight(extracted);
+}
+
+function getHeadingSourceWeight(extracted: ExtractedProductFields) {
+  if (!hasText(extracted.h1)) return 0;
+
+  switch (extracted.heading_source) {
+    case "raw_h1":
+    case "itemprop_name":
+    case "visible_product_title":
+    case "visible_product_name":
+    case "jsonld_name":
+      return 1;
+    case "og_title":
+    case "twitter_title":
+      return 0.7;
+    case "html_title":
+      return 0.4;
+    default:
+      return 0;
+  }
+}
+
+function getWeightedHeadingScore(
+  extracted: ExtractedProductFields,
+  baseScore: number
+) {
+  return baseScore * getHeadingSourceWeight(extracted);
+}
+
+function getMetaDescriptionEvidence(extracted: ExtractedProductFields) {
+  switch (extracted.meta_description_source) {
+    case "meta_description":
+    case "og_description":
+    case "twitter_description":
+    case "itemprop_description":
+      return "Meta açıklaması güçlü kaynaklardan doğrulandı.";
+    case "jsonld_description":
+    case "itemprop_text":
+      return "Meta açıklaması sayfa içi yapısal kaynaktan türetildi.";
+    case "visible_description_fallback":
+      return "Meta açıklaması görünür açıklamadan yedek olarak üretildi.";
+    default:
+      return null;
+  }
+}
+
+function getHeadingEvidence(extracted: ExtractedProductFields) {
+  switch (extracted.heading_source) {
+    case "raw_h1":
+      return "Ana baslik dogrudan H1 etiketinden dogrulandi.";
+    case "itemprop_name":
+    case "visible_product_title":
+    case "visible_product_name":
+    case "jsonld_name":
+      return "Ana baslik sayfa ici guclu kaynaklardan cozuldu.";
+    case "og_title":
+    case "twitter_title":
+      return "Ana baslik sosyal meta basligindan tamamlandi.";
+    case "html_title":
+      return "Ana baslik HTML title alanindan yedek olarak tamamlandi.";
+    default:
+      return null;
+  }
+}
+
+function getIdentitySourceWeight(source: string | null | undefined) {
+  switch (source) {
+    case "jsonld":
+    case "state":
+    case "spec_table":
+      return 1;
+    case "labeled_text":
+      return 0.7;
+    default:
+      return 0;
+  }
+}
+
+function getWeightedIdentityScore(
+  value: string | null | undefined,
+  source: string | null | undefined,
+  baseScore: number
+) {
+  if (!hasText(value)) return 0;
+  return baseScore * getIdentitySourceWeight(source);
 }
 
 function average(values: number[]) {
@@ -389,26 +567,85 @@ function getCompletenessScore(input: ConsolidatedAnalysisInput) {
     : 0;
 
   // Fields still using raw extracted data
-  if (hasText(extracted.meta_description)) score += 6 * fallbackEvidenceFactor;
-  if (hasText(extracted.h1)) score += 6 * fallbackEvidenceFactor;
-  if (hasText(extracted.sku)) score += 4 * fallbackEvidenceFactor;
-  if (hasText(extracted.mpn)) score += 4 * fallbackEvidenceFactor;
-  if (hasText(extracted.gtin)) score += 5 * fallbackEvidenceFactor;
-  if (hasReliableQuestionSignal(extracted)) score += 2 * fallbackEvidenceFactor;
-  if (typeof extracted.favorite_count === "number") score += 2 * fallbackEvidenceFactor;
-  if (extracted.has_add_to_cart) score += 5 * fallbackEvidenceFactor;
-  if (extracted.has_shipping_info) score += 4 * fallbackEvidenceFactor;
-  if (extracted.has_return_info) score += 4 * fallbackEvidenceFactor;
-  if (extracted.has_specs) score += 6 * fallbackEvidenceFactor;
-  if (extracted.has_faq) score += 2 * fallbackEvidenceFactor;
-  if (extracted.has_video) score += 2 * fallbackEvidenceFactor;
-  if (
-    Array.isArray(extracted.other_seller_offers) &&
-    extracted.other_seller_offers.length > 0
-  ) {
-    score += 4 * fallbackEvidenceFactor;
-  }
-  if (hasText(extracted.stock_status)) score += 2 * fallbackEvidenceFactor;
+  score +=
+    getWeightedMetaDescriptionScore(extracted, 6) * fallbackEvidenceFactor;
+  score += getWeightedHeadingScore(extracted, 6) * fallbackEvidenceFactor;
+  score +=
+    getWeightedIdentityScore(
+      extracted.sku,
+      extracted.sku_source,
+      4
+    ) * fallbackEvidenceFactor;
+  score +=
+    getWeightedIdentityScore(
+      extracted.mpn,
+      extracted.mpn_source,
+      4
+    ) * fallbackEvidenceFactor;
+  score +=
+    getWeightedIdentityScore(
+      extracted.gtin,
+      extracted.gtin_source,
+      5
+    ) * fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(
+      input,
+      "question_count",
+      hasReliableQuestionSignal(extracted) ? extracted.question_count ?? 1 : null,
+      2
+    ) * fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(
+      input,
+      "favorite_count",
+      extracted.favorite_count,
+      2
+    ) * fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(
+      input,
+      "has_add_to_cart",
+      extracted.has_add_to_cart,
+      5
+    ) * fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(
+      input,
+      "has_shipping_info",
+      extracted.has_shipping_info,
+      4
+    ) * fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(
+      input,
+      "has_return_info",
+      extracted.has_return_info,
+      4
+    ) * fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(input, "has_specs", extracted.has_specs, 6) *
+    fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(input, "has_faq", extracted.has_faq, 2) *
+    fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(input, "has_video", extracted.has_video, 2) *
+    fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(
+      input,
+      "other_seller_offers",
+      extracted.other_seller_offers,
+      4
+    ) * fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(
+      input,
+      "stock_status",
+      extracted.stock_status,
+      2
+    ) * fallbackEvidenceFactor;
   if (extracted.extractor_status === "ok") score += 5;
   if (extracted.extractor_status === "partial") score += 2;
   if (extracted.extractor_status === "blocked") score -= 8;
@@ -435,9 +672,12 @@ function getSeoScore(input: ConsolidatedAnalysisInput) {
       : 0;
 
   // Fields still using raw extracted data during transition
-  if (hasText(extracted.meta_description)) score += 15 * fallbackEvidenceFactor;
-  if (hasText(extracted.h1)) score += 15 * fallbackEvidenceFactor;
-  if (extracted.has_specs) score += 5 * fallbackEvidenceFactor;
+  score +=
+    getWeightedMetaDescriptionScore(extracted, 15) * fallbackEvidenceFactor;
+  score += getWeightedHeadingScore(extracted, 15) * fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(input, "has_specs", extracted.has_specs, 5) *
+    fallbackEvidenceFactor;
 
   return clampScore(score);
 }
@@ -472,10 +712,36 @@ function getConversionScore(input: ConsolidatedAnalysisInput) {
       : 0;
 
   // Logic still dependent on old structure
-  if (extracted.has_add_to_cart) score += 20 * fallbackEvidenceFactor;
-  if ((extracted.favorite_count || 0) > 0) score += 5 * fallbackEvidenceFactor;
-  if (extracted.has_shipping_info) score += 10 * fallbackEvidenceFactor;
-  if (extracted.has_return_info) score += 10 * fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(
+      input,
+      "has_add_to_cart",
+      extracted.has_add_to_cart,
+      20
+    ) * fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(
+      input,
+      "favorite_count",
+      extracted.favorite_count && extracted.favorite_count > 0
+        ? extracted.favorite_count
+        : null,
+      5
+    ) * fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(
+      input,
+      "has_shipping_info",
+      extracted.has_shipping_info,
+      10
+    ) * fallbackEvidenceFactor;
+  score +=
+    getWeightedRawPresenceScore(
+      input,
+      "has_return_info",
+      extracted.has_return_info,
+      10
+    ) * fallbackEvidenceFactor;
 
   if (lowRatedRatio != null) {
     if (lowRatedRatio >= 0.5) {
@@ -498,22 +764,35 @@ function getConversionScore(input: ConsolidatedAnalysisInput) {
   return clampScore(score);
 }
 
-function buildProductQualityMetric(extracted: ExtractedProductFields): DerivedMetric {
+function buildProductQualityMetric(
+  extracted: ExtractedProductFields,
+  input: ConsolidatedAnalysisInput
+): DerivedMetric {
   let score = 0;
   const evidence: string[] = [];
 
+  const headingScore = getWeightedHeadingScore(extracted, 20);
   // Content quality elements
-  if (hasText(extracted.title) && hasText(extracted.h1)) {
+  if (hasText(extracted.title) && headingScore > 0) {
     score += 20;
     evidence.push("Başlık ve H1 etiketleri mevcut.");
-  } else if (hasText(extracted.title) || hasText(extracted.h1)) {
+  } else if (hasText(extracted.title) || headingScore > 0) {
     score += 10;
     evidence.push("Sayfa başlıklarından biri eksik.");
   }
 
-  if (hasText(extracted.meta_description)) {
-    score += 12;
-    evidence.push("Meta açıklaması (description) mevcut.");
+  const headingEvidence = getHeadingEvidence(extracted);
+  if (headingEvidence) {
+    evidence.push(headingEvidence);
+  }
+
+  const metaDescriptionScore = getWeightedMetaDescriptionScore(extracted, 12);
+  if (metaDescriptionScore > 0) {
+    score += metaDescriptionScore;
+    const metaDescriptionEvidence = getMetaDescriptionEvidence(extracted);
+    if (metaDescriptionEvidence) {
+      evidence.push(metaDescriptionEvidence);
+    }
   }
 
   if ((extracted.description_length || 0) >= 300) {
@@ -530,7 +809,7 @@ function buildProductQualityMetric(extracted: ExtractedProductFields): DerivedMe
   }
 
   if (extracted.has_specs) {
-    score += 12;
+    score += getWeightedRawPresenceScore(input, "has_specs", extracted.has_specs, 12);
     evidence.push("Teknik özellikler tablosu bulunuyor.");
   }
 
@@ -552,7 +831,7 @@ function buildProductQualityMetric(extracted: ExtractedProductFields): DerivedMe
   }
 
   if (extracted.has_video) {
-    score += 20;
+    score += getWeightedRawPresenceScore(input, "has_video", extracted.has_video, 20);
     evidence.push("Ürün videosu mevcut.");
   }
 
@@ -563,29 +842,47 @@ function buildProductQualityMetric(extracted: ExtractedProductFields): DerivedMe
 
   // Decision clarity elements
   if (extracted.has_faq) {
-    score += 8;
+    score += getWeightedRawPresenceScore(input, "has_faq", extracted.has_faq, 8);
     evidence.push("Sıkça Sorulan Sorular (SSS) bölümü mevcut.");
   }
 
   if (hasReliableQuestionSignal(extracted)) {
-    score += 8;
+    score += getWeightedRawPresenceScore(
+      input,
+      "question_count",
+      extracted.question_count ?? 1,
+      8
+    );
     evidence.push("Soru-Cevap bölümü aktif.");
   }
 
   if (typeof extracted.shipping_days === "number") {
-    score += 8;
+    score += getWeightedRawPresenceScore(
+      input,
+      "shipping_days",
+      extracted.shipping_days,
+      8
+    );
     evidence.push("Teslimat süresi belirtilmiş.");
   }
 
   if (extracted.has_return_info) {
-    score += 8;
+    score += getWeightedRawPresenceScore(
+      input,
+      "has_return_info",
+      extracted.has_return_info,
+      8
+    );
     evidence.push("İade politikası bilgisi mevcut.");
   }
 
   return buildMetric(clampScore(score), evidence);
 }
 
-function buildSellerTrustMetric(extracted: ExtractedProductFields): DerivedMetric {
+function buildSellerTrustMetric(
+  extracted: ExtractedProductFields,
+  input: ConsolidatedAnalysisInput
+): DerivedMetric {
   let score = 70; // Start from neutral for review risk
   const evidence: string[] = [];
   const reviewThemes = extractReviewThemes(extracted);
@@ -609,12 +906,17 @@ function buildSellerTrustMetric(extracted: ExtractedProductFields): DerivedMetri
   }
 
   if (hasText(extracted.seller_name)) {
-    score += 8;
+    score += getWeightedRawPresenceScore(input, "seller_name", extracted.seller_name, 8);
     evidence.push("Satıcı bilgisi görünür durumda.");
   }
 
   if (Array.isArray(extracted.seller_badges) && extracted.seller_badges.length > 0) {
-    score += 6;
+    score += getWeightedRawPresenceScore(
+      input,
+      "seller_badges",
+      extracted.seller_badges,
+      6
+    );
     evidence.push(`Satıcı rozetleri mevcut: ${extracted.seller_badges.join(", ")}.`);
   }
 
@@ -656,35 +958,70 @@ function buildSellerTrustMetric(extracted: ExtractedProductFields): DerivedMetri
   }
 
   if (hasReliableQuestionSignal(extracted) && (extracted.question_count ?? 0) >= 5) {
-    score += 8;
+    score += getWeightedRawPresenceScore(
+      input,
+      "question_count",
+      extracted.question_count ?? 5,
+      8
+    );
     evidence.push("Soru-cevap hacmi güven sinyali oluşturuyor.");
   } else if (hasReliableQuestionSignal(extracted)) {
-    score += 4;
+    score += getWeightedRawPresenceScore(
+      input,
+      "question_count",
+      extracted.question_count ?? 1,
+      4
+    );
     evidence.push("Temel soru-cevap sinyali mevcut.");
   }
 
   if (extracted.official_seller) {
-    score += 8;
+    score += getWeightedRawPresenceScore(
+      input,
+      "official_seller",
+      extracted.official_seller,
+      8
+    );
     evidence.push("Resmi satıcı sinyali mevcut.");
   }
 
   if (extracted.has_brand_page) {
-    score += 8;
+    score += getWeightedRawPresenceScore(
+      input,
+      "has_brand_page",
+      extracted.has_brand_page,
+      8
+    );
     evidence.push("Marka sayfası sinyali mevcut.");
   }
 
   if (extracted.has_return_info) {
-    score += 12;
+    score += getWeightedRawPresenceScore(
+      input,
+      "has_return_info",
+      extracted.has_return_info,
+      12
+    );
     evidence.push("İade bilgisi görünür durumda.");
   }
 
   if (extracted.has_shipping_info) {
-    score += 8;
+    score += getWeightedRawPresenceScore(
+      input,
+      "has_shipping_info",
+      extracted.has_shipping_info,
+      8
+    );
     evidence.push("Kargo bilgisi görünür durumda.");
   }
 
   if (hasText(extracted.stock_status)) {
-    score += 4;
+    score += getWeightedRawPresenceScore(
+      input,
+      "stock_status",
+      extracted.stock_status,
+      4
+    );
     evidence.push("Stok durumu belirtilmiş.");
   }
 
@@ -713,7 +1050,10 @@ function buildSellerTrustMetric(extracted: ExtractedProductFields): DerivedMetri
   return buildMetric(clampScore(score), evidence);
 }
 
-function buildMarketPositionMetric(extracted: ExtractedProductFields): DerivedMetric {
+function buildMarketPositionMetric(
+  extracted: ExtractedProductFields,
+  input: ConsolidatedAnalysisInput
+): DerivedMetric {
   let score = 0;
   const evidence: string[] = [];
 
@@ -731,7 +1071,12 @@ function buildMarketPositionMetric(extracted: ExtractedProductFields): DerivedMe
   }
 
   if (extracted.has_free_shipping) {
-    score += 20;
+    score += getWeightedRawPresenceScore(
+      input,
+      "has_free_shipping",
+      extracted.has_free_shipping,
+      20
+    );
     evidence.push("Ücretsiz kargo avantajı sunuluyor.");
   }
 
@@ -750,7 +1095,12 @@ function buildMarketPositionMetric(extracted: ExtractedProductFields): DerivedMe
   }
 
   if (extracted.has_campaign) {
-    score += 10;
+    score += getWeightedRawPresenceScore(
+      input,
+      "has_campaign",
+      extracted.has_campaign,
+      10
+    );
     evidence.push(
       extracted.campaign_label
         ? `Kampanya sinyali mevcut: ${extracted.campaign_label}.`
@@ -762,16 +1112,31 @@ function buildMarketPositionMetric(extracted: ExtractedProductFields): DerivedMe
     Array.isArray(extracted.seller_badges) &&
     extracted.seller_badges.some((badge) => /hizli teslimat/i.test(badge))
   ) {
-    score += 10;
+    score += getWeightedRawPresenceScore(
+      input,
+      "seller_badges",
+      extracted.seller_badges,
+      10
+    );
     evidence.push("Hızlı teslimat rozeti teklif gücünü destekliyor.");
   }
 
   if (typeof extracted.shipping_days === "number") {
     if (extracted.shipping_days <= 3) {
-      score += 20;
+      score += getWeightedRawPresenceScore(
+        input,
+        "shipping_days",
+        extracted.shipping_days,
+        20
+      );
       evidence.push("Teslim süresi hızlı görünüyor.");
     } else if (extracted.shipping_days <= 5) {
-      score += 10;
+      score += getWeightedRawPresenceScore(
+        input,
+        "shipping_days",
+        extracted.shipping_days,
+        10
+      );
       evidence.push("Teslim süresi makul seviyede.");
     } else {
       evidence.push("Teslim süresi uzun olabilir.");
@@ -807,7 +1172,12 @@ function buildMarketPositionMetric(extracted: ExtractedProductFields): DerivedMe
   }
 
   if (hasText(extracted.delivery_type)) {
-    score += 5;
+    score += getWeightedRawPresenceScore(
+      input,
+      "delivery_type",
+      extracted.delivery_type,
+      5
+    );
     evidence.push(
       `${formatDeliveryType(extracted.delivery_type) || "Teslimat tipi"} belirtilmiş.`
     );
@@ -819,11 +1189,14 @@ function buildMarketPositionMetric(extracted: ExtractedProductFields): DerivedMe
 
 
 
-function buildDerivedMetrics(extracted: ExtractedProductFields): DerivedMetrics {
+function buildDerivedMetrics(
+  extracted: ExtractedProductFields,
+  input: ConsolidatedAnalysisInput
+): DerivedMetrics {
   return {
-    productQuality: buildProductQualityMetric(extracted),
-    sellerTrust: buildSellerTrustMetric(extracted),
-    marketPosition: buildMarketPositionMetric(extracted),
+    productQuality: buildProductQualityMetric(extracted, input),
+    sellerTrust: buildSellerTrustMetric(extracted, input),
+    marketPosition: buildMarketPositionMetric(extracted, input),
   };
 }
 
@@ -950,10 +1323,18 @@ function buildDecisionSupportPacket(params: {
     raw: {
       title: extracted.title,
       meta_description: extracted.meta_description,
+      meta_description_source: extracted.meta_description_source,
+      search_snippet_fallback: extracted.search_snippet_fallback,
       h1: extracted.h1,
+      raw_h1: extracted.raw_h1 ?? null,
+      resolved_primary_heading: extracted.resolved_primary_heading ?? null,
+      heading_source: extracted.heading_source ?? null,
       brand: extracted.brand,
       product_name: extracted.product_name,
       model_code: extracted.model_code,
+      sku_source: extracted.sku_source ?? null,
+      mpn_source: extracted.mpn_source ?? null,
+      gtin_source: extracted.gtin_source ?? null,
       price: extracted.price,
       normalized_price: extracted.normalized_price,
       original_price: extracted.original_price,
@@ -1936,17 +2317,21 @@ export function buildAnalysis({
   extracted,
   planContext = "free",
 }: BuildAnalysisParams): BuildAnalysisResult {
-    const seoScore = getSeoScore(consolidatedInput);
+  const trendyolScorecard = buildTrendyolScorecard({
+    extracted,
+    consolidatedInput,
+  });
+  const seoScore = trendyolScorecard.searchVisibility.score;
   const dataCompletenessScore = getCompletenessScore(consolidatedInput);
-  const conversionScore = getConversionScore(consolidatedInput);
+  const conversionScore = trendyolScorecard.conversionPotential.score;
 
   const overallScore = clampScore(
-    seoScore * SCORING_CONFIG.weights.seo +
-      dataCompletenessScore * SCORING_CONFIG.weights.completeness +
-      conversionScore * SCORING_CONFIG.weights.conversion
+    trendyolScorecard.overall.score * 0.65 +
+      dataCompletenessScore * 0.2 +
+      getConversionScore(consolidatedInput) * 0.15
   );
 
-  const derivedMetrics = buildDerivedMetrics(extracted);
+  const derivedMetrics = buildDerivedMetrics(extracted, consolidatedInput);
   const marketOverview = buildMarketOverview(consolidatedInput);
   const strengths = getStrengths(extracted, derivedMetrics);
   const weaknesses = getWeaknesses(extracted, derivedMetrics);
@@ -1992,6 +2377,7 @@ export function buildAnalysis({
     dataCompletenessScore,
     conversionScore,
     overallScore,
+    trendyolScorecard,
     extractedData: extracted,
     derivedMetrics,
     decisionSupportPacket,

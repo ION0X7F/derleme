@@ -1,4 +1,4 @@
-# SellBoost AI Degerlendirme Akisi
+﻿# SellBoost Yapay Zeka Değerlendirme Akışı
 
 Tarih: 24 Mart 2026
 
@@ -356,3 +356,5 @@ SellBoost AI akisi su mantikla calisir:
 
 Yani AI burada "karari veren tek motor" degil.
 Karar omurgasi deterministic katmandadir; AI kontrollu yorum ve zenginlestirme katmanidir.
+
+

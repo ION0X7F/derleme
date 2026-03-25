@@ -116,6 +116,62 @@ export type DerivedMetrics = {
   marketPosition: DerivedMetric;
 };
 
+export type TrendyolScoreLabel = "strong" | "medium" | "weak" | "unclear";
+
+export type TrendyolRecommendationPriority = "high" | "medium" | "low";
+
+export type TrendyolKeywordEntitySet = {
+  productType: string | null;
+  problemOrNeed: string | null;
+  targetAudience: string | null;
+  format: string | null;
+  attributes: string[];
+  useCases: string[];
+};
+
+export type TrendyolKeywordInsight = {
+  primaryKeyword: string | null;
+  secondaryKeywords: string[];
+  source: "deterministic" | "ai_enriched";
+  confidence: "high" | "medium" | "low";
+  entities: TrendyolKeywordEntitySet;
+  suggestedTitle: string | null;
+};
+
+export type TrendyolScoreDimension = {
+  score: number;
+  label: TrendyolScoreLabel;
+  evidence: string[];
+};
+
+export type TrendyolIssue = {
+  key: string;
+  severity: "high" | "medium" | "low";
+  title: string;
+  detail: string;
+};
+
+export type TrendyolRecommendation = {
+  key: string;
+  priority: TrendyolRecommendationPriority;
+  title: string;
+  detail: string;
+};
+
+export type TrendyolScorecard = {
+  keywordInsight: TrendyolKeywordInsight;
+  contentFit: TrendyolScoreDimension;
+  listingQuality: TrendyolScoreDimension;
+  commercialStrength: TrendyolScoreDimension;
+  performanceSignal: TrendyolScoreDimension;
+  operationalTrust: TrendyolScoreDimension;
+  searchVisibility: TrendyolScoreDimension;
+  conversionPotential: TrendyolScoreDimension;
+  overall: TrendyolScoreDimension;
+  issues: TrendyolIssue[];
+  recommendations: TrendyolRecommendation[];
+};
+
 export type ReviewRatingBreakdown = {
   one_star: number | null;
   two_star: number | null;
@@ -128,6 +184,13 @@ export type ReviewRatingBreakdown = {
 export type ReviewSnippet = {
   rating: number | null;
   text: string | null;
+};
+
+export type ReviewRecordDetailed = {
+  rating: number | null;
+  text: string | null;
+  created_at: string | null;
+  seller_name: string | null;
 };
 
 export type ReviewSummary = {
@@ -145,6 +208,37 @@ export type ReviewThemes = {
 export type ReviewThemeHit = {
   label: string;
   count: number;
+};
+
+export type ReviewTimelinePoint = {
+  month: string;
+  count: number;
+  low_rated_count: number;
+  average_rating: number | null;
+};
+
+export type ReviewScopeAnalysis = {
+  scope: "product" | "seller";
+  seller_name: string | null;
+  average_rating: number | null;
+  total_comment_count: number | null;
+  total_rating_count: number | null;
+  rating_breakdown: ReviewRatingBreakdown | null;
+  review_summary: ReviewSummary | null;
+  review_themes: ReviewThemes | null;
+  top_positive_review_hits: ReviewThemeHit[] | null;
+  top_negative_review_hits: ReviewThemeHit[] | null;
+  monthly_trend: ReviewTimelinePoint[] | null;
+  recent_reviews: ReviewRecordDetailed[] | null;
+};
+
+export type ReviewAnalysis = {
+  is_single_seller: boolean;
+  seller_filter_available: boolean;
+  seller_id: number | null;
+  seller_name: string | null;
+  general: ReviewScopeAnalysis | null;
+  seller: ReviewScopeAnalysis | null;
 };
 
 export type QuestionAnswerSnippet = {
@@ -634,10 +728,18 @@ export type DecisionSupportPacket = {
   raw: {
     title: string | null;
     meta_description: string | null;
+    meta_description_source: string | null;
+    search_snippet_fallback: string | null;
     h1: string | null;
+    raw_h1: string | null;
+    resolved_primary_heading: string | null;
+    heading_source: string | null;
     brand: string | null;
     product_name: string | null;
     model_code: string | null;
+    sku_source: string | null;
+    mpn_source: string | null;
+    gtin_source: string | null;
     price: string | null;
     normalized_price: number | null;
     original_price: number | null;
@@ -649,11 +751,13 @@ export type DecisionSupportPacket = {
     rating_breakdown: ReviewRatingBreakdown | null;
     review_count: number | null;
     review_snippets: ReviewSnippet[] | null;
+    review_records?: ReviewRecordDetailed[] | null;
     qa_snippets: QuestionAnswerSnippet[] | null;
     review_summary: ReviewSummary | null;
     review_themes: ReviewThemes | null;
     top_positive_review_hits: ReviewThemeHit[] | null;
     top_negative_review_hits: ReviewThemeHit[] | null;
+    review_analysis?: ReviewAnalysis | null;
     question_count: number | null;
     description_length: number | null;
     bullet_point_count: number | null;
@@ -698,14 +802,22 @@ export type DecisionSupportPacket = {
 export type ExtractedProductFields = {
   title: string | null;
   meta_description: string | null;
+  meta_description_source: string | null;
+  search_snippet_fallback: string | null;
   h1: string | null;
+  raw_h1?: string | null;
+  resolved_primary_heading?: string | null;
+  heading_source?: string | null;
 
   brand: string | null;
   product_name: string | null;
   model_code: string | null;
   sku: string | null;
+  sku_source?: string | null;
   mpn: string | null;
+  mpn_source?: string | null;
   gtin: string | null;
+  gtin_source?: string | null;
 
   price: string | null;
   normalized_price: number | null;
@@ -720,11 +832,13 @@ export type ExtractedProductFields = {
   rating_breakdown: ReviewRatingBreakdown | null;
   review_count: number | null;
   review_snippets: ReviewSnippet[] | null;
+  review_records?: ReviewRecordDetailed[] | null;
   qa_snippets: QuestionAnswerSnippet[] | null;
   review_summary: ReviewSummary | null;
   review_themes: ReviewThemes | null;
   top_positive_review_hits: ReviewThemeHit[] | null;
   top_negative_review_hits: ReviewThemeHit[] | null;
+  review_analysis?: ReviewAnalysis | null;
   question_count: number | null;
 
   description_length: number | null;
@@ -811,6 +925,24 @@ export type LearningContext = {
   rules: LearnedRuleSnapshot[];
   memorySnippets: string[];
   systemLearning: string | null;
+};
+
+export type CategoryAverages = {
+  source: "learning_benchmark";
+  sampleSize: number;
+  imageCount: number | null;
+  descriptionLength: number | null;
+  ratingValue: number | null;
+  sellerScore: number | null;
+  price: number | null;
+  reviewCount: number | null;
+  favoriteCount: number | null;
+  shippingDays: number | null;
+  otherSellersCount: number | null;
+  freeShippingRate: number | null;
+  fastDeliveryRate: number | null;
+  hasVideoRate: number | null;
+  officialSellerRate: number | null;
 };
 
 export type AnalysisTraceTheme =
@@ -953,6 +1085,8 @@ export type BuildAnalysisResult = {
   dataCompletenessScore: number;
   conversionScore: number;
   overallScore: number;
+  trendyolScorecard?: TrendyolScorecard | null;
+  categoryAverages?: CategoryAverages | null;
 
   extractedData: ExtractedProductFields;
   derivedMetrics: DerivedMetrics;

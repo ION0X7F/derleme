@@ -11,6 +11,31 @@ type ModelCodeSource =
   | null;
 
 type Confidence = "high" | "medium" | "low" | null;
+type MetaDescriptionSource =
+  | "meta_description"
+  | "og_description"
+  | "twitter_description"
+  | "itemprop_description"
+  | "itemprop_text"
+  | "jsonld_description"
+  | "visible_description_fallback"
+  | null;
+type HeadingSource =
+  | "raw_h1"
+  | "itemprop_name"
+  | "visible_product_title"
+  | "visible_product_name"
+  | "jsonld_name"
+  | "og_title"
+  | "twitter_title"
+  | "html_title"
+  | null;
+type IdentitySource =
+  | "jsonld"
+  | "state"
+  | "spec_table"
+  | "labeled_text"
+  | null;
 
 // ── Global model kodu blacklist ──────────────────────────────
 const GLOBAL_MODEL_CODE_BLACKLIST = new Set([
@@ -289,10 +314,274 @@ function extractProductName(
   return h1 || title || null;
 }
 
+function cleanHeadingCandidate(value: string | null | undefined) {
+  const cleaned = cleanText(value);
+  if (!cleaned) return null;
+
+  const trimmed = cleaned
+    .replace(/\s*[|\-–—]\s*(Trendyol|Hepsiburada|Amazon|n11)(\s.*)?$/i, "")
+    .replace(/\s*\|\s*Online Alisveris.*$/i, "")
+    .trim();
+
+  return trimmed || cleaned;
+}
+
+function extractResolvedPrimaryHeading(params: {
+  $: cheerio.CheerioAPI;
+  title: string | null;
+  nodes: Record<string, unknown>[];
+}): { rawH1: string | null; resolved: string | null; source: HeadingSource } {
+  const { $, title, nodes } = params;
+  const rawH1 = cleanText($("h1").first().text());
+
+  const jsonLdName = nodes.find(
+    (node) => typeof node.name === "string" && cleanText(node.name)
+  );
+
+  const candidates: Array<{ value: string | null; source: HeadingSource }> = [
+    { value: rawH1, source: "raw_h1" },
+    {
+      value: cleanHeadingCandidate($('[itemprop="name"]').first().text()),
+      source: "itemprop_name",
+    },
+    {
+      value: cleanHeadingCandidate($('[data-testid="product-title"]').first().text()),
+      source: "visible_product_title",
+    },
+    {
+      value: cleanHeadingCandidate($('[data-testid="product-name"]').first().text()),
+      source: "visible_product_name",
+    },
+    {
+      value: cleanHeadingCandidate($(".product-title").first().text()),
+      source: "visible_product_title",
+    },
+    {
+      value: cleanHeadingCandidate($(".product-name").first().text()),
+      source: "visible_product_name",
+    },
+    {
+      value: cleanHeadingCandidate(
+        typeof jsonLdName?.name === "string" ? jsonLdName.name : null
+      ),
+      source: "jsonld_name",
+    },
+    {
+      value: cleanHeadingCandidate($('meta[property="og:title"]').attr("content")),
+      source: "og_title",
+    },
+    {
+      value: cleanHeadingCandidate($('meta[name="twitter:title"]').attr("content")),
+      source: "twitter_title",
+    },
+    {
+      value: cleanHeadingCandidate(title),
+      source: "html_title",
+    },
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate.value) {
+      return {
+        rawH1,
+        resolved: candidate.value,
+        source: candidate.source,
+      };
+    }
+  }
+
+  return { rawH1, resolved: null, source: null };
+}
+
+function normalizeIdentityCode(
+  value: string | null | undefined,
+  kind: "sku" | "mpn"
+) {
+  const cleaned = cleanText(value);
+  if (!cleaned) return null;
+
+  const normalized = cleaned
+    .replace(
+      /^(?:sku|mpn|ean|gtin|upc|barkod|urun\s*kodu|ürün\s*kodu|stok\s*kodu|uretici\s*kodu|üretici\s*kodu|parca\s*numarasi|parça\s*numarası)[:\s-]*/i,
+      ""
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized) return null;
+  if (normalized.length < 3 || normalized.length > 80) return null;
+  if (!/[A-Za-z0-9]/.test(normalized)) return null;
+  if (/^(true|false|null|undefined)$/i.test(normalized)) return null;
+
+  if (kind === "mpn" && !/[A-Za-z]/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function normalizeGtin(value: string | null | undefined) {
+  const cleaned = cleanText(value);
+  if (!cleaned) return null;
+  const digits = cleaned.replace(/\D/g, "");
+  if (![8, 12, 13, 14].includes(digits.length)) return null;
+  return digits;
+}
+
+function pickIdentityCandidate<T extends string>(...values: Array<T | null | undefined>) {
+  for (const value of values) {
+    if (value) return value;
+  }
+  return null;
+}
+
+function extractIdentityFromState(
+  html: string,
+  kind: "sku" | "mpn" | "gtin"
+): string | null {
+  const patterns =
+    kind === "sku"
+      ? [
+          /"(?:sku|merchantSku|stockCode|stockcode|productCode)"\s*:\s*"([^"]+)"/i,
+          /"(?:sku|merchantSku|stockCode|stockcode|productCode)"\s*:\s*([0-9A-Za-z-_/]+)/i,
+        ]
+      : kind === "mpn"
+      ? [
+          /"(?:mpn|manufacturerPartNumber|partNumber|modelCode|modelKodu)"\s*:\s*"([^"]+)"/i,
+          /"(?:mpn|manufacturerPartNumber|partNumber|modelCode|modelKodu)"\s*:\s*([0-9A-Za-z-_/]+)/i,
+        ]
+      : [
+          /"(?:gtin|gtin8|gtin12|gtin13|gtin14|ean|upc|barcode|barCode|barkod)"\s*:\s*"([^"]+)"/i,
+          /"(?:gtin|gtin8|gtin12|gtin13|gtin14|ean|upc|barcode|barCode|barkod)"\s*:\s*([0-9A-Za-z-_/]+)/i,
+        ];
+
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (!match?.[1]) continue;
+    const value =
+      kind === "gtin"
+        ? normalizeGtin(match[1])
+        : normalizeIdentityCode(match[1], kind);
+    if (value) return value;
+  }
+
+  return null;
+}
+
+function extractIdentityFromTable(
+  $: cheerio.CheerioAPI,
+  kind: "sku" | "mpn" | "gtin"
+): string | null {
+  const labels =
+    kind === "sku"
+      ? ["SKU", "Stok Kodu", "Ürün Kodu", "Urun Kodu", "Stock Code"]
+      : kind === "mpn"
+      ? ["MPN", "Model Kodu", "Üretici Kodu", "Uretici Kodu", "Parça Numarası", "Parca Numarasi"]
+      : ["GTIN", "GTIN13", "GTIN14", "EAN", "UPC", "Barkod", "Barcode"];
+
+  for (const label of labels) {
+    const candidates = [
+      cleanText($(`tr:contains("${label}") td, th:contains("${label}") + td`).first().text()),
+      cleanText(
+        $(`[class*="detail"], [class*="attribute"], [class*="spec"]`)
+          .filter((_: number, el: unknown) => {
+            const text = cleanText($(el as any).text()) || "";
+            return text.toLocaleLowerCase("tr-TR").includes(label.toLocaleLowerCase("tr-TR"));
+          })
+          .first()
+          .text()
+      ),
+    ];
+
+    for (const candidate of candidates) {
+      const value =
+        kind === "gtin"
+          ? normalizeGtin(candidate)
+          : normalizeIdentityCode(candidate, kind);
+      if (value) return value;
+    }
+  }
+
+  return null;
+}
+
+function extractIdentityFromLabeledText(
+  text: string | null,
+  kind: "sku" | "mpn" | "gtin"
+) {
+  if (!text) return null;
+
+  const patterns =
+    kind === "sku"
+      ? [
+          /(?:sku|stok\s*kodu|ürün\s*kodu|urun\s*kodu)[:\s]+([A-Za-z0-9-_/]{3,80})/i,
+        ]
+      : kind === "mpn"
+      ? [
+          /(?:mpn|model\s*kodu|üretici\s*kodu|uretici\s*kodu|parça\s*numarası|parca\s*numarasi)[:\s]+([A-Za-z0-9-_/]{3,80})/i,
+        ]
+      : [
+          /(?:gtin(?:13|14|12|8)?|ean|upc|barkod|barcode)[:\s]+([0-9\s-]{8,20})/i,
+        ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match?.[1]) continue;
+    const value =
+      kind === "gtin"
+        ? normalizeGtin(match[1])
+        : normalizeIdentityCode(match[1], kind);
+    if (value) return value;
+  }
+
+  return null;
+}
+
+function resolveIdentityField(params: {
+  kind: "sku" | "mpn" | "gtin";
+  html: string;
+  $: cheerio.CheerioAPI;
+  jsonLdValue: string | null;
+  specsText: string | null;
+  description: string | null;
+  bodyText: string | null;
+}): { value: string | null; source: IdentitySource } {
+  const { kind, html, $, jsonLdValue, specsText, description, bodyText } = params;
+
+  const value = pickIdentityCandidate(
+    kind === "gtin" ? normalizeGtin(jsonLdValue) : normalizeIdentityCode(jsonLdValue, kind),
+    extractIdentityFromState(html, kind),
+    extractIdentityFromTable($, kind),
+    extractIdentityFromLabeledText(specsText, kind),
+    extractIdentityFromLabeledText(description, kind),
+    extractIdentityFromLabeledText(bodyText, kind)
+  );
+
+  if (!value) {
+    return { value: null, source: null };
+  }
+
+  if (
+    (kind === "gtin" ? normalizeGtin(jsonLdValue) : normalizeIdentityCode(jsonLdValue, kind)) ===
+    value
+  ) {
+    return { value, source: "jsonld" };
+  }
+  if (extractIdentityFromState(html, kind) === value) {
+    return { value, source: "state" };
+  }
+  if (extractIdentityFromTable($, kind) === value) {
+    return { value, source: "spec_table" };
+  }
+
+  return { value, source: "labeled_text" };
+}
+
 function extractJsonLdProductSignals(nodes: Record<string, unknown>[]) {
   let price: string | null = null;
   let oldPrice: string | null = null;
   let currency: string | null = null;
+  let description: string | null = null;
   let sku: string | null = null;
   let mpn: string | null = null;
   let gtin: string | null = null;
@@ -302,6 +591,10 @@ function extractJsonLdProductSignals(nodes: Record<string, unknown>[]) {
   let stockStatus: string | null = null;
 
   for (const node of nodes) {
+    if (!description && typeof node.description === "string") {
+      description = cleanText(node.description);
+    }
+
     const offers = node.offers;
     const offerList = Array.isArray(offers)
       ? offers
@@ -388,7 +681,65 @@ function extractJsonLdProductSignals(nodes: Record<string, unknown>[]) {
     }
   }
 
-  return { price, oldPrice, currency, sku, mpn, gtin, ratingValue, reviewCount, sellerName, stockStatus };
+  return {
+    description,
+    price,
+    oldPrice,
+    currency,
+    sku,
+    mpn,
+    gtin,
+    ratingValue,
+    reviewCount,
+    sellerName,
+    stockStatus,
+  };
+}
+
+function extractMetaDescription(params: {
+  $: cheerio.CheerioAPI;
+  jsonLdDescription: string | null;
+  visibleDescription: string | null;
+}): { value: string | null; source: MetaDescriptionSource } {
+  const { $, jsonLdDescription, visibleDescription } = params;
+  const candidates: Array<{ value: string | null; source: MetaDescriptionSource }> = [
+    {
+      value: cleanText($('meta[name="description"]').attr("content")),
+      source: "meta_description",
+    },
+    {
+      value: cleanText($('meta[property="og:description"]').attr("content")),
+      source: "og_description",
+    },
+    {
+      value: cleanText($('meta[name="twitter:description"]').attr("content")),
+      source: "twitter_description",
+    },
+    {
+      value: cleanText($('meta[itemprop="description"]').attr("content")),
+      source: "itemprop_description",
+    },
+    {
+      value: cleanText($('[itemprop="description"]').first().text()),
+      source: "itemprop_text",
+    },
+    {
+      value: cleanText(jsonLdDescription),
+      source: "jsonld_description",
+    },
+    {
+      value: cleanText(visibleDescription),
+      source: "visible_description_fallback",
+    },
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate.value) {
+      return candidate;
+    }
+  }
+
+  return { value: null, source: null };
 }
 
 function isLikelyBadPriceText(text: string) {
@@ -723,15 +1074,12 @@ export function extractBasicFields(html: string): ExtractedProductFields {
     cleanText($('meta[property="og:title"]').attr("content")) ||
     cleanText($('meta[name="twitter:title"]').attr("content"));
 
-  const meta_description =
-    cleanText($('meta[name="description"]').attr("content")) ||
-    cleanText($('meta[property="og:description"]').attr("content")) ||
-    cleanText($('meta[name="twitter:description"]').attr("content"));
-
-  const h1 =
-    cleanText($("h1").first().text()) ||
-    cleanText($('[itemprop="name"]').first().text()) ||
-    cleanText($('meta[property="og:title"]').attr("content"));
+  const heading = extractResolvedPrimaryHeading({
+    $,
+    title,
+    nodes: structuredNodes,
+  });
+  const h1 = heading.resolved;
 
   const brand = extractBrand($, structuredNodes);
   const product_name = extractProductName(title, h1, structuredNodes);
@@ -748,12 +1096,46 @@ export function extractBasicFields(html: string): ExtractedProductFields {
 
   const image_count = getImageCount($);
   const description = findDescription($);
+  const metaDescription = extractMetaDescription({
+    $,
+    jsonLdDescription: jsonLdSignals.description,
+    visibleDescription: description,
+  });
   const specsText = cleanText(extractSpecsText($));
   const bodyText = cleanText($("body").text());
+  const pageHtml = $.html();
+
+  const skuIdentity = resolveIdentityField({
+    kind: "sku",
+    html: pageHtml,
+    $,
+    jsonLdValue: jsonLdSignals.sku,
+    specsText,
+    description,
+    bodyText,
+  });
+  const mpnIdentity = resolveIdentityField({
+    kind: "mpn",
+    html: pageHtml,
+    $,
+    jsonLdValue: jsonLdSignals.mpn,
+    specsText,
+    description,
+    bodyText,
+  });
+  const gtinIdentity = resolveIdentityField({
+    kind: "gtin",
+    html: pageHtml,
+    $,
+    jsonLdValue: jsonLdSignals.gtin,
+    specsText,
+    description,
+    bodyText,
+  });
 
   const { model_code } = extractModelCode(
     title, h1, description, specsText, bodyText,
-    { sku: jsonLdSignals.sku, mpn: jsonLdSignals.mpn, gtin: jsonLdSignals.gtin }
+    { sku: skuIdentity.value, mpn: mpnIdentity.value, gtin: gtinIdentity.value }
   );
 
   const rating_value =
@@ -815,14 +1197,22 @@ export function extractBasicFields(html: string): ExtractedProductFields {
 
   return {
     title: title || null,
-    meta_description: meta_description || null,
+    meta_description: metaDescription.value || null,
+    meta_description_source: metaDescription.source,
+    search_snippet_fallback: null,
     h1: h1 || null,
+    raw_h1: heading.rawH1,
+    resolved_primary_heading: heading.resolved,
+    heading_source: heading.source,
     brand: brand || null,
     product_name: product_name || null,
     model_code: model_code || null,
-    sku: jsonLdSignals.sku || null,
-    mpn: jsonLdSignals.mpn || null,
-    gtin: jsonLdSignals.gtin || null,
+    sku: skuIdentity.value || null,
+    sku_source: skuIdentity.source,
+    mpn: mpnIdentity.value || null,
+    mpn_source: mpnIdentity.source,
+    gtin: gtinIdentity.value || null,
+    gtin_source: gtinIdentity.source,
     price: price || null,
     normalized_price,
     original_price: null,

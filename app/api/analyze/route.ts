@@ -171,6 +171,12 @@ function shapeAnalysisForAccess(
               marketPosition: analysis.derivedMetrics.marketPosition,
             }
           : analysis.derivedMetrics,
+    trendyolScorecard:
+      access.plan === "guest" ? null : analysis.trendyolScorecard ?? null,
+    categoryAverages:
+      access.plan === "guest" ? null : analysis.categoryAverages ?? null,
+    reviewAnalysis:
+      access.plan === "guest" ? null : analysis.extractedData.review_analysis ?? null,
     coverage:
       access.plan === "guest"
         ? {

@@ -67,15 +67,23 @@ function normalizeFields(
     ...fields,
     title: cleanText(fields.title),
     meta_description: cleanText(fields.meta_description),
+    meta_description_source: cleanText(fields.meta_description_source),
+    search_snippet_fallback: cleanText(fields.search_snippet_fallback),
     h1: cleanText(fields.h1),
+    raw_h1: cleanText(fields.raw_h1),
+    resolved_primary_heading: cleanText(fields.resolved_primary_heading),
+    heading_source: cleanText(fields.heading_source),
 
     brand: cleanText(fields.brand),
     product_name: cleanText(fields.product_name),
     model_code: cleanText(fields.model_code),
 
     sku: cleanText(fields.sku),
+    sku_source: cleanText(fields.sku_source),
     mpn: cleanText(fields.mpn),
+    mpn_source: cleanText(fields.mpn_source),
     gtin: cleanText(fields.gtin),
+    gtin_source: cleanText(fields.gtin_source),
 
     price: cleanText(fields.price),
     currency: cleanText(fields.currency),

@@ -3,6 +3,10 @@ import {
   parseAnalysisSummary,
   syncStructuredSummaryWithSuggestions,
 } from "@/lib/analysis-summary";
+import {
+  buildAiLearningPromptSection,
+  readReviewerPromptTemplate,
+} from "@/lib/ai-learning-memory";
 import type {
   AnalysisSuggestion,
   ConsolidatedAnalysisInput,
@@ -102,6 +106,17 @@ type RawAiAnalysisResult = {
   seo_score: number;
   conversion_score: number;
   overall_score: number;
+};
+
+type AiReviewerResult = {
+  approved: boolean;
+  confidence: "yüksek" | "orta" | "düşük";
+  issues: Array<{
+    severity: "yüksek" | "orta" | "düşük";
+    message: string;
+    reason: string;
+  }>;
+  fixSuggestions: string[];
 };
 
 type AiBaselineContext = {
@@ -953,7 +968,7 @@ function alignSummaryWithMarket(params: {
   return rebuilt.slice(0, limit).join("\n\n");
 }
 
-function buildPrompt(params: {
+async function buildPrompt(params: {
   consolidatedInput: ConsolidatedAnalysisInput,
   packet: DecisionSupportPacket,
   extracted: ExtractedProductFields,
@@ -990,6 +1005,7 @@ function buildPrompt(params: {
   };
 
   const dataQualitySummary = buildDataQualitySummary(consolidatedInput);
+  const learningMemory = await buildAiLearningPromptSection({ area: "genel", limit: 6 });
 
   const confidenceWarning = eligibility.level === "medium"
     ? `Veri guveni orta seviyede (${eligibility.score.toFixed(2)}). Kesin yargi yerine temkinli ve net ifadeler kullan.`
@@ -998,6 +1014,8 @@ function buildPrompt(params: {
   return `
 Sen Trendyol urun analizi yapan bir yardimci asistansin.
 Amacin: sabit iskelet ile dinamik icerik uretmek.
+
+${learningMemory}
 
 VERI KALITESI OZETI:
 ${dataQualitySummary}
@@ -1016,7 +1034,7 @@ CIKTI KURALLARI:
 6) Su kelimeleri kullanma: demand, capture, social proof, bottleneck, conversion, momentum.
 7) Su sade ifadeleri tercih et: urune ilgi, satis durumu, musteri guveni, diger magazalara gore durum, fiyat avantaji, sayfa gucu, buyume firsati, en buyuk engel.
 8) Veri zayifsa daha kisa ve daha temkinli yaz; kesin iddialardan kacinin.
-9) strengths en fazla 4, weaknesses en fazla 5, suggestions en fazla 5 olsun.
+9) strengths en fazla 4, weaknesses en fazla 5, suggestions en fazla 10 olsun.
 10) weaknesses ve suggestions ogelerinde depends_on alanini doldur.
 
 Veri:
@@ -1204,7 +1222,7 @@ function sanitizeWeaknesses(value: unknown) {
         depends_on: SupportedDependency[];
       } => item !== null
     )
-    .slice(0, 5);
+    .slice(0, 10);
 }
 
 function sanitizeSuggestions(value: unknown) {
@@ -1267,6 +1285,86 @@ function sanitizeAiResult(raw: unknown): RawAiAnalysisResult | null {
     conversion_score,
     overall_score,
   };
+}
+
+function sanitizeReviewerResult(raw: unknown): AiReviewerResult | null {
+  if (!raw || typeof raw !== "object") return null;
+  const record = raw as Record<string, unknown>;
+  if (typeof record.approved !== "boolean") return null;
+  const confidence =
+    record.confidence === "yüksek" || record.confidence === "orta" || record.confidence === "düşük"
+      ? record.confidence
+      : "orta";
+  const issues = Array.isArray(record.issues)
+    ? record.issues
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const issue = item as Record<string, unknown>;
+          if (typeof issue.message !== "string" || typeof issue.reason !== "string") return null;
+          return {
+            severity:
+              issue.severity === "yüksek" || issue.severity === "orta" || issue.severity === "düşük"
+                ? issue.severity
+                : "orta",
+            message: issue.message.trim(),
+            reason: issue.reason.trim(),
+          };
+        })
+        .filter((item): item is AiReviewerResult["issues"][number] => item !== null)
+    : [];
+  const fixSuggestions = Array.isArray(record.fixSuggestions)
+    ? record.fixSuggestions.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+  return { approved: record.approved, confidence, issues, fixSuggestions };
+}
+
+async function reviewAiResult(params: {
+  model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>;
+  sanitized: RawAiAnalysisResult;
+  extracted: ExtractedProductFields;
+  packet: DecisionSupportPacket;
+  learningContext?: LearningContext | null;
+}) {
+  try {
+    const reviewerTemplate = await readReviewerPromptTemplate();
+    const memory = await buildAiLearningPromptSection({ area: "genel", limit: 4 });
+    const prompt = [
+      reviewerTemplate,
+      "",
+      memory,
+      "",
+      "DENETLENECEK AI CIKTISI:",
+      JSON.stringify(params.sanitized, null, 2),
+      "",
+      "KAYNAK VERI OZETI:",
+      JSON.stringify(
+        {
+          extracted: {
+            title: params.extracted.title,
+            normalized_price: params.extracted.normalized_price,
+            rating_value: params.extracted.rating_value,
+            review_count: params.extracted.review_count,
+            question_count: params.extracted.question_count,
+            favorite_count: params.extracted.favorite_count,
+            seller_score: params.extracted.seller_score,
+            other_sellers_count: params.extracted.other_sellers_count,
+            has_return_info: params.extracted.has_return_info,
+            shipping_days: params.extracted.shipping_days,
+          },
+          metrics: params.packet.metrics,
+          learning_context: params.learningContext ?? null,
+        },
+        null,
+        2
+      ),
+    ].join("\n");
+
+    const result = await params.model.generateContent(prompt);
+    const parsed = parseAiJson(result.response.text()) as unknown;
+    return sanitizeReviewerResult(parsed);
+  } catch {
+    return null;
+  }
 }
 
 function collectEvidenceFilteredSuggestions(params: {
@@ -1943,12 +2041,25 @@ export async function analyzeWithAi(params: {
       },
     });
 
-    const prompt = buildPrompt(params);
+    const prompt = await buildPrompt(params);
     const result = await model.generateContent(prompt);
     const parsed = parseAiJson(result.response.text()) as unknown;
     const sanitized = sanitizeAiResult(parsed);
 
     if (!sanitized) {
+      return fallback;
+    }
+
+    const reviewer = await reviewAiResult({
+      model,
+      sanitized,
+      extracted: params.extracted,
+      packet: params.packet,
+      learningContext: params.learningContext,
+    });
+
+    if (reviewer && reviewer.approved === false) {
+      console.warn("AI reviewer fallback active:", reviewer.issues.map((item) => item.message).join(" | "));
       return fallback;
     }
 

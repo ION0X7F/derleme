@@ -1,4 +1,4 @@
-# SellBoost Smoke Test Checklist
+﻿# Duman Testi Kontrol Listesi
 
 Tarih: 24 Mart 2026
 
@@ -161,3 +161,5 @@ Ancak manuel smoke testin tam anlamiyla degerli olabilmesi icin asagidaki ekranl
 - account
 - dashboard
 - admin
+
+

@@ -1,4 +1,4 @@
-# SellBoost UI Gap Priority
+﻿# SellBoost Arayüz Eksikleri Öncelikleri
 
 Tarih: 24 Mart 2026
 
@@ -63,3 +63,5 @@ Gerekce:
 Bir sonraki en mantikli gelistirme gorevi:
 
 `app/analyze/page.tsx` ekranini gercek urun akisina cevirip `/api/analyze` ile baglamak.
+
+
