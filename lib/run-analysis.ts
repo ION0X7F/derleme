@@ -11,7 +11,11 @@ import {
 import { extractFieldsWithFallback } from "@/lib/extractors";
 import { mergeExtractedFieldsWithMetadata } from "@/lib/extractors/merge-extracted-fields";
 import { fetchPageHtml } from "@/lib/fetch-page-html";
-import { fetchTrendyolApi } from "@/lib/fetch-trendyol-api";
+import {
+  fetchTrendyolApi,
+  fetchTrendyolFollowerCountByMerchantId,
+} from "@/lib/fetch-trendyol-api";
+import { runPythonJson } from "@/lib/python-runner";
 import { isAiAnalysisEligible } from "@/lib/ai-eligibility";
 import { createDebugTrace, emitDebugTrace, traceEvent } from "@/lib/debug-observability";
 import { getLearningContext } from "@/lib/learning-engine";
@@ -54,6 +58,41 @@ type RunAnalysisPipelineParams = {
   includeSyntheticLearning?: boolean;
 };
 
+const PYTHON_BACKFILL_FIELDS: Array<keyof import("@/types/analysis").ExtractedProductFields> = [
+  "original_price",
+  "discount_rate",
+  "question_count",
+  "qa_snippets",
+  "other_sellers_count",
+  "other_seller_offers",
+  "other_sellers_summary",
+  "review_snippets",
+  "review_summary",
+  "review_themes",
+  "follower_count",
+];
+
+const PYTHON_BACKFILL_SCRIPT = `
+import asyncio
+import json
+import sys
+from trendyol_pdp_extractor.fetch_page import fetch_html
+from trendyol_pdp_extractor.parse_html import extract_html_data
+from trendyol_pdp_extractor.parse_embedded_json import extract_embedded_json
+from trendyol_pdp_extractor.capture_network import capture_runtime_requests
+from trendyol_pdp_extractor.parse_runtime_json import extract_runtime_data
+from trendyol_pdp_extractor.normalize import merge_product_data
+
+url = sys.argv[1]
+html = fetch_html(url)
+html_data = extract_html_data(html, url)
+embedded_data = extract_embedded_json(html)
+logs = asyncio.run(capture_runtime_requests(url))
+runtime_data = extract_runtime_data(logs)
+merged = merge_product_data(html_data, embedded_data, runtime_data)
+print(json.dumps(merged, ensure_ascii=False))
+`;
+
 export type AnalysisPipelineResult = {
   platform: string | null;
   category: string;
@@ -74,6 +113,70 @@ export type AnalysisPipelineResult = {
 
 function hasText(value: string | null | undefined) {
   return !!value && value.trim().length > 0;
+}
+
+function isMissingValue(value: unknown) {
+  if (value == null) return true;
+  if (typeof value === "string") return value.trim().length === 0;
+  if (typeof value === "number") return !Number.isFinite(value);
+  if (Array.isArray(value)) return value.length === 0;
+  return false;
+}
+
+function shouldRunPythonBackfill(
+  extracted: import("@/types/analysis").ExtractedProductFields
+) {
+  return PYTHON_BACKFILL_FIELDS.some((field) => isMissingValue(extracted[field]));
+}
+
+async function fetchPythonBackfill(
+  url: string
+): Promise<Partial<import("@/types/analysis").ExtractedProductFields> | null> {
+  try {
+    const payload = (await runPythonJson({
+      script: PYTHON_BACKFILL_SCRIPT,
+      args: [url],
+      cwd: process.cwd(),
+    })) as Record<string, unknown>;
+
+    if (!payload || typeof payload !== "object") return null;
+    return payload as Partial<import("@/types/analysis").ExtractedProductFields>;
+  } catch {
+    return null;
+  }
+}
+
+function applyPythonBackfill(params: {
+  extracted: import("@/types/analysis").ExtractedProductFields;
+  pythonData: Partial<import("@/types/analysis").ExtractedProductFields>;
+  fieldMetadata: Record<string, import("@/types/analysis").ExtractedFieldMetadata>;
+  trace: ReturnType<typeof createDebugTrace>;
+}) {
+  const { extracted, pythonData, fieldMetadata, trace } = params;
+
+  for (const field of PYTHON_BACKFILL_FIELDS) {
+    const currentValue = extracted[field];
+    const incomingValue = pythonData[field];
+
+    if (!isMissingValue(currentValue) || isMissingValue(incomingValue)) {
+      continue;
+    }
+
+    extracted[field] = incomingValue as never;
+    fieldMetadata[String(field)] = {
+      source: "runtime_xhr",
+      confidence: "medium",
+      timestamp: Date.now(),
+      reason: "python layered fallback",
+    };
+
+    traceEvent(trace, {
+      stage: "merge",
+      code: "python_backfill_field",
+      message: `${String(field)} python fallback ile dolduruldu.`,
+      field: String(field),
+    });
+  }
 }
 
 function shouldUseAiScore(aiScore: number, fallbackScore: number) {
@@ -243,7 +346,7 @@ export async function runAnalysisPipeline(
     extracted,
     fieldMetadata,
     report: missingDataReport,
-  } = (() => {
+  } = await (async () => {
     // Önce sadece HTML'den veri çıkarılır (platforma özel ve genel olarak).
     const htmlExtraction = extractFieldsWithFallback({
       url: params.url,
@@ -304,6 +407,25 @@ export async function runAnalysisPipeline(
       );
     })();
 
+    if (isTrendyol && shouldRunPythonBackfill(finalExtractionResult.extracted)) {
+      const pythonData = await fetchPythonBackfill(params.url);
+      if (pythonData) {
+        applyPythonBackfill({
+          extracted: finalExtractionResult.extracted,
+          pythonData,
+          fieldMetadata: finalExtractionResult.fieldMetadata,
+          trace: debugTrace,
+        });
+      } else {
+        traceEvent(debugTrace, {
+          stage: "merge",
+          level: "warn",
+          code: "python_backfill_unavailable",
+          message: "Python fallback denendi fakat veri alinamadi.",
+        });
+      }
+    }
+
     return {
       extracted: finalExtractionResult.extracted,
       fieldMetadata: finalExtractionResult.fieldMetadata,
@@ -311,6 +433,46 @@ export async function runAnalysisPipeline(
     };
   })();
   extractionMs = Date.now() - extractionStartedAt;
+
+  if (
+    isTrendyol &&
+    extracted.follower_count == null &&
+    typeof extracted.merchant_id === "number"
+  ) {
+    const followerCount = await fetchTrendyolFollowerCountByMerchantId(
+      extracted.merchant_id
+    );
+    if (typeof followerCount === "number") {
+      extracted.follower_count = followerCount;
+      fieldMetadata.follower_count = {
+        source: "api",
+        confidence: "high",
+        timestamp: Date.now(),
+        reason: "trendyol sellerstore-follow api",
+      };
+      traceEvent(debugTrace, {
+        stage: "merge",
+        code: "follower_count_runtime_fallback_success",
+        message: "follower_count runtime fallback ile dolduruldu.",
+        field: "follower_count",
+        meta: {
+          merchantId: extracted.merchant_id,
+          followerCount,
+        },
+      });
+    } else {
+      traceEvent(debugTrace, {
+        stage: "merge",
+        level: "warn",
+        code: "follower_count_runtime_fallback_missed",
+        message: "follower_count runtime fallback denendi ama sonuc alinmadi.",
+        field: "follower_count",
+        meta: {
+          merchantId: extracted.merchant_id,
+        },
+      });
+    }
+  }
 
   // Adım 1.5: Veri Konsolidasyon Katmanı
   traceEvent(debugTrace, {

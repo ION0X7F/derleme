@@ -1,10 +1,10 @@
-import RoutePlaceholder from "../../_ui/route-placeholder";
+import DashboardShellFrame from "../../_ui/dashboard-shell-frame";
 
-export default function ReportDetailPage() {
-  return (
-    <RoutePlaceholder
-      title="Analiz sonucu"
-      description="Rapor detay ekrani yeniden tasarlanacak. Bu route su an temel iskelet olarak calisiyor."
-    />
-  );
+export default async function ReportDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return <DashboardShellFrame initialView="report-detail" reportId={id} />;
 }

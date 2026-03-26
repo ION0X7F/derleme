@@ -577,18 +577,6 @@ function getCompletenessScore(input: ConsolidatedAnalysisInput) {
       4
     ) * fallbackEvidenceFactor;
   score +=
-    getWeightedIdentityScore(
-      extracted.mpn,
-      extracted.mpn_source,
-      4
-    ) * fallbackEvidenceFactor;
-  score +=
-    getWeightedIdentityScore(
-      extracted.gtin,
-      extracted.gtin_source,
-      5
-    ) * fallbackEvidenceFactor;
-  score +=
     getWeightedRawPresenceScore(
       input,
       "question_count",
@@ -811,11 +799,6 @@ function buildProductQualityMetric(
   if (extracted.has_specs) {
     score += getWeightedRawPresenceScore(input, "has_specs", extracted.has_specs, 12);
     evidence.push("Teknik özellikler tablosu bulunuyor.");
-  }
-
-  if (hasText(extracted.brand) && hasText(extracted.model_code)) {
-    score += 4;
-    evidence.push("Marka ve model kodu bilgisi ayrıştırılmış.");
   }
 
   // Visual strength elements
@@ -1207,7 +1190,6 @@ function getAvailableFields(extracted: ExtractedProductFields) {
     ["meta_description", hasText(extracted.meta_description)],
     ["brand", hasText(extracted.brand)],
     ["product_name", hasText(extracted.product_name)],
-    ["model_code", hasText(extracted.model_code)],
     ["normalized_price", typeof extracted.normalized_price === "number"],
     ["original_price", typeof extracted.original_price === "number"],
     ["discount_rate", typeof extracted.discount_rate === "number"],
@@ -1324,17 +1306,13 @@ function buildDecisionSupportPacket(params: {
       title: extracted.title,
       meta_description: extracted.meta_description,
       meta_description_source: extracted.meta_description_source,
-      search_snippet_fallback: extracted.search_snippet_fallback,
       h1: extracted.h1,
       raw_h1: extracted.raw_h1 ?? null,
       resolved_primary_heading: extracted.resolved_primary_heading ?? null,
       heading_source: extracted.heading_source ?? null,
       brand: extracted.brand,
       product_name: extracted.product_name,
-      model_code: extracted.model_code,
       sku_source: extracted.sku_source ?? null,
-      mpn_source: extracted.mpn_source ?? null,
-      gtin_source: extracted.gtin_source ?? null,
       price: extracted.price,
       normalized_price: extracted.normalized_price,
       original_price: extracted.original_price,

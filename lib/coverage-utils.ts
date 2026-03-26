@@ -4,7 +4,6 @@ export const coverageFieldLabels: Record<string, string> = {
   meta_description: "Meta aciklama",
   brand: "Marka",
   product_name: "Urun adi",
-  model_code: "Model kodu",
   normalized_price: "Normalize fiyat",
   original_price: "Eski fiyat",
   discount_rate: "Indirim orani",

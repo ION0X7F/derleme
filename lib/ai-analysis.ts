@@ -29,7 +29,6 @@ type SupportedDependency =
   | "meta_description"
   | "brand"
   | "product_name"
-  | "model_code"
   | "normalized_price"
   | "original_price"
   | "discount_rate"
@@ -135,7 +134,6 @@ const SUPPORTED_DEPENDENCIES: SupportedDependency[] = [
   "meta_description",
   "brand",
   "product_name",
-  "model_code",
   "normalized_price",
   "original_price",
   "discount_rate",
@@ -1138,7 +1136,6 @@ function hasDependencyData(
     case "meta_description":
     case "brand":
     case "product_name":
-    case "model_code":
     case "stock_status":
     case "seller_name":
     case "campaign_label":

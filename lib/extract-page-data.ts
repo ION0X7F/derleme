@@ -4,7 +4,6 @@ type ExtractedData = {
   title?: string;
   meta_description?: string;
   meta_description_source?: string;
-  search_snippet_fallback?: string;
   h1?: string;
   raw_h1?: string;
   resolved_primary_heading?: string;
@@ -167,7 +166,6 @@ export function extractPageData(html: string): ExtractedData {
     title: title || undefined,
     meta_description: metaDescription.value || undefined,
     meta_description_source: metaDescription.source || undefined,
-    search_snippet_fallback: undefined,
     h1: heading.resolved || undefined,
     raw_h1: heading.rawH1 || undefined,
     resolved_primary_heading: heading.resolved || undefined,

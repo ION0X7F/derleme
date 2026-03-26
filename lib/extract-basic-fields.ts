@@ -1114,30 +1114,6 @@ export function extractBasicFields(html: string): ExtractedProductFields {
     description,
     bodyText,
   });
-  const mpnIdentity = resolveIdentityField({
-    kind: "mpn",
-    html: pageHtml,
-    $,
-    jsonLdValue: jsonLdSignals.mpn,
-    specsText,
-    description,
-    bodyText,
-  });
-  const gtinIdentity = resolveIdentityField({
-    kind: "gtin",
-    html: pageHtml,
-    $,
-    jsonLdValue: jsonLdSignals.gtin,
-    specsText,
-    description,
-    bodyText,
-  });
-
-  const { model_code } = extractModelCode(
-    title, h1, description, specsText, bodyText,
-    { sku: skuIdentity.value, mpn: mpnIdentity.value, gtin: gtinIdentity.value }
-  );
-
   const rating_value =
     jsonLdSignals.ratingValue ??
     (() => {
@@ -1199,20 +1175,19 @@ export function extractBasicFields(html: string): ExtractedProductFields {
     title: title || null,
     meta_description: metaDescription.value || null,
     meta_description_source: metaDescription.source,
-    search_snippet_fallback: null,
     h1: h1 || null,
     raw_h1: heading.rawH1,
     resolved_primary_heading: heading.resolved,
     heading_source: heading.source,
     brand: brand || null,
     product_name: product_name || null,
-    model_code: model_code || null,
+    model_code: null,
     sku: skuIdentity.value || null,
     sku_source: skuIdentity.source,
-    mpn: mpnIdentity.value || null,
-    mpn_source: mpnIdentity.source,
-    gtin: gtinIdentity.value || null,
-    gtin_source: gtinIdentity.source,
+    mpn: null,
+    mpn_source: null,
+    gtin: null,
+    gtin_source: null,
     price: price || null,
     normalized_price,
     original_price: null,

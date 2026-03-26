@@ -360,27 +360,27 @@ canvas{display:block;width:100%!important;}
   <div class="g4">
     <div class="kpi kpi-b">
       <div class="kpi-lbl">Ortalama Genel Skor</div>
-      <div class="kpi-val">71</div>
-      <div class="kpi-note up">↑ +4 puan bu ay</div>
-      <div class="kpi-bar"><div class="kpi-fill" style="width:71%;background:var(--brand);"></div></div>
+      <div class="kpi-val" id="ovAvgScoreVal">71</div>
+      <div class="kpi-note up" id="ovAvgScoreNote">↑ +4 puan bu ay</div>
+      <div class="kpi-bar"><div class="kpi-fill" id="ovAvgScoreFill" style="width:71%;background:var(--brand);"></div></div>
     </div>
     <div class="kpi kpi-g">
       <div class="kpi-lbl">Toplam Rapor</div>
-      <div class="kpi-val">47</div>
-      <div class="kpi-note up">↑ %18 geçen ay</div>
-      <div class="kpi-bar"><div class="kpi-fill" style="width:78%;background:var(--accent);"></div></div>
+      <div class="kpi-val" id="ovTotalReportsVal">47</div>
+      <div class="kpi-note up" id="ovTotalReportsNote">↑ %18 geçen ay</div>
+      <div class="kpi-bar"><div class="kpi-fill" id="ovTotalReportsFill" style="width:78%;background:var(--accent);"></div></div>
     </div>
     <div class="kpi kpi-w">
       <div class="kpi-lbl">Veri Tamamlanma</div>
-      <div class="kpi-val">%83</div>
-      <div class="kpi-note ne">Ortalama veri kalitesi</div>
-      <div class="kpi-bar"><div class="kpi-fill" style="width:83%;background:var(--warn);"></div></div>
+      <div class="kpi-val" id="ovDataCompletenessVal">%83</div>
+      <div class="kpi-note ne" id="ovDataCompletenessNote">Ortalama veri kalitesi</div>
+      <div class="kpi-bar"><div class="kpi-fill" id="ovDataCompletenessFill" style="width:83%;background:var(--warn);"></div></div>
     </div>
     <div class="kpi kpi-r">
       <div class="kpi-lbl">Bekleyen Aksiyon</div>
-      <div class="kpi-val">9</div>
-      <div class="kpi-note dn">3 raporda kritik</div>
-      <div class="kpi-bar"><div class="kpi-fill" style="width:40%;background:var(--danger);"></div></div>
+      <div class="kpi-val" id="ovPendingActionsVal">9</div>
+      <div class="kpi-note dn" id="ovPendingActionsNote">3 raporda kritik</div>
+      <div class="kpi-bar"><div class="kpi-fill" id="ovPendingActionsFill" style="width:40%;background:var(--danger);"></div></div>
     </div>
   </div>
 
@@ -421,7 +421,7 @@ canvas{display:block;width:100%!important;}
     <h3>Son Raporlar</h3>
     <button class="btn btn-g btn-sm" onclick="gv('reports')">Tümünü Gör →</button>
   </div>
-  <div class="rt">
+  <div class="rt" id="overviewReportsTable">
     <div class="rt-head">
       <div class="rt-hc">Ürün (title · brand)</div>
       <div class="rt-hc">Genel</div>
@@ -475,7 +475,7 @@ canvas{display:block;width:100%!important;}
 
 <div id="view-reports" class="view">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;">
-    <h2 style="font-size:20px;">Tüm Raporlar <span style="font-size:13px;color:var(--muted);font-weight:400;">· 12 rapor</span></h2>
+    <h2 style="font-size:20px;">Tüm Raporlar <span id="reportsTotalCountLabel" style="font-size:13px;color:var(--muted);font-weight:400;">· 12 rapor</span></h2>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       <select class="fi" style="padding:7px 10px;font-size:12.5px;"><option>Tüm Kategoriler</option><option>Kişisel Bakım</option><option>Ayakkabı</option><option>Elektronik</option><option>Ev Aletleri</option></select>
       <select class="fi" style="padding:7px 10px;font-size:12.5px;"><option>Tüm Durumlar</option><option>Güçlü (80+)</option><option>İyileştir (60-79)</option><option>Kritik (&lt;60)</option></select>
@@ -483,7 +483,7 @@ canvas{display:block;width:100%!important;}
       <button class="btn btn-p btn-sm" onclick="gv('new-analysis')">+ Yeni Analiz</button>
     </div>
   </div>
-  <div class="rt">
+  <div class="rt" id="reportsTable">
     <div class="rt-head">
       <div class="rt-hc">Ürün</div>
       <div class="rt-hc">Genel</div>
@@ -861,6 +861,8 @@ let currentReportData=null;
 let currentCampaignState={discountRate:null,campaignDays:null};
 let keywordRankRequestToken=0;
 let currentActionFeedbackType='veri_yorumlama';
+let liveReportsCache=[];
+let reportsFetchPromise=null;
 function dc(id){if(CI[id]){CI[id].destroy();delete CI[id];}}
 function mk(id,type,data,opts={}){
   dc(id);const el=document.getElementById(id);if(!el)return;
@@ -1285,14 +1287,28 @@ function getPriceData(){
   const r=currentReportData||{};
   const offers=Array.isArray(r.otherSellerOffers)?r.otherSellerOffers:[];
   const summary=r.otherSellersSummary||null;
+  const marketSummary=r.marketComparison?.competitorSummary || null;
   const similarProducts=Array.isArray(r.similarProducts)?r.similarProducts:[];
-  const ownPrice=safeNumber(r.normalizedPrice) ?? 849;
-  const offerPrices=alignPriceScale(offers.map(item=>safeNumber(item.price)), ownPrice);
-  const similarPrices=alignPriceScale(similarProducts.map(item=>safeNumber(item.price)), ownPrice);
+  const rawOwnPrice=safeNumber(r.normalizedPrice);
+  const summaryAnchor=safeNumber(summary?.avg_price) ?? safeNumber(summary?.min_price) ?? safeNumber(summary?.max_price);
+  const referencePrice=rawOwnPrice ?? summaryAnchor ?? null;
+  const ownPrice=normalizeComparablePrice(rawOwnPrice, referencePrice);
+  const scaleAnchor=ownPrice ?? referencePrice;
+  const offerPrices=alignPriceScale(offers.map(item=>safeNumber(item.price)), scaleAnchor);
+  const similarPrices=alignPriceScale(similarProducts.map(item=>safeNumber(item.price)), scaleAnchor);
   const comparisonPrices=offerPrices.length?offerPrices:similarPrices;
-  const minPrice=normalizeComparablePrice(safeNumber(summary?.min_price), ownPrice) ?? (comparisonPrices.length?Math.min(...comparisonPrices):750);
-  const avgPrice=normalizeComparablePrice(safeNumber(summary?.avg_price), ownPrice) ?? (comparisonPrices.length?Number((comparisonPrices.reduce((a,b)=>a+b,0)/comparisonPrices.length).toFixed(2)):921);
-  const maxPrice=normalizeComparablePrice(safeNumber(summary?.max_price), ownPrice) ?? (comparisonPrices.length?Math.max(...comparisonPrices):1050);
+  const minPrice=normalizeComparablePrice(
+    safeNumber(summary?.min_price) ?? safeNumber(marketSummary?.lowestCompetitorPrice),
+    scaleAnchor
+  ) ?? (comparisonPrices.length?Math.min(...comparisonPrices):null);
+  const avgPrice=normalizeComparablePrice(
+    safeNumber(summary?.avg_price) ?? safeNumber(marketSummary?.averageCompetitorPrice),
+    scaleAnchor
+  ) ?? (comparisonPrices.length?Number((comparisonPrices.reduce((a,b)=>a+b,0)/comparisonPrices.length).toFixed(2)):null);
+  const maxPrice=normalizeComparablePrice(
+    safeNumber(summary?.max_price) ?? safeNumber(marketSummary?.highestCompetitorPrice),
+    scaleAnchor
+  ) ?? (comparisonPrices.length?Math.max(...comparisonPrices):null);
   return { ownPrice,minPrice,avgPrice,maxPrice };
 }
 function getCompetitiveAdvantageData(){
@@ -1389,9 +1405,26 @@ function updatePriceKpis(){
   const priceData=getPriceData();
   const offers=Array.isArray(r.otherSellerOffers)?r.otherSellerOffers:[];
   const similarProducts=Array.isArray(r.similarProducts)?r.similarProducts:[];
-  const comparisonItems=offers.length?offers:similarProducts;
-  const cheaperCount=comparisonItems.filter(item=>safeNumber(item?.price)<currentPrice).length;
-  const avgDiffPct=(currentPrice!=null && priceData.avgPrice)?Math.round(Math.abs(((currentPrice-priceData.avgPrice)/priceData.avgPrice)*100)):0;
+  const normalizedOfferPrices=alignPriceScale(
+    offers.map(item=>safeNumber(item?.price)),
+    currentPrice ?? priceData.avgPrice
+  );
+  const hasDirectOfferComparison=normalizedOfferPrices.length>0 && currentPrice!=null;
+  const comparisonSourcePrices=offers.length
+    ? offers.map(item=>safeNumber(item?.price))
+    : similarProducts.map(item=>safeNumber(item?.price));
+  const normalizedComparisonPrices=alignPriceScale(
+    comparisonSourcePrices,
+    currentPrice ?? priceData.avgPrice
+  );
+  const hasComparisonData=normalizedComparisonPrices.length>0;
+  const hasComparableAverage=currentPrice!=null && priceData.avgPrice!=null && priceData.avgPrice>0;
+  const cheaperCount=hasDirectOfferComparison
+    ? normalizedOfferPrices.filter((price)=>price<currentPrice).length
+    : 0;
+  const avgDiffPct=hasComparableAverage
+    ? Math.round(Math.abs(((currentPrice-priceData.avgPrice)/priceData.avgPrice)*100))
+    : 0;
   const currentPriceEl=document.getElementById('rdCurrentPrice');
   const currentPriceNoteEl=document.getElementById('rdCurrentPriceNote');
   const originalPriceEl=document.getElementById('rdOriginalPrice');
@@ -1419,7 +1452,7 @@ function updatePriceKpis(){
   if(avgCompetitorPriceEl) avgCompetitorPriceEl.textContent=formatCurrencyTRY(priceData.avgPrice);
   if(avgCompetitorPriceNoteEl){
     const usingSimilar=offers.length===0 && similarProducts.length>0;
-    if(currentPrice!=null && priceData.avgPrice){
+    if(hasComparableAverage){
       avgCompetitorPriceNoteEl.textContent=currentPrice<priceData.avgPrice
         ? `Bu ürün %${avgDiffPct} daha uygun`
         : currentPrice>priceData.avgPrice
@@ -1428,18 +1461,25 @@ function updatePriceKpis(){
     } else {
       avgCompetitorPriceNoteEl.textContent='Karşılaştırma verisi yok';
     }
-    avgCompetitorPriceNoteEl.className=`kpi-note ${currentPrice!=null && priceData.avgPrice && currentPrice<=priceData.avgPrice?'up':'ne'}`;
+    avgCompetitorPriceNoteEl.className=`kpi-note ${hasComparableAverage && currentPrice<=priceData.avgPrice?'up':'ne'}`;
     if(usingSimilar && avgCompetitorPriceNoteEl.textContent!=='Karşılaştırma verisi yok'){
       avgCompetitorPriceNoteEl.textContent=`Benzer ürünlere göre ${avgCompetitorPriceNoteEl.textContent.toLowerCase()}`;
     }
   }
-  if(cheaperCountEl) cheaperCountEl.textContent=String(cheaperCount);
+  if(cheaperCountEl) cheaperCountEl.textContent=hasDirectOfferComparison?String(cheaperCount):'—';
   if(cheaperCountNoteEl){
     const usingSimilar=offers.length===0 && similarProducts.length>0;
-    cheaperCountNoteEl.textContent=cheaperCount>0
-      ? (usingSimilar?'Daha uygun benzer ürün var':'Daha ucuz rakip var')
-      : (usingSimilar?'Fiyat benzer ürünlerle rekabetçi':'Rakipler arasında güçlü konum');
-    cheaperCountNoteEl.className=`kpi-note ${cheaperCount>0?'dn':'up'}`;
+    if(!hasDirectOfferComparison){
+      cheaperCountNoteEl.textContent=usingSimilar
+        ? 'Aynı ürün rakip satıcı verisi yok'
+        : 'Karşılaştırma verisi yok';
+      cheaperCountNoteEl.className='kpi-note ne';
+    }else{
+      cheaperCountNoteEl.textContent=cheaperCount>0
+        ? 'Daha ucuz rakip var'
+        : 'Rakipler arasında güçlü konum';
+      cheaperCountNoteEl.className=`kpi-note ${cheaperCount>0?'dn':'up'}`;
+    }
   }
 }
 function getContentSeoData(){
@@ -1811,6 +1851,129 @@ function pickEmojiForCategory(category){
   return '📦';
 }
 
+function toReportDataFromStored(item){
+  const extracted=item?.extractedData&&typeof item.extractedData==='object'?item.extractedData:{};
+  return adaptApiResultToReportData({
+    url:item?.url || null,
+    category:item?.category || extracted?.category || null,
+    seoScore:safeNumber(item?.seoScore),
+    conversionScore:safeNumber(item?.conversionScore),
+    overallScore:safeNumber(item?.overallScore),
+    dataSource:item?.dataSource || null,
+    createdAt:item?.createdAt || null,
+    extractedData:extracted,
+    marketComparison:item?.marketComparison || null,
+    reviewAnalysis:extracted?.review_analysis || null,
+    suggestions:Array.isArray(item?.suggestions)?item.suggestions:[],
+    priorityActions:Array.isArray(item?.priorityActions)?item.priorityActions:[],
+    aiCommentary:item?.aiCommentary || null,
+    trendyolScorecard:item?.trendyolScorecard || null,
+    questionAnalysis:item?.questionAnalysis || null,
+  });
+}
+
+function getCurrentReports(){
+  return liveReportsCache.length?liveReportsCache:getDemoReports();
+}
+
+function getScoreStatus(score){
+  if(score>=80) return {label:'Güçlü',tag:'t-g',scoreClass:'sco-g',color:'var(--accent)'};
+  if(score>=60) return {label:'İyileştir',tag:'t-w',scoreClass:'sco-w',color:'var(--warn)'};
+  return {label:'Kritik',tag:'t-r',scoreClass:'sco-r',color:'var(--danger)'};
+}
+
+function buildReportRowHtml(report,index){
+  const score=Math.round(safeNumber(report?.overallScore) ?? 0);
+  const seoScore=Math.round(safeNumber(report?.seoScore) ?? 0);
+  const conversionScore=Math.round(safeNumber(report?.conversionScore) ?? 0);
+  const status=getScoreStatus(score);
+  return `<div class="rt-row" onclick="openReport(${index})">
+    <div class="rt-prod">
+      <div class="rt-thumb">${escapeHtml(String(report?.emoji||'📦'))}</div>
+      <div><div class="rt-pname">${escapeHtml(String(report?.title||'Ürün'))}</div><div class="rt-pcat">${escapeHtml(String(report?.cat||'Kategori'))}</div></div>
+    </div>
+    <div><div class="sco ${status.scoreClass}">${score}</div></div>
+    <div style="font-size:12.5px;color:${status.color};">${seoScore}</div>
+    <div style="font-size:12.5px;color:${status.color};">${conversionScore}</div>
+    <div><span class="tag ${status.tag}">${status.label}</span></div>
+    <div style="font-size:12px;color:var(--muted);">${escapeHtml(String(report?.date||''))}</div>
+    <div class="rt-acts"><div class="act-btn" title="Detay">→</div><div class="act-btn" title="Export">↓</div></div>
+  </div>`;
+}
+
+function renderReportTables(){
+  const reports=getCurrentReports();
+  const overviewTable=document.getElementById('overviewReportsTable');
+  if(overviewTable){
+    const rows=reports.slice(0,4).map((report,index)=>buildReportRowHtml(report,index)).join('');
+    overviewTable.innerHTML=`<div class="rt-head">
+      <div class="rt-hc">Ürün (title · brand)</div>
+      <div class="rt-hc">Genel</div>
+      <div class="rt-hc">SEO</div>
+      <div class="rt-hc">Dönüşüm</div>
+      <div class="rt-hc">Durum</div>
+      <div class="rt-hc">Tarih</div>
+      <div class="rt-hc"></div>
+    </div>${rows}`;
+  }
+  const reportsTable=document.getElementById('reportsTable');
+  if(reportsTable){
+    const rows=reports.map((report,index)=>buildReportRowHtml(report,index)).join('');
+    reportsTable.innerHTML=`<div class="rt-head">
+      <div class="rt-hc">Ürün</div>
+      <div class="rt-hc">Genel</div>
+      <div class="rt-hc">SEO</div>
+      <div class="rt-hc">Dönüşüm</div>
+      <div class="rt-hc">Durum</div>
+      <div class="rt-hc">Tarih</div>
+      <div class="rt-hc"></div>
+    </div>${rows}`;
+  }
+  const reportsCount=document.getElementById('reportsTotalCountLabel');
+  if(reportsCount){
+    reportsCount.textContent=`· ${reports.length} rapor`;
+  }
+}
+
+function rollingMonthLabels(lastN){
+  const now=new Date();
+  const labels=[];
+  for(let offset=lastN-1; offset>=0; offset--){
+    const d=new Date(now.getFullYear(),now.getMonth()-offset,1);
+    labels.push(monthLabelTR(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`));
+  }
+  return labels;
+}
+
+function toIsoMonth(value){
+  try{
+    const d=new Date(value);
+    if(Number.isNaN(d.getTime())) return null;
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  }catch{
+    return null;
+  }
+}
+
+async function ensureLiveReportsLoaded(){
+  if(liveReportsCache.length) return liveReportsCache;
+  if(reportsFetchPromise) return reportsFetchPromise;
+  reportsFetchPromise=(async ()=>{
+    try{
+      const res=await fetch('/api/reports/list?detail=full&take=100',{cache:'no-store'});
+      const payload=await res.json().catch(()=>null);
+      if(res.ok && Array.isArray(payload?.reports) && payload.reports.length){
+        liveReportsCache=payload.reports.map(toReportDataFromStored);
+      }
+    }catch{}
+    finally{
+      reportsFetchPromise=null;
+    }
+    return liveReportsCache;
+  })();
+  return reportsFetchPromise;
+}
+
 function getDemoReports(){
   return [
     {
@@ -1860,6 +2023,19 @@ function getDemoReports(){
 
 function adaptApiResultToReportData(payload){
   const extracted=payload?.extractedData||{};
+  const extractedSimilarProducts=Array.isArray(extracted?.similar_product_candidates)
+    ? extracted.similar_product_candidates
+    : [];
+  const mappedSimilarProducts=extractedSimilarProducts
+    .map((item)=>({
+      title:item?.title || item?.name || null,
+      price:safeNumber(item?.price),
+    }))
+    .filter((item)=>item.title || item.price!=null);
+  const marketSimilarProducts=Array.isArray(payload?.marketComparison?.similarProducts)
+    ? payload.marketComparison.similarProducts
+    : [];
+  const similarProducts=(marketSimilarProducts.length?marketSimilarProducts:mappedSimilarProducts).slice(0,12);
   const overallScore=safeNumber(payload?.overallScore);
   const seoScore=safeNumber(payload?.seoScore);
   const title=String(extracted.title||extracted.product_name||extracted.resolved_primary_heading||'Ürün analizi');
@@ -1872,11 +2048,13 @@ function adaptApiResultToReportData(payload){
     emoji:pickEmojiForCategory(payload?.category || extracted.category || title),
     title,
     meta:meta || sellerName,
-    date:formatDetailDate(new Date().toISOString()),
+    date:formatDetailDate(payload?.createdAt || new Date().toISOString()),
+    createdAt:payload?.createdAt || null,
     cat:String(payload?.category || extracted.category || 'Kategori bilgisi yok'),
     src:String(payload?.dataSource || 'Gerçek Veri'),
     url:payload?.url || null,
     overallScore:overallScore ?? 0,
+    dataCompletenessScore:safeNumber(payload?.dataCompletenessScore) ?? null,
     seoScore:seoScore ?? 0,
     conversionScore:safeNumber(payload?.conversionScore) ?? 0,
     discountRate:safeNumber(extracted.discount_rate) ?? 0,
@@ -1908,7 +2086,8 @@ function adaptApiResultToReportData(payload){
     categoryAverages:payload?.categoryAverages || null,
     otherSellerOffers:Array.isArray(extracted.other_seller_offers)?extracted.other_seller_offers:[],
     otherSellersSummary:extracted.other_sellers_summary || null,
-    similarProducts:Array.isArray(payload?.marketComparison?.similarProducts)?payload.marketComparison.similarProducts:[],
+    similarProducts,
+    marketComparison:payload?.marketComparison || null,
     reviewAnalysis:payload?.reviewAnalysis || extracted.review_analysis || null,
     suggestions:Array.isArray(payload?.suggestions)?payload.suggestions:[],
     priorityActions:Array.isArray(payload?.priorityActions)?payload.priorityActions:[],
@@ -1998,9 +2177,23 @@ function openReportData(r){
 }
 
 function openReport(idx){
-  const data=getDemoReports();
+  const data=getCurrentReports();
   const r=data[idx]||data[0];
   openReportData(r);
+}
+async function loadReportById(reportId){
+  const id=String(reportId||'').trim();
+  if(!id) return false;
+  try{
+    const res=await fetch(`/api/reports/${encodeURIComponent(id)}?timeline=0`,{cache:'no-store'});
+    const payload=await res.json().catch(()=>null);
+    if(!res.ok || !payload?.report) return false;
+    const report=adaptApiResultToReportData(payload.report);
+    openReportData(report);
+    return true;
+  }catch{
+    return false;
+  }
 }
 
 function rTab(btn,secId){
@@ -2048,39 +2241,166 @@ async function startAnalysis(){
   }
 }
 
-function initOverview(){
-  mk('actChart','bar',{
-    labels:['Ekim','Kasım','Aralık','Ocak','Şubat','Mart'],
-    datasets:[
-      {type:'bar',label:'Rapor Sayısı',data:[18,24,31,27,38,47],backgroundColor:'rgba(79,127,255,.35)',borderRadius:6,borderSkipped:false,yAxisID:'y'},
-      {type:'line',label:'Ort. overallScore',data:[64,67,69,66,70,71],borderColor:AC,backgroundColor:'transparent',tension:.4,pointRadius:4,pointBackgroundColor:AC,yAxisID:'y1'}
-    ]
-  },{plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:12}}},scales:{y:{grid:{color:GC},position:'left'},y1:{grid:{display:false},position:'right',min:50,max:100}}});
+function initAnalyzeInputHandlers(){
+  const input=document.getElementById('analyzeInput');
+  if(!input || input.dataset.bound==='1') return;
+  input.dataset.bound='1';
+  input.addEventListener('keydown',(event)=>{
+    if(event.key==='Enter'){
+      event.preventDefault();
+      startAnalysis();
+    }
+  });
+}
 
+function initOverview(){
+  const reports=getCurrentReports();
+  if(!reports.length) return;
+
+  const avgOverall=Math.round(
+    reports.reduce((sum,item)=>sum+(safeNumber(item.overallScore) ?? 0),0) / reports.length
+  );
+  const avgCompleteness=Math.round(
+    reports.reduce((sum,item)=>sum+(safeNumber(item.dataCompletenessScore) ?? 70),0) / reports.length
+  );
+  const criticalCount=reports.filter((item)=>(safeNumber(item.overallScore) ?? 0)<60).length;
+  const pendingActions=reports.reduce((sum,item)=>sum+(Array.isArray(item.priorityActions)?Math.min(3,item.priorityActions.length):1),0);
+
+  setText('ovAvgScoreVal',String(avgOverall));
+  setText('ovAvgScoreNote',avgOverall>=80?'↑ Güçlü ortalama skor':avgOverall>=60?'→ İyileştirme alanı var':'↓ Kritik seviye');
+  const avgFill=document.getElementById('ovAvgScoreFill');
+  if(avgFill) avgFill.style.width=`${clamp(avgOverall,0,100)}%`;
+
+  setText('ovTotalReportsVal',String(reports.length));
+  setText('ovTotalReportsNote',reports.length>=20?'↑ Yüksek analiz hacmi':'→ Rapor hacmi artıyor');
+  const totalFill=document.getElementById('ovTotalReportsFill');
+  if(totalFill) totalFill.style.width=`${clamp(Math.round((reports.length/100)*100),8,100)}%`;
+
+  setText('ovDataCompletenessVal',`%${avgCompleteness}`);
+  setText('ovDataCompletenessNote',avgCompleteness>=80?'Ortalama veri kalitesi yüksek':avgCompleteness>=60?'Ortalama veri kalitesi orta':'Veri kalitesi gelişmeli');
+  const compFill=document.getElementById('ovDataCompletenessFill');
+  if(compFill) compFill.style.width=`${clamp(avgCompleteness,0,100)}%`;
+
+  setText('ovPendingActionsVal',String(pendingActions));
+  setText('ovPendingActionsNote',`${criticalCount} raporda kritik`);
+  const pendingFill=document.getElementById('ovPendingActionsFill');
+  if(pendingFill) pendingFill.style.width=`${clamp(Math.round((pendingActions/Math.max(5,reports.length*2))*100),5,100)}%`;
+
+  const labels=rollingMonthLabels(6);
+  const monthCountMap={};
+  const monthScoreMap={};
+  labels.forEach((label)=>{ monthCountMap[label]=0; monthScoreMap[label]=[]; });
+  reports.forEach((report)=>{
+    const keyIso=toIsoMonth(report?.createdAt || report?.date);
+    if(!keyIso) return;
+    const label=monthLabelTR(keyIso);
+    if(!(label in monthCountMap)) return;
+    monthCountMap[label]+=1;
+    const score=safeNumber(report?.overallScore);
+    if(score!=null) monthScoreMap[label].push(score);
+  });
+  const monthCounts=labels.map((label)=>monthCountMap[label]||0);
+  const monthScores=labels.map((label)=>{
+    const values=monthScoreMap[label]||[];
+    if(!values.length) return null;
+    return Math.round(values.reduce((a,b)=>a+b,0)/values.length);
+  });
+
+  mk('actChart','bar',{
+    labels,
+    datasets:[
+      {type:'bar',label:'Rapor Sayısı',data:monthCounts,backgroundColor:'rgba(79,127,255,.35)',borderRadius:6,borderSkipped:false,yAxisID:'y'},
+      {type:'line',label:'Ort. overallScore',data:monthScores,borderColor:AC,backgroundColor:'transparent',tension:.4,pointRadius:4,pointBackgroundColor:AC,yAxisID:'y1'}
+    ]
+  },{plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:12}}},scales:{y:{grid:{color:GC},position:'left',beginAtZero:true},y1:{grid:{display:false},position:'right',min:40,max:100}}});
+
+  const strong=reports.filter((item)=>(safeNumber(item.overallScore) ?? 0)>=80).length;
+  const medium=reports.filter((item)=>{const s=safeNumber(item.overallScore) ?? 0; return s>=60 && s<80;}).length;
+  const critical=Math.max(0,reports.length-strong-medium);
   mk('scoreDistChart','doughnut',{
     labels:['Güçlü (80+)','Orta (60-79)','Kritik (<60)'],
-    datasets:[{data:[14,25,8],backgroundColor:[AC,BR,DG],borderWidth:0,hoverOffset:5}]
+    datasets:[{data:[strong,medium,critical],backgroundColor:[AC,BR,DG],borderWidth:0,hoverOffset:5}]
   },{cutout:'62%',plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:12}}}});
 
+  const pageScores=reports.map((item)=>{
+    const titleLen=String(item?.title||'').length;
+    const image=safeNumber(item?.imageCount) ?? 0;
+    const desc=safeNumber(item?.descriptionLength) ?? 0;
+    const qa=safeNumber(item?.qaSnippetCount) ?? 0;
+    const hasSpecs=item?.hasSpecs===true;
+    return {
+      title:clamp(Math.round((titleLen/90)*100),15,100),
+      image:clamp(Math.round((image/8)*100),10,100),
+      desc:clamp(Math.round((desc/1200)*100),10,100),
+      faq:clamp(Math.round((qa/10)*100),5,100),
+      tech:hasSpecs?85:35,
+    };
+  });
+  const avgPage=[
+    Math.round(pageScores.reduce((s,i)=>s+i.title,0)/pageScores.length),
+    Math.round(pageScores.reduce((s,i)=>s+i.image,0)/pageScores.length),
+    Math.round(pageScores.reduce((s,i)=>s+i.desc,0)/pageScores.length),
+    Math.round(pageScores.reduce((s,i)=>s+i.faq,0)/pageScores.length),
+    Math.round(pageScores.reduce((s,i)=>s+i.tech,0)/pageScores.length),
+  ];
   mk('pageStrChart','bar',{
     labels:['Başlık','Görsel','Açıklama','SSS','Teknik'],
-    datasets:[{label:'Skor',data:[38,48,40,20,75],backgroundColor:[DG,WN,WN,'rgba(239,68,68,.5)',AC],borderRadius:5,borderSkipped:false}]
+    datasets:[{label:'Skor',data:avgPage,backgroundColor:[DG,WN,WN,'rgba(239,68,68,.5)',AC],borderRadius:5,borderSkipped:false}]
   },{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{max:100,grid:{color:GC}},y:{grid:{display:false}}}});
 
+  const trustPoints=reports.map((item)=>{
+    const seller=safeNumber(item?.sellerScore);
+    const reviews=safeNumber(item?.reviewAnalysis?.general?.total_comment_count) ?? 0;
+    const rating=safeNumber(item?.reviewAnalysis?.general?.average_rating);
+    const deliveryText=String(item?.deliveryText||'').toLocaleLowerCase('tr-TR');
+    const delivery=/1-2 gün|yarın|hızlı/.test(deliveryText)?9:/2-3 gün/.test(deliveryText)?8:/3-5 gün/.test(deliveryText)?6.8:5.6;
+    return {
+      seller:seller!=null?Math.min(10,Math.max(0,seller)):7,
+      reviewDepth:Math.min(10,Math.max(2,Math.log10(reviews+1)*3.4)),
+      rating:rating!=null?Math.min(10,Math.max(0,rating*2)):7.4,
+      returns:item?.hasReturnInfo===true?8.2:5.5,
+      delivery,
+    };
+  });
+  const avgTrust=[
+    Number((trustPoints.reduce((s,i)=>s+i.seller,0)/trustPoints.length).toFixed(1)),
+    Number((trustPoints.reduce((s,i)=>s+i.reviewDepth,0)/trustPoints.length).toFixed(1)),
+    Number((trustPoints.reduce((s,i)=>s+i.rating,0)/trustPoints.length).toFixed(1)),
+    Number((trustPoints.reduce((s,i)=>s+i.returns,0)/trustPoints.length).toFixed(1)),
+    Number((trustPoints.reduce((s,i)=>s+i.delivery,0)/trustPoints.length).toFixed(1)),
+  ];
   mk('custTrustChart','radar',{
     labels:['Satıcı','Yorum','Puan','İade','Teslimat'],
-    datasets:[{data:[9.6,8.4,9.4,7.2,9.0],borderColor:AC,backgroundColor:'rgba(0,212,168,.12)',pointRadius:3,pointBackgroundColor:AC}]
+    datasets:[{data:avgTrust,borderColor:AC,backgroundColor:'rgba(0,212,168,.12)',pointRadius:3,pointBackgroundColor:AC}]
   },{plugins:{legend:{display:false}},scales:{r:{max:10,ticks:{display:false},grid:{color:GC},pointLabels:{font:{size:9}}}}});
 
+  const avgMarket=Math.round(
+    reports.reduce((sum,item)=>{
+      const own=safeNumber(item?.normalizedPrice);
+      const avg=safeNumber(item?.otherSellersSummary?.avg_price);
+      if(own==null || avg==null || avg<=0) return sum+55;
+      return sum+clamp(Math.round(50+(((avg-own)/avg)*50)),5,95);
+    },0) / reports.length
+  );
   mk('mktPosChart','doughnut',{
     labels:['Bu Ürün','Kalan'],
-    datasets:[{data:[62,38],backgroundColor:[BR,'rgba(255,255,255,.05)'],borderWidth:0}]
+    datasets:[{data:[avgMarket,100-avgMarket],backgroundColor:[BR,'rgba(255,255,255,.05)'],borderWidth:0}]
   },{cutout:'70%',plugins:{legend:{display:false}}});
 
+  const challengeCounts={title:0,image:0,desc:0,faq:0,seller:0};
+  reports.forEach((item)=>{
+    if(String(item?.title||'').length<45) challengeCounts.title++;
+    if((safeNumber(item?.imageCount) ?? 0)<6) challengeCounts.image++;
+    if((safeNumber(item?.descriptionLength) ?? 0)<700) challengeCounts.desc++;
+    if((safeNumber(item?.qaSnippetCount) ?? 0)<3) challengeCounts.faq++;
+    if((safeNumber(item?.sellerScore) ?? 0)<8) challengeCounts.seller++;
+  });
   mk('challengesChart','bar',{
-    labels:['Başlık','image_count','desc_length','has_faq','SSS'],
-    datasets:[{data:[9,8,7,11,5],backgroundColor:'rgba(239,68,68,.5)',borderRadius:4,borderSkipped:false}]
-  },{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:GC}},y:{grid:{display:false}}}});
+    labels:['Başlık','image_count','desc_length','has_faq','seller_score'],
+    datasets:[{data:[challengeCounts.title,challengeCounts.image,challengeCounts.desc,challengeCounts.faq,challengeCounts.seller],backgroundColor:'rgba(239,68,68,.5)',borderRadius:4,borderSkipped:false}]
+  },{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:GC},beginAtZero:true},y:{grid:{display:false}}}});
+
+  renderReportTables();
 }
 
 function initRdSec(sec){
@@ -2094,18 +2414,94 @@ function initRdSec(sec){
 
 function initRdSummary(){
   updateSummaryDiagnosis();
+  const r=currentReportData||{};
+  const content=getContentSeoData();
+  const trust=getTrustData();
+  const demand=getDemandData();
+  const priceData=getPriceData();
+  const compAdvData=getCompetitiveAdvantageData();
+  const summary=r.otherSellersSummary||{};
+
+  const hasPriceComparison=priceData.ownPrice!=null && priceData.avgPrice!=null && priceData.avgPrice>0;
+  const offerScore=hasPriceComparison
+    ? clamp(Math.round(50+(((priceData.avgPrice-priceData.ownPrice)/priceData.avgPrice)*50)),0,100)
+    : clamp(Math.round(demand.relativeScore),0,100);
+  const trustScore=clamp(
+    Math.round(
+      ((safeNumber(trust.ratingValue) ?? 4.2)/5)*45 +
+      ((safeNumber(r.sellerScore) ?? 8)/10)*35 +
+      (r.hasReturnInfo===true?20:8)
+    ),
+    0,
+    100
+  );
+  const contentStrengthScore=clamp(
+    Math.round(content.descriptionScore*0.45 + content.imageScore*0.35 + content.keywordCoverageScore*0.2),
+    0,
+    100
+  );
+  const sellerTotal=
+    safeNumber(summary.total_sellers) ??
+    safeNumber(r.otherSellersCount) ??
+    (Array.isArray(r.otherSellerOffers)?r.otherSellerOffers.length:0);
+  const competitorPressure=clamp(Math.round(sellerTotal*8),0,100);
+  const competitionScore=clamp(
+    100-competitorPressure + (hasPriceComparison && priceData.ownPrice<=priceData.avgPrice?8:0),
+    0,
+    100
+  );
+  const seoScoreValue=clamp(Math.round(safeNumber(r.seoScore) ?? content.searchVisibilityScore),0,100);
+  const conversionScoreValue=clamp(Math.round(safeNumber(r.conversionScore) ?? demand.finalScore),0,100);
+  const productRadar=[seoScoreValue,conversionScoreValue,trustScore,offerScore,contentStrengthScore,competitionScore];
+  const categoryRadar=[
+    clamp(Math.round((content.categoryVisibilityScore ?? 70)+4),0,100),
+    72,
+    68,
+    65,
+    clamp(Math.round((content.descriptionBenchmark/1400)*100),50,90),
+    60
+  ];
+
+  const pageStrength=[content.titleScore,content.imageScore,content.descriptionScore,Math.round((content.questionSignalScore+content.qaCoverageScore)/2),content.specScore];
+
+  const ratingTrust=trust.ratingValue!=null?Math.min(10,Math.max(0,trust.ratingValue*2)):7;
+  const reviewDepth=trust.reviewCount!=null?Math.min(10,Math.max(2,Math.log10(trust.reviewCount+1)*3.5)):4;
+  const returnTrust=trust.hasReturnInfo?8.2:5.5;
+  const sellerTrustScore=trust.sellerScore!=null?Math.min(10,Math.max(0,trust.sellerScore)):7;
+  const breakdown=trust.generalBreakdown||{};
+  const complaintRatio=(breakdown.total&&breakdown.total>0)?(((breakdown.one_star||0)+(breakdown.two_star||0))/breakdown.total):0;
+  const complaintScore=Math.max(1,10-(complaintRatio*20));
+  const trustRadar=[sellerTrustScore,returnTrust,reviewDepth,ratingTrust,complaintScore];
+
+  const marketPositionShare=clamp(Math.round(demand.relativeScore),10,95);
+
+  const deliveryText=String(r.deliveryText||'').toLocaleLowerCase('tr-TR');
+  const deliveryScore=/1-2 gün|yarın|hızlı/.test(deliveryText)?90:/2-3 gün/.test(deliveryText)?78:/3-5 gün/.test(deliveryText)?62:50;
+  const ownSellerScore=clamp(Math.round((safeNumber(r.sellerScore) ?? 7.5)*10),0,100);
+  const ownComp=[offerScore,deliveryScore,ownSellerScore,content.imageScore,content.descriptionScore];
+
+  const compTotal=compAdvData
+    ? Math.max(1,compAdvData.officialCount+compAdvData.fastDeliveryCount+compAdvData.freeShippingCount+compAdvData.otherCount)
+    : Math.max(1,sellerTotal);
+  const rivalPrice=hasPriceComparison?clamp(100-offerScore+10,35,95):65;
+  const rivalDelivery=compAdvData?clamp(Math.round((compAdvData.fastDeliveryCount/compTotal)*100),45,90):65;
+  const rivalSeller=compAdvData?clamp(Math.round((compAdvData.officialCount/compTotal)*100)+55,45,95):68;
+  const rivalVisual=clamp(Math.round((content.imageBenchmark/Math.max(1,content.imageCount))*45+42),45,95);
+  const rivalContent=clamp(Math.round((content.descriptionBenchmark/Math.max(1,content.descriptionLength))*42+45),45,95);
+  const rivalComp=[rivalPrice,rivalDelivery,rivalSeller,rivalVisual,rivalContent];
+
   mk('summaryRadarChart','radar',{
     labels:['SEO','Dönüşüm','Güven','Teklif','İçerik','Rekabet'],
     datasets:[
-      {label:'Bu Ürün',data:[61,83,55,78,42,66],borderColor:BR,backgroundColor:'rgba(79,127,255,.13)',pointBackgroundColor:BR,pointRadius:4},
-      {label:'Kat. Ort.',data:[70,72,68,65,72,60],borderColor:'rgba(255,255,255,.2)',backgroundColor:'rgba(255,255,255,.04)',pointRadius:3,borderDash:[4,4]}
+      {label:'Bu Ürün',data:productRadar,borderColor:BR,backgroundColor:'rgba(79,127,255,.13)',pointBackgroundColor:BR,pointRadius:4},
+      {label:'Kat. Ort.',data:categoryRadar,borderColor:'rgba(255,255,255,.2)',backgroundColor:'rgba(255,255,255,.04)',pointRadius:3,borderDash:[4,4]}
     ]
   },{plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:12}}},scales:{r:{ticks:{stepSize:20,backdropColor:'transparent'},grid:{color:GC},pointLabels:{font:{size:10}}}}});
 
-  mk('rdPageStrChart','bar',{labels:['Başlık','Görsel','Açık.','SSS','Teknik'],datasets:[{data:[38,48,40,20,75],backgroundColor:[DG,WN,WN,'rgba(239,68,68,.5)',AC],borderRadius:4,borderSkipped:false}]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{max:100,grid:{color:GC}},y:{grid:{display:false}}}});
-  mk('rdCustTrChart','radar',{labels:['Satıcı','Yorum','Puan','İade','Teslimat'],datasets:[{data:[9.6,8.4,9.4,7.2,9.0],borderColor:AC,backgroundColor:'rgba(0,212,168,.12)',pointRadius:3,pointBackgroundColor:AC}]},{plugins:{legend:{display:false}},scales:{r:{max:10,ticks:{display:false},grid:{color:GC},pointLabels:{font:{size:9}}}}});
-  mk('rdMktPosChart','doughnut',{labels:['Konum','Kalan'],datasets:[{data:[62,38],backgroundColor:[BR,'rgba(255,255,255,.05)'],borderWidth:0}]},{cutout:'70%',plugins:{legend:{display:false}}});
-  mk('rdCompStrChart','bar',{labels:['Fiyat','Kargo','Satıcı P.','Görsel','İçerik'],datasets:[{label:'Rakip Ort.',data:[72,65,68,80,74],backgroundColor:'rgba(255,255,255,.08)',borderRadius:4,borderSkipped:false},{label:'Bu Ürün',data:[85,90,96,48,42],backgroundColor:[AC,AC,AC,DG,DG],borderRadius:4,borderSkipped:false}]},{plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:10}}},scales:{y:{max:110,grid:{color:GC}},x:{grid:{display:false}}}});
+  mk('rdPageStrChart','bar',{labels:['Başlık','Görsel','Açık.','SSS','Teknik'],datasets:[{data:pageStrength,backgroundColor:[DG,WN,WN,'rgba(239,68,68,.5)',AC],borderRadius:4,borderSkipped:false}]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{max:100,grid:{color:GC}},y:{grid:{display:false}}}});
+  mk('rdCustTrChart','radar',{labels:['Satıcı','Yorum','Puan','İade','Şikayet Riski'],datasets:[{data:trustRadar,borderColor:AC,backgroundColor:'rgba(0,212,168,.12)',pointRadius:3,pointBackgroundColor:AC}]},{plugins:{legend:{display:false}},scales:{r:{max:10,ticks:{display:false},grid:{color:GC},pointLabels:{font:{size:9}}}}});
+  mk('rdMktPosChart','doughnut',{labels:['Konum','Kalan'],datasets:[{data:[marketPositionShare,100-marketPositionShare],backgroundColor:[BR,'rgba(255,255,255,.05)'],borderWidth:0}]},{cutout:'70%',plugins:{legend:{display:false}}});
+  mk('rdCompStrChart','bar',{labels:['Fiyat','Kargo','Satıcı P.','Görsel','İçerik'],datasets:[{label:'Rakip Ort.',data:rivalComp,backgroundColor:'rgba(255,255,255,.08)',borderRadius:4,borderSkipped:false},{label:'Bu Ürün',data:ownComp,backgroundColor:[AC,AC,AC,DG,DG],borderRadius:4,borderSkipped:false}]},{plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:10}}},scales:{y:{max:110,grid:{color:GC}},x:{grid:{display:false}}}});
 }
 
 function initRdPrice(){
@@ -2200,8 +2596,43 @@ function initRdActions(){
   mk('actionScoreChart','bar',{labels:scoreLabels,datasets:[{data:scoreData,backgroundColor:scoreColors,borderRadius:5,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{min:Math.max(0,currentScore-10),max:100,grid:{color:GC}},x:{grid:{display:false}}}});
 }
 
-renderRecentAnalyses();
-initOverview();
+async function bootstrapDashboard(){
+  renderRecentAnalyses();
+  initAnalyzeInputHandlers();
+  await ensureLiveReportsLoaded();
+  renderReportTables();
+  const params=new URLSearchParams(window.location.search);
+  const queryView=params.get('view');
+  const reportId=params.get('reportId');
+  const hasKnownView=queryView && Object.prototype.hasOwnProperty.call(VIEWS,queryView);
+
+  if(queryView==='report-detail'){
+    const loaded=await loadReportById(reportId);
+    if(!loaded){
+      openReport(0);
+    }
+    return;
+  }
+
+  if(hasKnownView){
+    gv(queryView);
+    if(queryView==='reports'){
+      renderReportTables();
+      const requestedIndex=Number(params.get('demoIndex')||0);
+      if(Number.isFinite(requestedIndex) && requestedIndex>=0){
+        const reports=getCurrentReports();
+        if(reports[requestedIndex]){
+          openReport(requestedIndex);
+        }
+      }
+    }
+    return;
+  }
+
+  gv('overview');
+}
+
+bootstrapDashboard();
 </script>
 </body>
 </html>

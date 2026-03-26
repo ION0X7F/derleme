@@ -82,6 +82,13 @@ type TrendyolApiResponse = {
   questionCount?: number | null;
 };
 
+type TrendyolFollowerCountResponse = {
+  result?: {
+    count?: number | null;
+    text?: string | null;
+  } | null;
+};
+
 function extractContentId(url: string): string | null {
   // p-123456789 formatı
   const match = url.match(/[/-]p-?(\d+)/i);
@@ -104,6 +111,26 @@ function buildApiHeaders() {
     Origin: "https://www.trendyol.com",
     Referer: "https://www.trendyol.com/",
   };
+}
+
+export async function fetchTrendyolFollowerCountByMerchantId(
+  merchantId: number
+): Promise<number | null> {
+  try {
+    const followerUrl = `https://apigw.trendyol.com/discovery-storefront-trproductgw-service/api/sellerstore-follow/${merchantId}/follower-count?culture=tr-TR&channelId=1&checkCoupon=true`;
+    const response = await fetch(followerUrl, {
+      method: "GET",
+      headers: buildApiHeaders(),
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as TrendyolFollowerCountResponse;
+    const count = toFiniteNumber(data?.result?.count);
+    return typeof count === "number" ? Math.round(count) : null;
+  } catch {
+    return null;
+  }
 }
 
 function toFiniteNumber(value: unknown) {
@@ -302,6 +329,13 @@ export async function fetchTrendyolApi(url: string): Promise<TrendyolApiResult |
     // Ana satıcı
     const sellerData = data?.result?.product?.seller || data?.seller || null;
     const seller: TrendyolSeller | null = sellerData ? normalizeSellerOffer(sellerData) : null;
+
+    if (seller && typeof seller.merchant_id === "number" && seller.follower_count == null) {
+      const followerCount = await fetchTrendyolFollowerCountByMerchantId(seller.merchant_id);
+      if (typeof followerCount === "number") {
+        seller.follower_count = followerCount;
+      }
+    }
 
     // Diğer satıcılar
     const otherSellersRaw =

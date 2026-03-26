@@ -302,17 +302,13 @@ type ExtractedDataSummary = {
   title?: string;
   meta_description?: string;
   meta_description_source?: string | null;
-  search_snippet_fallback?: string | null;
   h1?: string;
   raw_h1?: string | null;
   resolved_primary_heading?: string | null;
   heading_source?: string | null;
   brand?: string | null;
   product_name?: string | null;
-  model_code?: string | null;
   sku_source?: string | null;
-  mpn_source?: string | null;
-  gtin_source?: string | null;
   category?: string | null;
   price?: string;
   normalized_price?: number | null;

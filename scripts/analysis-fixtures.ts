@@ -15,7 +15,7 @@ export function createExtracted(
     h1: "Test Elektronik Urun",
     brand: "TestBrand",
     product_name: "Test Urun",
-    model_code: "TB-1234",
+    model_code: null,
     sku: null,
     mpn: null,
     gtin: null,
@@ -88,7 +88,6 @@ export function createExtracted(
     platform: TEST_PLATFORM,
     ...overrides,
     meta_description_source: overrides.meta_description_source ?? "meta_description",
-    search_snippet_fallback: overrides.search_snippet_fallback ?? null,
   };
 }
 

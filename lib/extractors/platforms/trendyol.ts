@@ -343,6 +343,77 @@ function parsePromotionLabel(value: unknown) {
   return parsePromotionLabels(value)?.[0] ?? null;
 }
 
+function parseFollowerCountText(raw: string | null | undefined) {
+  const text = cleanText(raw);
+  if (!text) return null;
+
+  // "12,3B Takipçi", "1.2M", "12450" gibi değerleri normalize et
+  const normalized = text
+    .toLocaleLowerCase("tr-TR")
+    .replace(/takipç[iı]/g, "")
+    .replace(/followers?/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+
+  const match = normalized.match(/^(\d+(?:[.,]\d+)?)([a-zğüşöçı]*)$/i);
+  if (!match) return null;
+
+  const numberPart = Number(match[1].replace(",", "."));
+  if (!Number.isFinite(numberPart) || numberPart < 0) return null;
+
+  const unit = match[2];
+  const multiplier =
+    unit === "b" || unit === "bin"
+      ? 1_000
+      : unit === "m" || unit === "mn" || unit === "milyon"
+      ? 1_000_000
+      : 1;
+
+  return Math.round(numberPart * multiplier);
+}
+
+function extractFollowerCount(
+  $: CheerioAPI,
+  envoyProduct: Record<string, unknown> | null,
+  mainMerchantRecord: Record<string, unknown> | null,
+  decodedHtml: string
+) {
+  const fromState =
+    toFiniteNumber(getNestedValue(mainMerchantRecord, ["followerCount"])) ??
+    toFiniteNumber(getNestedValue(mainMerchantRecord, ["followersCount"])) ??
+    toFiniteNumber(getNestedValue(mainMerchantRecord, ["follower"])) ??
+    toFiniteNumber(getNestedValue(envoyProduct, ["merchantListing", "merchant", "followerCount"])) ??
+    toFiniteNumber(getNestedValue(envoyProduct, ["merchantListing", "merchant", "followersCount"])) ??
+    toFiniteNumber(getNestedValue(envoyProduct, ["merchant", "followerCount"])) ??
+    null;
+
+  if (typeof fromState === "number" && Number.isFinite(fromState)) {
+    return Math.round(fromState);
+  }
+
+  const fromSelector =
+    parseFollowerCountText(
+      $(
+        '#envoy > div > div > div._body_03c70b5._left_b388a23._bold_a1d0f64._align-left_def5d71.follower-count'
+      )
+        .first()
+        .text()
+    ) ??
+    parseFollowerCountText($(".follower-count").first().text()) ??
+    parseFollowerCountText($('[class*="follower-count"]').first().text()) ??
+    parseFollowerCountText($('[data-testid*="follower"]').first().text());
+
+  if (typeof fromSelector === "number") {
+    return fromSelector;
+  }
+
+  const fromHtmlRegex = parseFollowerCountText(
+    (decodedHtml.match(/"followerCount"\s*:\s*("?[\d.,]+[bBmM]?"?)/i) || [])[1] || null
+  );
+
+  return fromHtmlRegex;
+}
+
 function getCountFromRecord(
   record: Record<string, unknown> | null,
   candidates: string[]
@@ -663,6 +734,8 @@ function parseQaSnippets(
 }
 
 function parseOtherSellerOffers(
+  $: CheerioAPI,
+  decodedHtml: string,
   envoyProduct: Record<string, unknown> | null,
   currentPrice: number | null
 ) {
@@ -714,6 +787,7 @@ function parseOtherSellerOffers(
     mainMerchant && typeof mainMerchant === "object"
       ? (mainMerchant as Record<string, unknown>)
       : null;
+  const followerCount = extractFollowerCount($, envoyProduct, mainMerchantRecord, decodedHtml);
 
   const otherMerchants = getNestedValue(envoyProduct, ["merchantListing", "otherMerchants"]);
   const otherMerchantList = Array.isArray(otherMerchants)
@@ -961,7 +1035,7 @@ function parseOtherSellerOffers(
       toFiniteNumber(getNestedValue(mainMerchantRecord, ["sellerScore", "value"])) ??
       toFiniteNumber(getNestedValue(mainMerchantRecord, ["sellerScore"])) ??
       null,
-    follower_count: null,
+    follower_count: followerCount,
     official_seller: Boolean(
       getNestedValue(mainMerchantRecord, ["officialName"]) ||
         (parseMerchantBadges(mainMerchantRecord?.merchantMarkers)?.some((badge) =>
@@ -2168,6 +2242,33 @@ function extractSellerFromHtml($: CheerioAPI, decodedHtml: string) {
   );
 }
 
+function extractMerchantIdFromHtml($: CheerioAPI, decodedHtml: string) {
+  const linkCandidates = [
+    cleanText($('a[href*="/magaza/"]').first().attr("href") || null),
+    cleanText($('[data-testid="seller-name"]').closest("a").attr("href") || null),
+  ].filter((value): value is string => !!value);
+
+  for (const href of linkCandidates) {
+    const match = href.match(/-m-(\d+)/i);
+    if (match?.[1]) {
+      const id = Number(match[1]);
+      if (Number.isFinite(id)) return id;
+    }
+  }
+
+  const inlineMatch =
+    decodedHtml.match(/\/magaza\/[^"'\s]*-m-(\d+)/i) ||
+    decodedHtml.match(/"sellerId"\s*:\s*(\d+)/i) ||
+    decodedHtml.match(/"merchantId"\s*:\s*(\d+)/i);
+
+  if (inlineMatch?.[1]) {
+    const id = Number(inlineMatch[1]);
+    if (Number.isFinite(id)) return id;
+  }
+
+  return null;
+}
+
 export const extractTrendyolFields: PlatformExtractor = ({ $, html }) => {
   // 1. Tüm potansiyel veri kaynaklarını topla
   const decodedHtml = decodeUnicode(html);
@@ -2182,7 +2283,7 @@ export const extractTrendyolFields: PlatformExtractor = ({ $, html }) => {
     toFiniteNumber(getNestedValue(envoyProduct, ["price", "sellingPrice", "value"])) ??
     extractCurrentPriceNumber(jsonBlocks, stateObjects, decodedHtml);
 
-  const envoySignals = parseOtherSellerOffers(envoyProduct, currentPriceNumber);
+  const envoySignals = parseOtherSellerOffers($, decodedHtml, envoyProduct, currentPriceNumber);
 
   // 3. Veri önceliklendirme ve geri çekilme (fallback) mantığı ile nihai nesneyi oluştur
   // Öncelik Sırası: Envoy Sinyalleri -> Diğer Gömülü JSON'lar -> HTML Kazıma
@@ -2263,9 +2364,10 @@ export const extractTrendyolFields: PlatformExtractor = ({ $, html }) => {
     rating_breakdown: envoySignals.rating_breakdown,
     stock_quantity: envoySignals.stock_quantity,
     favorite_count: envoySignals.favorite_count,
+    follower_count: envoySignals.follower_count,
     other_seller_offers: envoySignals.other_seller_offers,
     other_sellers_summary: envoySignals.other_sellers_summary,
-    merchant_id: envoySignals.merchant_id,
+    merchant_id: envoySignals.merchant_id ?? extractMerchantIdFromHtml($, decodedHtml),
     listing_id: envoySignals.listing_id,
     is_best_seller: envoySignals.is_best_seller,
     best_seller_rank: envoySignals.best_seller_rank,

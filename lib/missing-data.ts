@@ -1241,7 +1241,7 @@ export function completeMissingFieldsWithMetadata(
 } {
   const result = completeMissingFields(params);
   const fieldMetadata = { ...baseMetadata };
-  const conservativeDerivedFields = new Set(["question_count", "model_code", "stock_quantity"]);
+  const conservativeDerivedFields = new Set(["question_count", "stock_quantity"]);
 
   // Update metadata for filled/derived fields
   for (const filledField of result.report.filledFields) {

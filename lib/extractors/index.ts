@@ -530,10 +530,6 @@ function mergeExtractedFields(params: {
       platformFields.meta_description_source,
       basicFields.meta_description_source
     ),
-    search_snippet_fallback: pickString(
-      platformFields.search_snippet_fallback,
-      basicFields.search_snippet_fallback
-    ),
     h1: pickString(platformFields.h1, basicFields.h1),
     raw_h1: pickString(platformFields.raw_h1, basicFields.raw_h1),
     resolved_primary_heading: pickString(
@@ -549,17 +545,14 @@ function mergeExtractedFields(params: {
 
     brand: pickString(platformFields.brand, basicFields.brand),
     product_name: pickString(platformFields.product_name, basicFields.product_name),
-    model_code: chooseBestModelCode(
-      platformFields.model_code,
-      basicFields.model_code
-    ),
+    model_code: null,
 
     sku: pickString(platformFields.sku, basicFields.sku),
     sku_source: pickString(platformFields.sku_source, basicFields.sku_source),
-    mpn: pickString(platformFields.mpn, basicFields.mpn),
-    mpn_source: pickString(platformFields.mpn_source, basicFields.mpn_source),
-    gtin: pickString(platformFields.gtin, basicFields.gtin),
-    gtin_source: pickString(platformFields.gtin_source, basicFields.gtin_source),
+    mpn: null,
+    mpn_source: null,
+    gtin: null,
+    gtin_source: null,
 
     price: mergedPrice,
     normalized_price: parseNormalizedPrice(mergedPrice),
@@ -734,7 +727,6 @@ function mergeExtractedFields(params: {
     merged.extractor_status === "ok" &&
     !platformFields.brand &&
     !platformFields.seller_name &&
-    !platformFields.model_code &&
     (platformFields.image_count == null || platformFields.image_count === 0)
   ) {
     merged.extractor_status = "partial";
