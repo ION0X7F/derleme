@@ -1,10 +1,11 @@
-import RoutePlaceholder from "../../../_ui/route-placeholder";
+import { permanentRedirect } from "next/navigation";
+import { getCanonicalReportRoute } from "@/lib/workspace-routes";
 
-export default function ReportExportPage() {
-  return (
-    <RoutePlaceholder
-      title="Rapor disa aktarma"
-      description="Export ekrani yeniden tasarlanacak. Simdilik temel route iskeleti calisiyor."
-    />
-  );
+export default async function LegacyReportExportPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  permanentRedirect(`${getCanonicalReportRoute(id)}/export`);
 }

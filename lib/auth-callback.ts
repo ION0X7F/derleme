@@ -1,12 +1,14 @@
-const DEFAULT_CALLBACK_PATH = "/dashboard";
+import { WORKSPACE_ROUTES } from "@/lib/workspace-routes";
+
+const DEFAULT_CALLBACK_PATH = WORKSPACE_ROUTES.dashboard;
 
 const ALLOWED_CALLBACK_PREFIXES = [
-  "/dashboard",
-  "/analyze",
-  "/reports",
+  WORKSPACE_ROUTES.dashboard,
+  WORKSPACE_ROUTES.analyze,
+  WORKSPACE_ROUTES.reports,
   "/reports/",
   "/report/",
-  "/account",
+  WORKSPACE_ROUTES.account,
   "/admin",
   "/admin/",
   "/login",
@@ -20,13 +22,24 @@ function isAllowedInternalPath(pathname: string) {
   );
 }
 
+function normalizeLegacyWorkspaceCallbackPath(path: string) {
+  if (!path.startsWith("/reports/")) return path;
+
+  const suffix = path.slice("/reports/".length);
+  if (!suffix) return WORKSPACE_ROUTES.reports;
+
+  return `/report/${suffix}`;
+}
+
 export function sanitizeAuthCallbackPath(raw: string | null | undefined): string {
   if (!raw) return DEFAULT_CALLBACK_PATH;
 
   if (raw.startsWith("/") && !raw.startsWith("//")) {
     try {
       const parsed = new URL(raw, "http://localhost");
-      const candidate = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+      const candidate = normalizeLegacyWorkspaceCallbackPath(
+        `${parsed.pathname}${parsed.search}${parsed.hash}`
+      );
       return isAllowedInternalPath(parsed.pathname)
         ? candidate
         : DEFAULT_CALLBACK_PATH;
@@ -39,7 +52,9 @@ export function sanitizeAuthCallbackPath(raw: string | null | undefined): string
     const parsed = new URL(raw, "http://localhost");
     if (parsed.origin !== "http://localhost") return DEFAULT_CALLBACK_PATH;
 
-    const candidate = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    const candidate = normalizeLegacyWorkspaceCallbackPath(
+      `${parsed.pathname}${parsed.search}${parsed.hash}`
+    );
     return isAllowedInternalPath(parsed.pathname)
       ? candidate
       : DEFAULT_CALLBACK_PATH;
