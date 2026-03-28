@@ -24,6 +24,7 @@ const CORE_FIELDS = [
   "descriptionLength",
   "sellerScore",
   "reviewCount",
+  "ratingValue",
 ] as const satisfies ReadonlyArray<keyof ConsolidatedAnalysisInput>;
 
 const CORE_FIELD_LABELS: Record<(typeof CORE_FIELDS)[number], string> = {
@@ -34,6 +35,7 @@ const CORE_FIELD_LABELS: Record<(typeof CORE_FIELDS)[number], string> = {
   descriptionLength: "description_length",
   sellerScore: "seller_score",
   reviewCount: "review_count",
+  ratingValue: "rating_value",
 };
 
 function isUsable(field: DataField<string | number | boolean> | undefined) {

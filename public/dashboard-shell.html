@@ -53,6 +53,8 @@ canvas{display:block;width:100%!important;}
 .sb-bottom{margin-top:auto;padding:12px;border-top:1px solid var(--border);}
 .sb-user{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;cursor:pointer;transition:background .18s;}
 .sb-user:hover{background:rgba(255,255,255,.04);}
+.sb-logout{width:100%;margin-top:8px;padding:9px 10px;border-radius:8px;border:1px solid rgba(239,68,68,.18);background:rgba(239,68,68,.08);color:var(--danger);font-size:12.5px;font-weight:700;text-align:left;transition:background .18s,border-color .18s;}
+.sb-logout:hover{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.28);}
 .sb-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:13px;flex-shrink:0;}
 .sb-uname{font-size:13px;font-weight:600;line-height:1.2;}
 .sb-uplan{font-size:11px;color:var(--accent);}
@@ -297,15 +299,15 @@ canvas{display:block;width:100%!important;}
 
   <div class="sb-sec">
     <div class="sb-sec-lbl">Raporlar</div>
-    <button class="sb-item" onclick="gv('reports')">
+    <button id="sbReportsAllBtn" class="sb-item" onclick="goReportsAll()">
       <svg class="sb-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5L9 1z"/><polyline points="9 1 9 5 13 5"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="9" y2="11"/></svg>
       Tüm Raporlar
-      <span class="sb-badge">12</span>
+      <span id="sbReportsAllBadge" class="sb-badge">0</span>
     </button>
-    <button class="sb-item" onclick="gv('reports')">
+    <button id="sbReportsFavoritesBtn" class="sb-item" onclick="goReportsFavorites()">
       <svg class="sb-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="8 1 10.2 5.6 15.5 6.4 11.75 10.1 12.7 15.5 8 13.1 3.3 15.5 4.25 10.1 0.5 6.4 5.8 5.6 8 1"/></svg>
       Favoriler
-      <span class="sb-badge w">3</span>
+      <span id="sbReportsFavoritesBadge" class="sb-badge w">0</span>
     </button>
   </div>
 
@@ -315,28 +317,29 @@ canvas{display:block;width:100%!important;}
       <svg class="sb-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
       Hesabım
     </button>
-    <button class="sb-item" onclick="gv('account')">
+    <button class="sb-item" onclick="gv('settings')">
       <svg class="sb-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.1 3.1l1.4 1.4M11.5 11.5l1.4 1.4M3.1 12.9l1.4-1.4M11.5 4.5l1.4-1.4"/></svg>
       Ayarlar
     </button>
   </div>
 
   <div class="sb-bottom">
-    <div class="sb-user">
-      <div class="sb-avatar">AY</div>
+    <div class="sb-user" onclick="gv('account')" title="Hesabım">
+      <div class="sb-avatar" id="sbUserAvatar">K</div>
       <div>
-        <div class="sb-uname">Ahmet Yılmaz</div>
-        <div class="sb-uplan">Pro Plan</div>
+        <div class="sb-uname" id="sbUserName">Kullanıcı</div>
+        <div class="sb-uplan" id="sbUserPlan">Free Plan</div>
       </div>
       <svg class="sb-chev" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 6 8 10 12 6"/></svg>
     </div>
+    <button class="sb-logout" onclick="logoutUser()">Çıkış Yap</button>
   </div>
 </aside>
 
 <header class="topbar">
   <div class="tb-left">
     <div class="tb-title" id="tbTitle">Genel Bakış</div>
-    <div class="tb-sub" id="tbSub">Son 30 gün · Ahmet 👋</div>
+    <div class="tb-sub" id="tbSub">Son 30 gün · Kullanıcı 👋</div>
   </div>
   <div class="tb-right">
     <div class="tb-search">
@@ -523,18 +526,19 @@ canvas{display:block;width:100%!important;}
       </div>
     </div>
     <div class="rd-hdr-acts">
+      <button id="rdFavoriteBtn" class="btn btn-o btn-sm" onclick="toggleCurrentReportFavorite()">☆ Favoriye Ekle</button>
       <button class="btn btn-g btn-sm">Export PDF</button>
       <button class="btn btn-p btn-sm">Yeniden Analiz</button>
     </div>
   </div>
 
   <div class="rd-tabs">
-    <button class="rd-tab act" onclick="rTab(this,'rdt-summary')">Özet</button>
-    <button class="rd-tab" onclick="rTab(this,'rdt-price')">Fiyat &amp; Rakip</button>
-    <button class="rd-tab" onclick="rTab(this,'rdt-content')">İçerik &amp; SEO</button>
-    <button class="rd-tab" onclick="rTab(this,'rdt-trust')">Güven &amp; Yorum</button>
-    <button class="rd-tab" onclick="rTab(this,'rdt-demand')">Talep Sinyalleri</button>
-    <button class="rd-tab" onclick="rTab(this,'rdt-actions')">Aksiyonlar</button>
+    <button class="rd-tab act" data-section="rdt-summary" onclick="rTab(this,'rdt-summary')">Özet</button>
+    <button class="rd-tab" data-section="rdt-price" onclick="rTab(this,'rdt-price')">Fiyat &amp; Rakip</button>
+    <button class="rd-tab" data-section="rdt-content" onclick="rTab(this,'rdt-content')">İçerik &amp; SEO</button>
+    <button class="rd-tab" data-section="rdt-trust" onclick="rTab(this,'rdt-trust')">Güven &amp; Yorum</button>
+    <button class="rd-tab" data-section="rdt-demand" onclick="rTab(this,'rdt-demand')">Talep Sinyalleri</button>
+    <button class="rd-tab" data-section="rdt-actions" onclick="rTab(this,'rdt-actions')">Aksiyonlar</button>
   </div>
 
   <div id="rdt-summary" class="rd-sec active">
@@ -552,7 +556,7 @@ canvas{display:block;width:100%!important;}
         <div>
           <div class="data-row"><span class="data-key">Ana Tema</span><span class="data-val" style="color:var(--danger);" id="summaryPrimaryTheme">İçerik Kalitesi</span></div>
           <div class="data-row"><span class="data-key">Önerilen Odak</span><span class="data-val" id="summaryRecommendedFocus">Başlık → Görsel → Açıklama</span></div>
-          <div class="data-row"><span class="data-key">Veri Kaynağı</span><span class="data-val" style="color:var(--accent);" id="summaryDataSource">Gerçek · runtime_xhr</span></div>
+          <div class="data-row"><span class="data-key">Veri Kaynağı</span><span class="data-val" style="color:var(--accent);" id="summaryDataSource">Gerçek Veri · canlı çekim</span></div>
         </div>
       </div>
       <div class="cc">
@@ -582,11 +586,12 @@ canvas{display:block;width:100%!important;}
   </div>
 
   <div id="rdt-price" class="rd-sec">
-    <div class="g4" style="margin-bottom:14px;">
+    <div class="g4" style="grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:14px;">
       <div class="kpi kpi-g" style="margin-bottom:0;"><div class="kpi-lbl">Mevcut Fiyat</div><div class="kpi-val" id="rdCurrentPrice">₺849</div><div class="kpi-note up" id="rdCurrentPriceNote">↓ %15 indirimli</div></div>
       <div class="kpi kpi-w" style="margin-bottom:0;"><div class="kpi-lbl">Eski Fiyat</div><div class="kpi-val" id="rdOriginalPrice">₺999</div><div class="kpi-note ne" id="rdOriginalPriceNote">discount_rate: %15</div></div>
       <div class="kpi kpi-b" style="margin-bottom:0;"><div class="kpi-lbl">Rakip Ortalama Fiyat</div><div class="kpi-val" id="rdAvgCompetitorPrice">₺921</div><div class="kpi-note up" id="rdAvgCompetitorPriceNote">Bu ürün %8 ucuz</div></div>
       <div class="kpi kpi-r" style="margin-bottom:0;"><div class="kpi-lbl">Daha Uygun Teklif</div><div class="kpi-val" id="rdCheaperCount">3</div><div class="kpi-note dn" id="rdCheaperCountNote">Daha ucuz rakip var</div></div>
+      <div class="kpi kpi-w" style="margin-bottom:0;"><div class="kpi-lbl">Kupon Durumu</div><div class="kpi-val" id="rdCouponValue">Yok</div><div class="kpi-note ne" id="rdCouponNote">Kupon sinyali görünmüyor</div></div>
     </div>
 
     <div class="g2">
@@ -628,15 +633,15 @@ canvas{display:block;width:100%!important;}
 
     <div class="g2" style="margin-top:14px;">
       <div class="cc"><div class="cc-head"><div><div class="cc-title">Rakip Fiyat Dağılımı</div><div class="cc-sub">other_sellers_summary: min/avg/max</div></div></div><div class="h180"><canvas id="priceRangeChart"></canvas></div></div>
-      <div class="cc"><div class="cc-head"><div><div class="cc-title">Rakip Avantajları</div><div class="cc-sub">official_count / fast_delivery_count</div></div></div><div class="h180"><canvas id="compAdvChart"></canvas></div></div>
+      <div class="cc"><div class="cc-head"><div><div class="cc-title">Rakip Avantajları</div><div class="cc-sub">Kampanya + indirim + teslimat sinyalleri</div></div></div><div class="h180"><canvas id="compAdvChart"></canvas></div><div id="compAdvNote" style="margin-top:10px;font-size:12px;color:var(--muted);">Rakip kampanya sinyalleri hazırlanıyor.</div></div>
     </div>
   </div>
 
   <div id="rdt-content" class="rd-sec">
     <div class="sig-grid" style="grid-template-columns:repeat(4,1fr);">
-      <div class="sig"><div class="sig-lbl">Birincil Anahtar Kelimeler</div><div class="sig-val c-b" id="contentPrimaryKeywordsValue" style="font-size:14px;line-height:1.35;">bromelain şurubu · detox şurubu · ananas şurubu</div><div class="sig-note ne" id="contentPrimaryKeywordsNote">AI tarafından seçilen 3 ana arama niyeti</div></div>
+      <div class="sig"><div class="sig-lbl">Birincil Anahtar Kelimeler</div><div class="sig-val c-b" id="contentPrimaryKeywordsValue" style="font-size:14px;line-height:1.35;">bromelain şurubu · detox şurubu · ananas şurubu</div><div class="sig-note ne" id="contentPrimaryKeywordsNote">Algoritma tarafından çıkarıldı</div></div>
       <div class="sig"><div class="sig-lbl">Anahtar Kelime Sıralaması</div><div class="sig-val c-b" id="contentKeywordRankValue" style="font-size:13px;line-height:1.45;">Kontrol ediliyor…</div><div class="sig-note ne" id="contentKeywordRankNote">Trendyol arama sırası</div></div>
-      <div class="sig"><div class="sig-lbl">Ürün / Kategori Uyumu</div><div class="sig-val c-g" id="contentCategoryFitValue">Yüksek</div><div class="sig-note up" id="contentCategoryFitNote">AI uyumu güçlü buldu</div></div>
+      <div class="sig"><div class="sig-lbl">Ürün / Kategori Uyumu</div><div class="sig-val c-g" id="contentCategoryFitValue">Yüksek</div><div class="sig-note up" id="contentCategoryFitNote">Kategori ile güçlü eşleşme görülüyor</div></div>
       <div class="sig"><div class="sig-lbl">Açıklama Yeterliliği</div><div class="sig-val c-r" id="contentDescriptionValue">Zayıf</div><div class="sig-note dn" id="contentDescriptionNote">Ürün bilgisini taşımakta yetersiz</div></div>
       <div class="sig"><div class="sig-lbl">Görsel Sayısı</div><div class="sig-val c-r" id="contentImageValue">4</div><div class="sig-note dn" id="contentImageNote">Kategori Ort.: 8,3</div></div>
       <div class="sig"><div class="sig-lbl">Maddeleme</div><div class="sig-val c-w" id="contentBulletValue">3</div><div class="sig-note dn" id="contentBulletNote">Önerilen: 6+</div></div>
@@ -666,12 +671,12 @@ canvas{display:block;width:100%!important;}
 
     <div class="g2">
       <div class="cc"><div class="cc-head"><div><div class="cc-title">Yorum Dağılımı</div><div class="cc-sub">Genel ürün yıldız dağılımı</div></div></div><div class="h200"><canvas id="ratingBreakdownChart"></canvas></div></div>
-      <div class="cc"><div class="cc-head"><div><div class="cc-title">Yorum Artış Trendi</div><div class="cc-sub">Genel ürün yorum akışı</div></div></div><div class="h200"><canvas id="reviewTrendChart"></canvas></div></div>
+      <div class="cc"><div class="cc-head"><div><div class="cc-title">Aylık Yorum Trendi</div><div class="cc-sub">Genel ürün yorum akışı</div></div></div><div class="h200"><canvas id="reviewTrendChart"></canvas></div></div>
     </div>
 
     <div class="g2" style="margin-bottom:14px;">
       <div class="cc">
-        <div class="cc-head"><div><div class="cc-title">Yorum Temaları</div><div class="cc-sub">Genel ürün yorum havuzu</div></div></div>
+        <div class="cc-head"><div><div class="cc-title">Yorum Temaları</div><div class="cc-sub">Örneklenen genel ürün yorum temaları</div></div></div>
         <div class="theme-grid">
           <div class="theme-group">
             <div class="theme-group-lbl tg-pos">Olumlu Temalar</div>
@@ -693,35 +698,35 @@ canvas{display:block;width:100%!important;}
           </div>
         </div>
       </div>
-      <div class="cc"><div class="cc-head"><div><div class="cc-title">Güven Boyutları</div><div class="cc-sub">Ürün ve satıcı güven sinyalleri</div></div></div><div class="h220"><canvas id="trustRadarChart"></canvas></div></div>
+      <div class="cc"><div class="cc-head"><div><div class="cc-title">Güven Boyutları</div><div class="cc-sub">Ürün geneli + satıcı operasyon sinyalleri</div></div></div><div class="h220"><canvas id="trustRadarChart"></canvas></div></div>
     </div>
 
     <div class="cc">
-      <div class="cc-head"><div><div class="cc-title">En Çok Geçen Olumlu / Olumsuz İfadeler</div><div class="cc-sub">Genel yorum havuzundan çıkarıldı</div></div></div>
-      <div class="h180"><canvas id="reviewHitsChart"></canvas></div>
+      <div class="cc-head"><div><div class="cc-title">Son 10 Yorum</div><div class="cc-sub">Yıldız ve kısa yorum özeti</div></div></div>
+      <div id="recentReviewList" style="display:grid;gap:8px;"></div>
     </div>
   </div>
 
   <div id="rdt-demand" class="rd-sec">
     <div class="g4" style="margin-bottom:14px;">
       <div class="kpi kpi-b" style="margin-bottom:0;"><div class="kpi-lbl">Talep Sinyali</div><div class="kpi-val" id="demandSignalValue">2.840</div><div class="kpi-note up" id="demandSignalNote">↑ Güçlü talep sinyali</div></div>
-      <div class="kpi kpi-g" style="margin-bottom:0;"><div class="kpi-lbl">Kategori Satış Tahmini</div><div class="kpi-val" id="demandSalesEstimateValue">%72</div><div class="kpi-note ne" id="demandSalesEstimateNote">Tahmini orta hacim</div></div>
+      <div class="kpi kpi-g" style="margin-bottom:0;"><div class="kpi-lbl">Tahmini Aylık Satış Hacmi</div><div class="kpi-val" id="demandSalesEstimateValue">%72</div><div class="kpi-note ne" id="demandSalesEstimateNote">Tahmini orta hacim</div></div>
       <div class="kpi kpi-v" style="margin-bottom:0;"><div class="kpi-lbl">Ticari İvme</div><div class="kpi-val" id="demandMomentumValue">%88</div><div class="kpi-note up" id="demandMomentumNote">↑ Yüksek güven</div></div>
       <div class="kpi kpi-w" style="margin-bottom:0;"><div class="kpi-lbl">Pazar Konumu</div><div class="kpi-val" id="demandMarketPositionValue">Orta</div><div class="kpi-note ne" id="demandMarketPositionNote">Güçlenme potansiyeli var</div></div>
     </div>
 
     <div class="g2">
-      <div class="cc"><div class="cc-head"><div><div class="cc-title">Kategori Satış Tahmini</div><div class="cc-sub">Doğrudan talep ve destek sinyallerinden türetildi</div></div><span class="tag t-w" id="demandSalesTag">Orta Hacim</span></div><div class="h200"><canvas id="salesStatusChart"></canvas></div></div>
+      <div class="cc"><div class="cc-head"><div><div class="cc-title">Tahmini Aylık Satış Hacmi</div><div class="cc-sub">Doğrudan talep ve destek sinyallerinden türetildi</div></div><span class="tag t-w" id="demandSalesTag">Orta Hacim</span></div><div class="h200"><canvas id="salesStatusChart"></canvas></div></div>
       <div class="cc"><div class="cc-head"><div><div class="cc-title">Büyüme Fırsatı</div><div class="cc-sub">Talep, ivme ve kalite açığı birlikte okunur</div></div><span class="tag t-g" id="demandGrowthTag">Yüksek</span></div><div class="h200"><canvas id="growthChart"></canvas></div></div>
     </div>
 
     <div class="g2">
-      <div class="cc"><div class="cc-head"><div><div class="cc-title">Pazar İlgisi</div><div class="cc-sub">Favori, yorum, soru ve görüntülenme sinyalleri</div></div></div><div class="h200"><canvas id="mktInterestChart"></canvas></div></div>
-      <div class="cc"><div class="cc-head"><div><div class="cc-title">İlgi → Satış Hunisi</div><div class="cc-sub">Görüntülenme, favori, sepet ve satış tahmini</div></div></div><div class="h200"><canvas id="funnelChart"></canvas></div></div>
+      <div class="cc"><div class="cc-head"><div><div class="cc-title">Pazar İlgisi</div><div class="cc-sub">Favori, yorum, soru ve görüntülenme sinyalleri birlikte okunur</div></div></div><div class="h200"><canvas id="mktInterestChart"></canvas></div></div>
+      <div class="cc"><div class="cc-head"><div><div class="cc-title">Tahmini İlgi → Satış Akışı</div><div class="cc-sub">Gerçek funnel değil, tahmini dönüşüm akışı</div></div></div><div class="h200"><canvas id="funnelChart"></canvas></div></div>
     </div>
 
     <div class="cc" style="margin-top:0;">
-      <div class="cc-head"><div><div class="cc-title">Pazar Genel Değerlendirme</div><div class="cc-sub">Talep seviyesi, fiyat avantajı, büyüme fırsatı ve baskı alanı</div></div></div>
+      <div class="cc-head"><div><div class="cc-title">Pazar Genel Değerlendirme</div><div class="cc-sub">Talep seviyesi, fiyat avantajı, büyüme fırsatı ve baskı alanı birlikte okunur</div></div></div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
         <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center;"><div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:6px;">Satış Seviyesi</div><div style="font-family:'Bricolage Grotesque',sans-serif;font-size:18px;font-weight:800;color:var(--warn);" id="demandOverviewSales">Orta</div></div>
         <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center;"><div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:6px;">Fiyat Avantajı</div><div style="font-family:'Bricolage Grotesque',sans-serif;font-size:18px;font-weight:800;color:var(--accent);" id="demandOverviewPrice">Var</div></div>
@@ -734,7 +739,7 @@ canvas{display:block;width:100%!important;}
   <div id="rdt-actions" class="rd-sec">
     <div style="margin-bottom:16px;">
       <h3 style="font-size:15px;font-weight:700;margin-bottom:4px;">Öncelikli Aksiyon Listesi</h3>
-      <p style="font-size:12px;color:var(--muted);">Veri dayanaklı, AI destekli ve önceliklendirilmiş aksiyonlar</p>
+      <p style="font-size:12px;color:var(--muted);">Veri dayanaklı ve önceliklendirilmiş aksiyonlar</p>
     </div>
     <div class="action-list" id="actionList" style="margin-bottom:18px;">
       <div class="action-item"><div class="ap ap1">Öncelik 1</div><div><div class="at">Başlık optimize et → title alanı</div><div class="ad">"Saç Düzleştirici", "Philips Seramik", "200°C" gibi yüksek hacimli anahtar kelimeler başlığa eklenmeli. Rakip ürünlerin %78'i bu terimleri kullanıyor. SEO skoru +8 puan artışı bekleniyor.</div></div></div>
@@ -800,11 +805,11 @@ canvas{display:block;width:100%!important;}
       <div class="cc" style="margin-bottom:14px;">
         <div style="font-size:14px;font-weight:700;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border);">Profil Bilgileri</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div class="field"><label>İsim</label><input class="fi" type="text" value="Ahmet"></div>
-          <div class="field"><label>Soyisim</label><input class="fi" type="text" value="Yılmaz"></div>
+          <div class="field"><label>İsim</label><input class="fi" id="accountFirstName" type="text" value="Kullanıcı"></div>
+          <div class="field"><label>Soyisim</label><input class="fi" id="accountLastName" type="text" value=""></div>
         </div>
-        <div class="field"><label>Kullanıcı Adı</label><input class="fi" type="text" value="ahmetyilmaz"></div>
-        <div class="field"><label>E-posta</label><input class="fi" type="email" value="ahmet@ornek.com"></div>
+        <div class="field"><label>Kullanıcı Adı</label><input class="fi" id="accountUsername" type="text" value="kullanici"></div>
+        <div class="field"><label>E-posta</label><input class="fi" id="accountEmail" type="email" value=""></div>
         <div class="field"><label>Cep Telefonu</label><input class="fi" type="tel" value="0532 xxx xx xx"></div>
         <div class="field"><label>Trendyol Mağaza Adı</label><input class="fi" type="text" value="AhmetStore"></div>
         <div class="field"><label>Şirket Adı</label><input class="fi" type="text" value="Yılmaz E-Ticaret Ltd."></div>
@@ -812,17 +817,20 @@ canvas{display:block;width:100%!important;}
       </div>
       <div class="cc">
         <div style="font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);">Şifre Değiştir</div>
-        <div class="field"><label>Mevcut Şifre</label><input class="fi" type="password" placeholder="••••••••"></div>
-        <div class="field"><label>Yeni Şifre</label><input class="fi" type="password" placeholder="••••••••"></div>
-        <div class="field"><label>Tekrar</label><input class="fi" type="password" placeholder="••••••••"></div>
-        <button class="btn btn-p btn-sm" style="margin-top:4px;">Güncelle</button>
+        <form onsubmit="event.preventDefault();return false;" novalidate>
+          <input id="accountUsernameHidden" type="text" value="kullanici" autocomplete="username" aria-label="Kullanıcı Adı" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;" tabindex="-1">
+          <div class="field"><label>Mevcut Şifre</label><input class="fi" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+          <div class="field"><label>Yeni Şifre</label><input class="fi" type="password" placeholder="••••••••" autocomplete="new-password"></div>
+          <div class="field"><label>Tekrar</label><input class="fi" type="password" placeholder="••••••••" autocomplete="new-password"></div>
+          <button type="submit" class="btn btn-p btn-sm" style="margin-top:4px;">Güncelle</button>
+        </form>
       </div>
     </div>
     <div>
       <div class="cc" style="margin-bottom:14px;">
         <div style="font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);">Plan Durumu</div>
         <div style="background:linear-gradient(135deg,rgba(79,127,255,.07),rgba(124,92,252,.05));border:1px solid rgba(79,127,255,.25);border-radius:12px;padding:18px;margin-bottom:14px;">
-          <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:18px;font-weight:800;margin-bottom:3px;">Pro Plan</div>
+          <div id="accountPlanName" style="font-family:'Bricolage Grotesque',sans-serif;font-size:18px;font-weight:800;margin-bottom:3px;">Free Plan</div>
           <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">Gerçek kullanıcılar için ana karar paneli · ₺399 / ay</div>
           <div style="font-size:12px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:5px;"><span>Aylık Analiz</span><span style="font-weight:700;color:var(--text);">47 / 100</span></div>
           <div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-bottom:12px;"><div style="width:47%;height:100%;background:var(--brand);border-radius:3px;"></div></div>
@@ -842,7 +850,47 @@ canvas{display:block;width:100%!important;}
       <div class="cc">
         <div style="font-size:14px;font-weight:700;color:var(--danger);margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border);">Tehlikeli Bölge</div>
         <p style="font-size:12.5px;color:var(--muted);margin-bottom:12px;">Bu işlemler geri alınamaz.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-d btn-sm">Raporları Sil</button><button class="btn btn-d btn-sm">Hesabı Kapat</button></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-d btn-sm" onclick="logoutUser()">Çıkış Yap</button><button class="btn btn-d btn-sm">Raporları Sil</button><button class="btn btn-d btn-sm">Hesabı Kapat</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="view-settings" class="view">
+  <h2 style="font-size:20px;margin-bottom:4px;">Ayarlar</h2>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:22px;">Bildirim, guvenlik ve tercih ayarlarini yonet</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div>
+      <div class="cc" style="margin-bottom:14px;">
+        <div style="font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);">Bildirim Tercihleri</div>
+        <div style="display:grid;gap:10px;">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--muted);"><input type="checkbox" checked style="accent-color:var(--brand);"> Analiz tamamlandığında e-posta gonder</label>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--muted);"><input type="checkbox" checked style="accent-color:var(--brand);"> Haftalik performans ozeti gonder</label>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--muted);"><input type="checkbox" style="accent-color:var(--brand);"> Urun ve kampanya duyurularini goster</label>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px;"><button class="btn btn-p btn-sm">Kaydet</button><button class="btn btn-g btn-sm">Varsayilana Don</button></div>
+      </div>
+      <div class="cc">
+        <div style="font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);">Arayuz Tercihleri</div>
+        <div class="field"><label>Varsayilan Acilis Sekmesi</label><select class="fi"><option>Genel Bakis</option><option>Yeni Analiz</option><option>Tum Raporlar</option><option>Favoriler</option></select></div>
+        <div class="field"><label>Rapor Listeleme Sirasi</label><select class="fi"><option>Tarihe Gore (Yeni -> Eski)</option><option>Skora Gore (Yuksek -> Dusuk)</option><option>Skora Gore (Dusuk -> Yuksek)</option></select></div>
+        <div class="field"><label>Otomatik Yenileme</label><select class="fi"><option>Kapali</option><option>30 saniye</option><option>1 dakika</option></select></div>
+      </div>
+    </div>
+    <div>
+      <div class="cc" style="margin-bottom:14px;">
+        <div style="font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);">Guvenlik</div>
+        <div class="field"><label>Iki Asamali Dogrulama</label><select class="fi"><option>Kapali</option><option>SMS</option><option>E-posta</option></select></div>
+        <div class="field"><label>Oturum Suresi</label><select class="fi"><option>7 gun</option><option>30 gun</option><option>Her giriste sor</option></select></div>
+        <div style="display:flex;gap:8px;margin-top:8px;"><button class="btn btn-p btn-sm">Guvenlik Ayarlarini Kaydet</button></div>
+      </div>
+      <div class="cc">
+        <div style="font-size:14px;font-weight:700;color:var(--danger);margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border);">Veri ve Gizlilik</div>
+        <p style="font-size:12.5px;color:var(--muted);margin-bottom:12px;">Kayitli raporlar, tercihlerin ve hesap verilerin burada yonetilir.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-g btn-sm">Verilerimi Disari Aktar</button>
+          <button class="btn btn-d btn-sm">Kayitli Verileri Temizle</button>
+        </div>
       </div>
     </div>
   </div>
@@ -857,12 +905,222 @@ Chart.defaults.font.family="'Instrument Sans',sans-serif";
 Chart.defaults.font.size=11;
 const BR='#4f7fff',BR2='#7c5cfc',AC='#00d4a8',WN='#f59e0b',DG='#ef4444',GC='rgba(255,255,255,0.06)';
 const CI={};
+const FAVORITE_REPORTS_STORAGE_KEY='sellboost:favorite-report-keys:v1';
+const REPORTS_FILTER_MODE_STORAGE_KEY='sellboost:reports-filter-mode:v1';
 let currentReportData=null;
 let currentCampaignState={discountRate:null,campaignDays:null};
 let keywordRankRequestToken=0;
 let currentActionFeedbackType='veri_yorumlama';
 let liveReportsCache=[];
 let reportsFetchPromise=null;
+let authSessionCheckPromise=null;
+let hasAuthenticatedSessionCache=null;
+let authSessionPayloadCache=undefined;
+let reportsFilterMode='all';
+let favoriteReportKeySet=new Set();
+let favoriteReportsSyncPromise=null;
+let resolvedRulebookCache=null;
+let rulebookFetchPromise=null;
+let currentUserProfile={
+  name:'Kullanıcı',
+  firstName:'Kullanıcı',
+  lastName:'',
+  email:'',
+  username:'kullanici',
+  plan:'FREE',
+};
+function getResolvedRuleSection(section){
+  return resolvedRulebookCache?.[section]?.rules ? resolvedRulebookCache[section] : null;
+}
+function hasResolvedRule(section,ruleId){
+  return Boolean(getResolvedRuleSection(section)?.rules?.some((rule)=>rule.id===ruleId));
+}
+async function ensureResolvedRulebookLoaded(){
+  if(resolvedRulebookCache) return resolvedRulebookCache;
+  if(rulebookFetchPromise) return rulebookFetchPromise;
+  rulebookFetchPromise=(async ()=>{
+    try{
+      const res=await fetch('/api/dev/trendyol-rulebook',{cache:'no-store'});
+      const payload=await res.json().catch(()=>null);
+      if(res.ok && payload?.resolved){
+        resolvedRulebookCache=payload.resolved;
+      }
+    }catch{}
+    finally{
+      rulebookFetchPromise=null;
+    }
+    return resolvedRulebookCache;
+  })();
+  return rulebookFetchPromise;
+}
+function getKeywordRankCacheKey(reportId,url,keywords){
+  const reportPart=reportId?`report:${String(reportId)}`:`url:${String(url||'').trim()}`;
+  const keywordPart=(Array.isArray(keywords)?keywords:[]).map((item)=>String(item||'').trim().toLocaleLowerCase('tr-TR')).filter(Boolean).join('|');
+  return `sellboost:keyword-rank:${reportPart}:${keywordPart}`;
+}
+function loadKeywordRankCache(reportId,url,keywords){
+  try{
+    const raw=localStorage.getItem(getKeywordRankCacheKey(reportId,url,keywords));
+    if(!raw) return null;
+    const parsed=JSON.parse(raw);
+    if(!parsed || !Array.isArray(parsed.lines) || typeof parsed.note!=='string') return null;
+    return {
+      lines:parsed.lines.map((item)=>String(item||'')),
+      note:String(parsed.note||''),
+      tone:parsed.tone==='up'||parsed.tone==='dn'?parsed.tone:'ne',
+    };
+  }catch{
+    return null;
+  }
+}
+function saveKeywordRankCache(reportId,url,keywords,payload){
+  try{
+    localStorage.setItem(
+      getKeywordRankCacheKey(reportId,url,keywords),
+      JSON.stringify({
+        lines:Array.isArray(payload?.lines)?payload.lines.map((item)=>String(item||'')):[],
+        note:String(payload?.note||''),
+        tone:payload?.tone==='up'||payload?.tone==='dn'?payload.tone:'ne',
+        savedAt:new Date().toISOString(),
+      })
+    );
+  }catch{}
+}
+function getDashboardScrollKey(){
+  const params=new URLSearchParams(window.location.search);
+  const view=params.get('view') || 'overview';
+  const reportId=params.get('reportId') || 'none';
+  return `sellboost:dashboard-scroll:${view}:${reportId}`;
+}
+function getAppRoute(view, reportId){
+  if(view==='report-detail'){
+    const hash=window.location.hash || '';
+    return reportId?`/report/${encodeURIComponent(String(reportId))}${hash}`:null;
+  }
+const routeMap={
+  overview:'/dashboard',
+  reports:'/reports',
+  'new-analysis':'/analyze',
+  account:'/account',
+  settings:'/settings',
+};
+  return routeMap[view] || '/dashboard';
+}
+function notifyParentNavigation(view, reportId){
+  try{
+    const href=getAppRoute(view, reportId);
+    if(!href || window.top===window) return;
+    window.parent.postMessage({type:'sellboost:navigate',href},window.location.origin);
+  }catch{}
+}
+const REPORT_DETAIL_TABS={
+  summary:'rdt-summary',
+  price:'rdt-price',
+  content:'rdt-content',
+  trust:'rdt-trust',
+  demand:'rdt-demand',
+  actions:'rdt-actions',
+};
+const REPORT_DETAIL_TAB_HASH_BY_SECTION={
+  'rdt-summary':'ozet',
+  'rdt-price':'fiyat-rakip',
+  'rdt-content':'icerik-seo',
+  'rdt-trust':'guven-yorum',
+  'rdt-demand':'talep-sinyalleri',
+  'rdt-actions':'aksiyonlar',
+};
+function getReportTabSectionFromHash(hashValue){
+  const normalized=String(hashValue||window.location.hash||'').replace(/^#/,'').trim().toLocaleLowerCase('tr-TR');
+  if(!normalized) return REPORT_DETAIL_TABS.summary;
+  const entry=Object.entries(REPORT_DETAIL_TAB_HASH_BY_SECTION).find(([,hash])=>hash===normalized);
+  return entry?entry[0]:REPORT_DETAIL_TABS.summary;
+}
+function getCurrentReportBaseRoute(){
+  const directRoute=getAppRoute('report-detail',currentReportData?.reportId);
+  if(directRoute) return directRoute.replace(/#.*$/,'');
+  try{
+    if(window.top && window.top!==window){
+      const topPath=String(window.top.location.pathname || '');
+      const topSearch=String(window.top.location.search || '');
+      if(topPath.startsWith('/report/')){
+        return `${topPath}${topSearch}`;
+      }
+    }
+  }catch{}
+  try{
+    const ownPath=String(window.location.pathname || '');
+    const ownSearch=String(window.location.search || '');
+    if(ownPath.startsWith('/report/')){
+      return `${ownPath}${ownSearch}`;
+    }
+  }catch{}
+  return null;
+}
+function syncReportTabHash(sectionId,replace=false){
+  if(sectionId!=='rdt-summary' && document.querySelector('.view.active')?.id!=='view-report-detail') return;
+  const hashValue=REPORT_DETAIL_TAB_HASH_BY_SECTION[sectionId] || REPORT_DETAIL_TAB_HASH_BY_SECTION['rdt-summary'];
+  const baseRoute=getCurrentReportBaseRoute();
+  const nextHref=baseRoute?`${baseRoute}#${hashValue}`:`#${hashValue}`;
+  try{
+    if(window.top!==window){
+      window.parent.postMessage({type:'sellboost:navigate',href:nextHref},window.location.origin);
+    }else{
+      const fn=replace?'replaceState':'pushState';
+      window.history[fn]({},'',nextHref);
+    }
+  }catch{}
+  try{
+    const url=new URL(window.location.href);
+    url.hash=hashValue;
+    const method=replace?'replaceState':'pushState';
+    window.history[method]({},'',`${url.pathname}${url.search}${url.hash}`);
+  }catch{}
+}
+function activateReportDetailTab(sectionId){
+  const normalizedSection=REPORT_DETAIL_TAB_HASH_BY_SECTION[sectionId]?sectionId:'rdt-summary';
+  const button=document.querySelector(`.rd-tab[data-section="${normalizedSection}"]`);
+  document.querySelectorAll('.rd-tab').forEach(t=>t.classList.remove('act'));
+  if(button) button.classList.add('act');
+  document.querySelectorAll('.rd-sec').forEach(s=>s.classList.remove('active'));
+  const section=document.getElementById(normalizedSection);
+  if(section) section.classList.add('active');
+  setTimeout(()=>initRdSec(normalizedSection),80);
+}
+function syncDashboardUrl(view, reportId){
+  try{
+    const url=new URL(window.location.href);
+    if(view && view!=='overview'){
+      url.searchParams.set('view',view);
+    }else{
+      url.searchParams.delete('view');
+    }
+    if(view==='report-detail' && reportId){
+      url.searchParams.set('reportId',String(reportId));
+    }else{
+      url.searchParams.delete('reportId');
+    }
+    const next=`${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState({},'',next);
+  }catch{}
+}
+function saveDashboardScrollPosition(){
+  try{
+    const main=document.querySelector('.main');
+    if(!main) return;
+    sessionStorage.setItem(getDashboardScrollKey(),String(main.scrollTop || 0));
+  }catch{}
+}
+function restoreDashboardScrollPosition(){
+  try{
+    const main=document.querySelector('.main');
+    if(!main) return;
+    const raw=sessionStorage.getItem(getDashboardScrollKey());
+    const scrollTop=Number(raw || 0);
+    if(Number.isFinite(scrollTop) && scrollTop>0){
+      requestAnimationFrame(()=>{main.scrollTop=scrollTop;});
+    }
+  }catch{}
+}
 function dc(id){if(CI[id]){CI[id].destroy();delete CI[id];}}
 function mk(id,type,data,opts={}){
   dc(id);const el=document.getElementById(id);if(!el)return;
@@ -870,6 +1128,189 @@ function mk(id,type,data,opts={}){
 }
 
 function safeNumber(v){return typeof v==='number'&&Number.isFinite(v)?v:null;}
+const TRENDYOL_FREE_SHIPPING_THRESHOLD=350;
+function isTrendyolFreeShippingEligible(price){
+  return typeof price==='number'&&Number.isFinite(price)&&price>=TRENDYOL_FREE_SHIPPING_THRESHOLD;
+}
+function extractPrimaryKeywordsFromTitle(title){
+  const stopwords=new Set(['ve','ile','icin','için','uygun','tüm','tum','ml','gr','adet','paket','set','tekli','orijinal','orjinal']);
+  const text=String(title||'')
+    .toLocaleLowerCase('tr-TR')
+    .replace(/[^\p{L}\p{N}\s|]/gu,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+  if(!text) return [];
+  const tokens=text
+    .split(' ')
+    .map((item)=>item.trim())
+    .filter((item)=>item.length>=2 && !stopwords.has(item) && !/^\d+$/.test(item));
+  const phrases=[];
+  if(tokens.length>=2) phrases.push(tokens.slice(0,2).join(' '));
+  if(tokens.length>=3) phrases.push(tokens.slice(0,3).join(' '));
+  if(tokens.length>=4) phrases.push(tokens.slice(0,4).join(' '));
+  const typeTail=tokens.slice(-3).join(' ');
+  if(typeTail) phrases.push(typeTail);
+  return [...new Set(phrases.map((item)=>item.replace(/\s+/g,' ').trim()).filter((item)=>item.length>=4))].slice(0,3);
+}
+function inferCategoryFitFromText(title, category, primaryKeywords){
+  const stopwords=new Set(['ve','ile','icin','için','uygun','tüm','tum','ml','gr','adet','paket','set','tekli','orijinal','orjinal','asit']);
+  const tokenize=(value)=>String(value||'')
+    .toLocaleLowerCase('tr-TR')
+    .replace(/[^\p{L}\p{N}\s>/]/gu,' ')
+    .split(/\s+/)
+    .map((item)=>item.trim())
+    .filter((item)=>item.length>=2 && !stopwords.has(item) && !/^\d+$/.test(item));
+  const titleTokens=[...new Set(tokenize(title))];
+  const categoryText=String(category||'').toLocaleLowerCase('tr-TR');
+  if(!categoryText.trim()){
+    return {score:45,label:'Zayıf',note:'Kategori bilgisi olmadığı için eşleşme ölçülemedi.'};
+  }
+  const categoryParts=categoryText.split('/').map((item)=>item.trim()).filter(Boolean);
+  const leafCategory=categoryParts[categoryParts.length-1] || categoryText;
+  const categoryTokens=[...new Set(tokenize(categoryText))];
+  const overlap=titleTokens.filter((token)=>categoryTokens.includes(token));
+  const keywordMatches=(primaryKeywords||[]).filter((keyword)=>categoryText.includes(String(keyword||'').toLocaleLowerCase('tr-TR')));
+  const leafTokens=tokenize(leafCategory);
+  const leafMatchCount=leafTokens.filter((token)=>titleTokens.includes(token)).length;
+  const titleTokenCoverage=categoryTokens.length?overlap.length/categoryTokens.length:0;
+  const score=clamp(
+    58 +
+    (overlap.length*10) +
+    (keywordMatches.length*8) +
+    (leafMatchCount*12) +
+    (titleTokenCoverage*14),
+    40,
+    96
+  );
+  const band=getLegacyContentBand(score);
+  const label=band==='strong'?'Yüksek':band==='medium'?'Orta':'Zayıf';
+  const note=
+    band==='strong'
+      ? `Başlık ile kategori güçlü eşleşiyor${leafTokens.length?`: ${leafTokens.slice(0,2).join(' ')}`:''}.`
+      : band==='medium'
+        ? 'Başlık ile kategori arasında kısmi eşleşme var.'
+        : 'Başlıkta kategoriyle ilişkili sinyaller zayıf.';
+  return {score,label,note};
+}
+function getLegacyContentBand(score){
+  if(score>=80) return 'strong';
+  if(score>=55) return 'medium';
+  return 'weak';
+}
+function scoreDescriptionRules(params){
+  const {
+    hasDescriptionContent,
+    effectiveDescriptionLength,
+    descriptionBenchmark,
+    metaDescription,
+    bulletPointCount,
+    hasSpecs,
+    primaryKeywords,
+    imageCount,
+    qaSnippetCount,
+    questionCount,
+  }=params;
+  if(!hasDescriptionContent){
+    const limitedBySpecs=hasSpecs===true;
+    const limitedByMeta=metaDescription.length>=70;
+    return {
+      score:limitedBySpecs?28:(limitedByMeta?18:0),
+      label:limitedBySpecs||limitedByMeta?'Sınırlı':'Yok',
+      note:limitedBySpecs
+        ? 'Serbest açıklama alanı zayıf, ancak ürün bilgi/özellik alanı mevcut'
+        : limitedByMeta
+          ? 'Görünür açıklama zayıf; yalnızca meta açıklama sinyali bulunuyor'
+          : 'Ürün açıklaması görünmüyor',
+      subscores:[
+        {key:'readability',label:'Okunabilirlik',score:0,available:true},
+        {key:'technical',label:'Teknik detay',score:limitedBySpecs?58:0,available:true},
+        {key:'meta',label:'Meta veri',score:limitedByMeta?35:0,available:true},
+        {key:'keyword',label:'Anahtar kelime',score:0,available:true},
+      ],
+    };
+  }
+  const keywordScore=clamp(
+    primaryKeywords.length>=3?88:primaryKeywords.length===2?74:primaryKeywords.length===1?56:24,
+    0,
+    100
+  );
+  const benefitScore=clamp(
+    effectiveDescriptionLength>=900?84:effectiveDescriptionLength>=500?68:effectiveDescriptionLength>=220?54:32,
+    0,
+    100
+  );
+  const readabilityScore=clamp(
+    (effectiveDescriptionLength>=250?38:effectiveDescriptionLength>=120?24:10)+
+    (bulletPointCount>=6?36:bulletPointCount>=3?22:bulletPointCount>0?10:0)+
+    (effectiveDescriptionLength<=1800?18:8),
+    0,
+    100
+  );
+  const technicalScore=clamp(
+    (hasSpecs?62:18)+(bulletPointCount>=4?22:bulletPointCount>0?10:0),
+    0,
+    100
+  );
+  const metaScore=clamp(
+    metaDescription.length>=150 && metaDescription.length<=160
+      ? 96
+      : metaDescription.length>=120 && metaDescription.length<=175
+        ? 76
+        : metaDescription.length>=70
+          ? 52
+          : metaDescription.length>0
+            ? 26
+            : 0,
+    0,
+    100
+  );
+  const mediaScore=clamp(
+    imageCount>=8?82:imageCount>=5?64:imageCount>=3?42:24,
+    0,
+    100
+  );
+  const socialProofScore=clamp(
+    qaSnippetCount>=5?78:qaSnippetCount>0?58:questionCount>=10?44:18,
+    0,
+    100
+  );
+  const rules=[
+    {key:'keyword',label:'Anahtar kelime',score:keywordScore,weight:0.18},
+    {key:'benefit',label:'Fayda odağı',score:benefitScore,weight:0.18},
+    {key:'readability',label:'Okunabilirlik',score:readabilityScore,weight:0.18},
+    {key:'technical',label:'Teknik detay',score:technicalScore,weight:0.16},
+    {key:'meta',label:'Meta veri',score:metaScore,weight:0.12},
+    {key:'media',label:'Görsel desteği',score:mediaScore,weight:0.1},
+    {key:'social',label:'Sosyal kanıt / CTA',score:socialProofScore,weight:0.08},
+  ];
+  const totalWeight=rules.reduce((sum,item)=>sum+item.weight,0);
+  const score=clamp(
+    rules.reduce((sum,item)=>sum+(item.score*item.weight),0)/Math.max(totalWeight,1),
+    0,
+    100
+  );
+  const weakestRule=[...rules].sort((a,b)=>a.score-b.score)[0];
+  const note=
+    score>=80
+      ? 'Açıklama kural setinde güçlü görünüyor'
+      : weakestRule.key==='meta'
+        ? 'Meta açıklama ve SERP ikna katmanı zayıf'
+        : weakestRule.key==='technical'
+          ? 'Teknik detay ve maddeleme derinliği sınırlı'
+          : weakestRule.key==='readability'
+            ? 'Paragraf yapısı ve okunabilirlik sinyali zayıf'
+            : weakestRule.key==='social'
+              ? 'Sosyal kanıt / CTA sinyali zayıf'
+              : weakestRule.key==='keyword'
+                ? 'Anahtar kelime yerleşimi zayıf görünüyor'
+                : 'Fayda ve kapsam derinliği sınırlı';
+  return {
+    score,
+    label:getLegacyContentBand(score)==='strong'?'Güçlü':getLegacyContentBand(score)==='medium'?'Orta':'Zayıf',
+    note,
+    subscores:rules.map((item)=>({...item,available:true})),
+  };
+}
 function normalizeComparablePrice(value, reference){
   const n=safeNumber(value);
   const ref=safeNumber(reference);
@@ -890,7 +1331,41 @@ function monthLabelTR(v){
   const names=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
   return `${names[m-1]||parts[1]} ${y}`;
 }
+function expandMonthlyTrend(trend, months=6){
+  const items=Array.isArray(trend)?trend.filter((item)=>item&&typeof item.month==='string'):[];
+  if(!items.length) return [];
+  const byMonth=new Map(items.map((item)=>[String(item.month),item]));
+  const sortedMonths=items
+    .map((item)=>String(item.month))
+    .filter((value)=>/^\d{4}-\d{2}$/.test(value))
+    .sort();
+  const anchor=sortedMonths[sortedMonths.length-1];
+  const [yearText,monthText]=anchor.split('-');
+  const anchorDate=new Date(Number(yearText),Number(monthText)-1,1);
+  if(Number.isNaN(anchorDate.getTime())) return items;
+  const expanded=[];
+  for(let offset=months-1; offset>=0; offset--){
+    const d=new Date(anchorDate.getFullYear(),anchorDate.getMonth()-offset,1);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const match=byMonth.get(key);
+    expanded.push(match || {month:key,count:0,low_rated_count:0,average_rating:null});
+  }
+  return expanded;
+}
 function setText(id,value){const el=document.getElementById(id); if(el) el.textContent=value;}
+function truncateSentence(value,maxLength=120){
+  const text=String(value||'').replace(/\s+/g,' ').trim();
+  if(!text) return '';
+  if(text.length<=maxLength) return text;
+  return `${text.slice(0,Math.max(0,maxLength-1)).trimEnd()}…`;
+}
+function normalizeActionTitle(value){
+  return String(value||'')
+    .toLocaleLowerCase('tr-TR')
+    .replace(/[^a-z0-9çğıöşü\s]/gi,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
 function themeItemHtml(label,count,positive){
   const klass=positive?'theme-item ti-pos':'theme-item ti-neg';
   const countHtml=typeof count==='number'?` <span class="ti-count">×${count}</span>`:'';
@@ -906,55 +1381,113 @@ function getTrustData(){
   const reviewAnalysis=r.reviewAnalysis||null;
   const general=reviewAnalysis?.general||null;
   const seller=reviewAnalysis?.seller||null;
+  const trustRules=getResolvedRuleSection('trust_reviews');
+  const sharedRules=getResolvedRuleSection('shared');
+  const recentReviewRule=trustRules?.rules?.find((item)=>item.id==='trust-no-fake-review-history');
+  const recentReviewPresentation={
+    limit:10,
+    truncateLength:140,
+    ratingPrefixRequired:true,
+  };
+  const nullMeansMissing=Boolean(sharedRules?.rules?.some((item)=>item.id==='shared-null-is-not-zero'));
+  const ratingValue=safeNumber(general?.average_rating) ?? safeNumber(r.ratingValue) ?? (nullMeansMissing?null:4.7);
+  const reviewCount=safeNumber(general?.total_comment_count) ?? safeNumber(r.reviewCount) ?? (nullMeansMissing?null:842);
+  const recentReviewsSource=Array.isArray(general?.recent_reviews)&&general.recent_reviews.length
+    ? general.recent_reviews
+    : Array.isArray(r.reviewSnippets)
+      ? r.reviewSnippets
+      : [];
   return {
-    ratingValue:safeNumber(general?.average_rating) ?? 4.7,
-    reviewCount:safeNumber(general?.total_comment_count) ?? 842,
+    ratingValue,
+    reviewCount,
     sellerScore:safeNumber(r.sellerScore) ?? 9.6,
     hasReturnInfo:typeof r.hasReturnInfo==='boolean'?r.hasReturnInfo:true,
-    generalBreakdown:general?.rating_breakdown || {five_star:520,four_star:180,three_star:72,two_star:38,one_star:32,total:842},
-    generalTrend:Array.isArray(general?.monthly_trend)&&general.monthly_trend.length?general.monthly_trend:[{month:'2025-10',count:62,low_rated_count:4,average_rating:4.6},{month:'2025-11',count:88,low_rated_count:5,average_rating:4.7},{month:'2025-12',count:110,low_rated_count:8,average_rating:4.6},{month:'2026-01',count:74,low_rated_count:5,average_rating:4.5},{month:'2026-02',count:95,low_rated_count:9,average_rating:4.4},{month:'2026-03',count:120,low_rated_count:6,average_rating:4.7}],
+    generalBreakdown:general?.rating_breakdown || null,
+    hasGeneralBreakdown:!!general?.rating_breakdown,
+    generalTrend:Array.isArray(general?.monthly_trend)&&general.monthly_trend.length?general.monthly_trend:[],
+    hasGeneralTrend:Array.isArray(general?.monthly_trend)&&general.monthly_trend.length>0,
     generalPositive:Array.isArray(general?.top_positive_review_hits)&&general.top_positive_review_hits.length?general.top_positive_review_hits:[{label:'ürün kalitesi',count:187},{label:'hızlı kargo',count:134},{label:'saç hasarı yok',count:98},{label:'fiyat performans',count:76}],
     generalNegative:Array.isArray(general?.top_negative_review_hits)&&general.top_negative_review_hits.length?general.top_negative_review_hits:[{label:'kablo kısa',count:42},{label:'ısınma süresi',count:28},{label:'ambalaj hasarlı',count:19},{label:'beklenti farkı',count:11}],
     sellerAverage:safeNumber(seller?.average_rating),
     sellerCount:safeNumber(seller?.total_comment_count),
     isSingleSeller:reviewAnalysis?.is_single_seller===true,
     sellerFilterAvailable:reviewAnalysis?.seller_filter_available===true,
+    trustRuleActive:!!recentReviewRule,
+    recentReviewPresentation,
+    recentReviews:recentReviewsSource
+      .map((item)=>({
+        rating:safeNumber(item?.rating ?? item?.score),
+        text:String(item?.text || item?.comment || '').trim(),
+      }))
+      .filter((item)=>item.text)
+      .slice(0,recentReviewPresentation.limit),
   };
 }
 function updateTrustKpis(trust){
   setText('trustRatingValue',trust.ratingValue!=null?trust.ratingValue.toFixed(1):'—');
-  setText('trustRatingNote',trust.ratingValue>=4.5?'↑ Güçlü ürün memnuniyeti':trust.ratingValue>=4?'ne Dengeli ürün memnuniyeti':'dn Geliştirilmeli');
+  const ratingNote=
+    trust.ratingValue==null
+      ? 'Ürün puanı verisi sınırlı'
+      : trust.ratingValue>=4.5 && trust.reviewCount>=1000
+      ? '↑ Güçlü ürün memnuniyeti'
+      : trust.ratingValue>=4.5
+        ? '↑ Yüksek puan, yorum hacmi izlenmeli'
+        : trust.ratingValue>=4
+          ? 'ne Dengeli ürün memnuniyeti'
+          : 'dn Geliştirilmeli';
+  setText('trustRatingNote',ratingNote);
   setText('trustReviewCount',trust.reviewCount!=null?String(trust.reviewCount):'—');
-  setText('trustReviewNote',trust.reviewCount>=100?'Güçlü sosyal kanıt':trust.reviewCount>=20?'Orta yorum hacmi':'Sınırlı yorum hacmi');
+  const reviewNote=
+    trust.reviewCount==null
+      ? 'Yorum hacmi verisi sınırlı'
+      : trust.reviewCount>=10000
+      ? 'Dominant sosyal kanıt'
+      : trust.reviewCount>=1000
+        ? 'Çok güçlü sosyal kanıt'
+        : trust.reviewCount>=100
+          ? 'Güçlü sosyal kanıt'
+          : trust.reviewCount>=20
+            ? 'Orta yorum hacmi'
+            : 'Sınırlı yorum hacmi';
+  setText('trustReviewNote',reviewNote);
   setText('trustSellerScore',trust.sellerScore!=null?trust.sellerScore.toFixed(1):'—');
   setText(
     'trustSellerNote',
     trust.isSingleSeller
       ? 'Tek satıcılı ürün'
       : trust.sellerFilterAvailable && trust.sellerCount!=null
-        ? `Satıcı özel puan: ${trust.sellerAverage!=null?trust.sellerAverage.toFixed(1):'—'} · ${trust.sellerCount} yorum`
-        : 'Çok satıcılı ürün'
+        ? `Satıcı yorum ort.: ${trust.sellerAverage!=null?trust.sellerAverage.toFixed(1):'—'} · ${trust.sellerCount} yorum`
+        : trust.sellerScore!=null
+          ? 'Pazar yeri satıcı performans puanı'
+          : 'Çok satıcılı ürün'
   );
   setText('trustReturnValue',trust.hasReturnInfo?'Evet':'Hayır');
   setText('trustReturnNote',trust.hasReturnInfo?'İade bilgisi mevcut':'İade bilgisi görünmüyor');
 }
+function getDerivedBand(score){
+  if(score>=70) return 'strong';
+  if(score>=40) return 'medium';
+  return 'weak';
+}
 function demandLevelLabel(score){
-  if(score>=85) return 'Çok Güçlü';
-  if(score>=65) return 'Güçlü';
-  if(score>=45) return 'Orta';
-  if(score>=25) return 'Zayıf';
-  return 'Çok Zayıf';
+  const band=getDerivedBand(score);
+  if(band==='strong') return 'Güçlü';
+  if(band==='medium') return 'Orta';
+  return 'Düşük';
 }
 function growthLabel(score){
-  if(score>=75) return 'Yüksek';
-  if(score>=50) return 'Orta';
+  const band=getDerivedBand(score);
+  if(band==='strong') return 'Yüksek';
+  if(band==='medium') return 'Orta';
   return 'Sınırlı';
 }
 function getDemandTone(score){
-  return score>=65?'up':score>=45?'ne':'dn';
+  const band=getDerivedBand(score);
+  return band==='strong'?'up':band==='medium'?'ne':'dn';
 }
 function getDemandSignalColor(score){
-  return score>=65?'c-g':score>=45?'c-w':'c-r';
+  const band=getDerivedBand(score);
+  return band==='strong'?'c-g':band==='medium'?'c-w':'c-r';
 }
 function parseCompactMetric(value){
   if(value==null) return null;
@@ -971,6 +1504,7 @@ function parseCompactMetric(value){
 }
 function getDemandData(){
   const r=currentReportData||{};
+  const demandRules=getResolvedRuleSection('demand_signals');
   const reviewAnalysis=r.reviewAnalysis||{};
   const general=reviewAnalysis.general||{};
   const questionAnalysis=r.questionAnalysis||{};
@@ -987,34 +1521,50 @@ function getDemandData(){
     parseCompactMetric(directSignals.basketCount) ??
     parseCompactMetric(r.basketCount) ??
     null;
-  const favoriteRaw=
+  const favoriteDirectRaw=
     parseCompactMetric(directSignals.favoriteCount) ??
     parseCompactMetric(r.favoriteCount) ??
-    parseCompactMetric(categoryAverages.favoriteCount!=null?Math.round(categoryAverages.favoriteCount*0.85):null) ??
+    null;
+  const favoriteProxyRaw=
+    favoriteDirectRaw==null
+      ? parseCompactMetric(categoryAverages.favoriteCount!=null?Math.round(categoryAverages.favoriteCount*0.85):null)
+      : null;
+  const favoriteRaw=
+    favoriteDirectRaw ??
+    favoriteProxyRaw ??
     null;
   const viewRaw=
     parseCompactMetric(directSignals.viewCount24h) ??
     parseCompactMetric(r.viewCount24h) ??
+    null;
+  const questionDirectRaw=
+    parseCompactMetric(directSignals.questionCount) ??
+    parseCompactMetric(questionAnalysis.general?.count) ??
+    parseCompactMetric(r.questionCount) ??
     null;
 
   const soldScore=soldRaw!=null?clamp(Math.log10(soldRaw+1)/3.4*100,0,100):null;
   const basketScore=basketRaw!=null?clamp(Math.log10(basketRaw+1)/3.8*100,0,100):null;
   const favoriteScore=favoriteRaw!=null?clamp(Math.log10(favoriteRaw+1)/4.2*100,0,100):null;
   const viewScore=viewRaw!=null?clamp(Math.log10(viewRaw+1)/4.1*100,0,100):null;
-
-  const directWeights=[
-    soldScore!=null?0.35:0,
-    basketScore!=null?0.25:0,
-    favoriteScore!=null?0.2:0,
-    viewScore!=null?0.2:0,
-  ];
-  const directWeightSum=directWeights.reduce((a,b)=>a+b,0);
-  const directDemandScore=directWeightSum>0
-    ? ((soldScore||0)*directWeights[0] + (basketScore||0)*directWeights[1] + (favoriteScore||0)*directWeights[2] + (viewScore||0)*directWeights[3]) / directWeightSum
+  const questionDirectScore=questionDirectRaw!=null
+    ? clamp(questionDirectRaw>=10000?100:questionDirectRaw>=5000?94:questionDirectRaw>=1000?84:questionDirectRaw>=300?72:questionDirectRaw>=100?60:questionDirectRaw>=30?48:questionDirectRaw>0?34:0,0,100)
     : null;
 
-  const reviewCount=safeNumber(general.total_comment_count) ?? 0;
-  const ratingValue=safeNumber(general.average_rating) ?? 0;
+  const directSignalSpecs=[
+    {score:soldScore,weight:0.34,kind:'real'},
+    {score:basketScore,weight:0.22,kind:'real'},
+    {score:viewScore,weight:0.18,kind:'real'},
+    {score:favoriteScore,weight:favoriteDirectRaw!=null?0.18:favoriteProxyRaw!=null?0.08:0,kind:favoriteDirectRaw!=null?'real':favoriteProxyRaw!=null?'proxy':'missing'},
+    {score:questionDirectScore,weight:questionDirectRaw!=null?0.08:0,kind:questionDirectRaw!=null?'real':'missing'},
+  ];
+  const directWeightSum=directSignalSpecs.reduce((sum,item)=>sum+(item.score!=null?item.weight:0),0);
+  const directDemandScore=directWeightSum>0
+    ? directSignalSpecs.reduce((sum,item)=>sum+((item.score??0)*item.weight),0) / directWeightSum
+    : null;
+
+  const reviewCount=safeNumber(general.total_comment_count) ?? safeNumber(r.reviewCount) ?? 0;
+  const ratingValue=safeNumber(general.average_rating) ?? safeNumber(r.ratingValue) ?? 0;
   const questionCount=safeNumber(questionAnalysis.general?.count) ?? safeNumber(r.questionCount) ?? 0;
   const sellerQuestionCount=safeNumber(questionAnalysis.seller?.count) ?? 0;
   const reviewTrend=Array.isArray(general.monthly_trend)?general.monthly_trend:[];
@@ -1024,19 +1574,21 @@ function getDemandData(){
   const ratingScore=clamp((ratingValue/5)*100,0,100);
   const questionScore=clamp(questionCount>=30?88:questionCount>=15?72:questionCount>=5?56:questionCount>0?38:18,0,100);
   const sellerQuestionScore=clamp(sellerQuestionCount>=10?82:sellerQuestionCount>=5?65:sellerQuestionCount>0?45:20,0,100);
+  const marketDepthScore=clamp((safeNumber(r.otherSellersCount) ?? 0)>=10?82:(safeNumber(r.otherSellersCount) ?? 0)>=5?68:(safeNumber(r.otherSellersCount) ?? 0)>1?54:38,0,100);
   const supportDemandScore=
-    reviewScore*0.3 +
-    trendScore*0.2 +
+    reviewScore*0.34 +
+    trendScore*0.16 +
     ratingScore*0.2 +
-    questionScore*0.15 +
-    sellerQuestionScore*0.15;
+    questionScore*0.16 +
+    sellerQuestionScore*0.04 +
+    marketDepthScore*0.1;
 
   const couponSignal=(/kupon/i.test(String(r.src||'')) || r.hasCoupon===true || directSignals.hasCoupon===true)?1:0;
   const lowStockSignal=r.lowStock===true || /tükeniyor/i.test(String(r.stockBadge||'')) ? 1 : 0;
   const fastDeliverySignal=/1-2 gün|yarın kargoda|hızlı/i.test(String(r.deliveryText||'')) ? 1 : 0;
-  const freeShippingSignal=r.freeShipping===true?1:0;
+  const freeShippingSignal=isTrendyolFreeShippingEligible(safeNumber(r.normalizedPrice))?1:0;
   const officialSignal=r.officialSeller===true || safeNumber(summary.official_count)>0 ? 1 : 0;
-  const campaignSignal=(safeNumber(r.discountRate) ?? 0) > 0 ? 1 : 0;
+  const campaignSignal=r.hasCampaign===true || (safeNumber(r.discountRate) ?? 0) > 0 ? 1 : 0;
   const commercialMomentumScore=clamp(
     couponSignal*18 +
     lowStockSignal*18 +
@@ -1069,22 +1621,67 @@ function getDemandData(){
     ? clamp(((priceData.avgPrice-ownPrice)/priceData.avgPrice)*100 + 50,0,100)
     : 50;
   const content=getContentSeoData();
+  const seoRelativeScore=content.categoryVisibilityScore!=null
+    ? clamp((content.searchVisibilityScore/(content.categoryVisibilityScore||1))*50,0,100)
+    : clamp(content.searchVisibilityScore*0.82,0,100);
   const relativeScore=clamp(
-    pricePositionScore*0.45 +
-    (content.categoryVisibilityScore!=null ? clamp((content.searchVisibilityScore/(content.categoryVisibilityScore||1))*50,0,100) : content.searchVisibilityScore)*0.55,
+    pricePositionScore*0.4 +
+    seoRelativeScore*0.45 +
+    marketDepthScore*0.15,
     0,
     100
   );
 
+  const realDirectWeight=directSignalSpecs.reduce((sum,item)=>sum+(item.kind==='real' && item.score!=null?item.weight:0),0);
+  const proxyDirectWeight=directSignalSpecs.reduce((sum,item)=>sum+(item.kind==='proxy' && item.score!=null?item.weight:0),0);
+  const directCoverage=clamp(realDirectWeight/0.82,0,1);
+  const proxyPressure=clamp(proxyDirectWeight/0.18,0,1);
+  const supportCoverage=clamp(
+    [reviewCount>0,ratingValue>0,questionCount>0,recentTrend>0,safeNumber(r.otherSellersCount)>0].filter(Boolean).length/5,
+    0,
+    1
+  );
+  const coreFormula=demandRules?.rules?.find((item)=>item.id==='demand-core-four-signal-formula')
+    ? {favoriteWeight:0.35,reviewWeight:0.30,questionWeight:0.15,ratingWeight:0.20}
+    : null;
+  const coreFourSignalScore=coreFormula
+    ? clamp(
+        (
+          (favoriteScore ?? 0)*coreFormula.favoriteWeight +
+          reviewScore*coreFormula.reviewWeight +
+          questionScore*coreFormula.questionWeight +
+          ratingScore*coreFormula.ratingWeight
+        ) /
+        Math.max(coreFormula.favoriteWeight + coreFormula.reviewWeight + coreFormula.questionWeight + coreFormula.ratingWeight,1),
+        0,
+        100
+      )
+    : null;
+  const demandConfidence=clamp(
+    (directCoverage*0.58) +
+    (supportCoverage*0.32) +
+    ((directDemandScore!=null?0.1:0)) -
+    (proxyPressure*0.12),
+    0.18,
+    1
+  );
+
   const finalScore=clamp(
-    ((directDemandScore!=null?directDemandScore*0.5:0) + supportDemandScore*0.25 + commercialMomentumScore*0.15 + relativeScore*0.1) *
-    (directDemandScore!=null?1:0.92) *
+    (
+      (directDemandScore!=null?directDemandScore*0.34:0) +
+      (coreFourSignalScore!=null?coreFourSignalScore*0.18:0) +
+      supportDemandScore*0.28 +
+      commercialMomentumScore*0.18 +
+      relativeScore*0.02
+    ) *
+    (directDemandScore!=null?1:0.94) *
     trustBalancer,
     0,
     100
   );
 
-  const estimatedMonthlySales=Math.max(0,Math.round((finalScore/100) * 420));
+  const adjustedDemandScore=clamp(finalScore*(0.72 + demandConfidence*0.28),0,100);
+  const estimatedMonthlySales=Math.max(0,Math.round((adjustedDemandScore/100) * 520));
   const basketEstimate=Math.max(0,Math.round((basketRaw!=null?basketRaw:estimatedMonthlySales*2.4)));
   const favoriteEstimate=Math.max(0,Math.round((favoriteRaw!=null?favoriteRaw:estimatedMonthlySales*4.8)));
   const viewEstimate=Math.max(0,Math.round((viewRaw!=null?viewRaw:estimatedMonthlySales*18)));
@@ -1105,15 +1702,30 @@ function getDemandData(){
     pricePositionScore<45 ? 'Fiyat' :
     complaintRatio>0.15 ? 'Yorumlar' :
     'Rekabet';
+  const missingSignals=[
+    soldRaw==null?'satış':null,
+    basketRaw==null?'sepet':null,
+    viewRaw==null?'görüntüleme':null,
+    favoriteDirectRaw==null?'favori':null,
+  ].filter(Boolean);
+  const demandNote=
+    demandConfidence>=0.75
+      ? `${demandLevelLabel(adjustedDemandScore)} talep sinyali`
+      : `Talep tahmini sınırlı veriyle üretildi${missingSignals.length?`: ${missingSignals.slice(0,3).join(', ')}`:''}`;
 
   return {
     directDemandScore,
+    coreFourSignalScore,
     supportDemandScore,
     commercialMomentumScore,
     relativeScore,
     trustBalancer,
-    finalScore,
-    demandLabel:demandLevelLabel(finalScore),
+    finalScore:adjustedDemandScore,
+    rawDemandScore:finalScore,
+    demandConfidence,
+    demandNote,
+    missingSignals,
+    demandLabel:demandLevelLabel(adjustedDemandScore),
     growthOpportunityScore,
     growthLabel:growthLabel(growthOpportunityScore),
     salesTag:estimatedMonthlySales>=300?'Yüksek Hacim':estimatedMonthlySales>=160?'Orta Hacim':'Düşük Hacim',
@@ -1128,17 +1740,22 @@ function getDemandData(){
     salesSeriesBase,
     favoriteSeries,
     breakdown:{
-      soldRaw,basketRaw,favoriteRaw,viewRaw
+      soldRaw,basketRaw,favoriteRaw,viewRaw,questionDirectRaw
     }
   };
 }
 function updateDemandKpis(demand){
+  const sharedRules=getResolvedRuleSection('shared');
+  const demandRules=getResolvedRuleSection('demand_signals');
+  const estimatedLanguageRule=Boolean(sharedRules?.rules?.some((item)=>item.id==='shared-estimated-language'));
+  const relativeMarketPositionRule=Boolean(demandRules?.rules?.some((item)=>item.id==='demand-market-position-is-relative'));
   setText('demandSignalValue',`${Math.round(demand.finalScore)}`);
-  setText('demandSignalNote',`${demand.finalScore>=65?'↑':demand.finalScore>=45?'→':'↓'} ${demand.demandLabel} talep sinyali`);
+  const demandBand=getDerivedBand(demand.finalScore);
+  setText('demandSignalNote',demand.demandConfidence>=0.75?`${demandBand==='strong'?'↑':demandBand==='medium'?'→':'↓'} ${demand.demandLabel} talep sinyali`:(estimatedLanguageRule?`ne ${demand.demandNote}`:'ne Veri güveni sınırlı'));
   setClass(document.getElementById('demandSignalNote'),'kpi-note',getDemandTone(demand.finalScore));
 
-  setText('demandSalesEstimateValue',`${demand.estimatedMonthlySales}/ay`);
-  setText('demandSalesEstimateNote',`Tahmini ${demand.salesTag.toLowerCase()}`);
+  setText('demandSalesEstimateValue',`${demand.estimatedMonthlySales}`);
+  setText('demandSalesEstimateNote',demand.demandConfidence>=0.75?`Tahmini ${demand.salesTag.toLowerCase()}`:(estimatedLanguageRule?`Tahmini ${demand.salesTag.toLowerCase()} · veri güveni sınırlı`:'Tahmin güveni sınırlı'));
   setClass(document.getElementById('demandSalesEstimateNote'),'kpi-note',getDemandTone(demand.finalScore));
 
   setText('demandMomentumValue',`%${Math.round(demand.commercialMomentumScore)}`);
@@ -1146,7 +1763,7 @@ function updateDemandKpis(demand){
   setClass(document.getElementById('demandMomentumNote'),'kpi-note',getDemandTone(demand.commercialMomentumScore));
 
   setText('demandMarketPositionValue',demand.marketPositionLabel);
-  setText('demandMarketPositionNote',demand.marketPositionLabel==='Güçlü'?'Rakiplere karşı avantajlı':demand.marketPositionLabel==='Orta'?'Güçlenme potansiyeli var':'Rakip baskısı yüksek');
+  setText('demandMarketPositionNote',relativeMarketPositionRule?(demand.marketPositionLabel==='Güçlü'?'Rakiplere göre avantajlı':demand.marketPositionLabel==='Orta'?'Göreli konum geliştirilebilir':'Rakiplere göre baskı altında'):(demand.marketPositionLabel==='Güçlü'?'Rakiplere karşı avantajlı':demand.marketPositionLabel==='Orta'?'Güçlenme potansiyeli var':'Rakip baskısı yüksek'));
   setClass(document.getElementById('demandMarketPositionNote'),'kpi-note',getDemandTone(demand.relativeScore));
 
   setText('demandOverviewSales',demand.salesTag.replace(' Hacim',''));
@@ -1158,7 +1775,7 @@ function updateDemandKpis(demand){
   const salesTagEl=document.getElementById('demandSalesTag');
   const growthTagEl=document.getElementById('demandGrowthTag');
   if(salesTagEl) salesTagEl.className=`tag ${demand.salesTagTone}`;
-  if(growthTagEl) growthTagEl.className=`tag ${demand.growthOpportunityScore>=75?'t-g':demand.growthOpportunityScore>=50?'t-w':'t-r'}`;
+  if(growthTagEl) growthTagEl.className=`tag ${getDerivedBand(demand.growthOpportunityScore)==='strong'?'t-g':getDerivedBand(demand.growthOpportunityScore)==='medium'?'t-w':'t-r'}`;
 }
 function inferActionSeverity(weight){
   if(weight>=85) return 'high';
@@ -1203,6 +1820,8 @@ function getActionData(){
   const priorityActions=Array.isArray(r.priorityActions)?r.priorityActions:[];
   const suggestions=Array.isArray(r.suggestions)?r.suggestions:[];
   const aiMode=r.aiCommentary?.mode||'deterministic';
+  const actionRules=getResolvedRuleSection('actions');
+  const shouldDedupeRephrased=Boolean(actionRules?.rules?.some((rule)=>rule.id==='actions-no-duplicate-rephrasing'));
   const merged=[];
   priorityActions.forEach((item,index)=>{
     if(!item||typeof item.title!=='string'||typeof item.detail!=='string') return;
@@ -1216,7 +1835,11 @@ function getActionData(){
   });
   suggestions.forEach((item,index)=>{
     if(!item||typeof item.title!=='string'||typeof item.detail!=='string') return;
-    if(merged.some(existing=>existing.title===item.title)) return;
+    const incomingTitle=shouldDedupeRephrased?normalizeActionTitle(item.title):item.title;
+    if(merged.some((existing)=>{
+      const existingTitle=shouldDedupeRephrased?normalizeActionTitle(existing.title):existing.title;
+      return existingTitle===incomingTitle;
+    })) return;
     merged.push({
       priority: merged.length+1,
       title:item.title,
@@ -1235,15 +1858,19 @@ function renderActionList(){
   const container=document.getElementById('actionList');
   if(!container) return;
   const {actions,aiMode}=getActionData();
+  const actionRules=getResolvedRuleSection('actions');
+  const evidenceRequired=Boolean(actionRules?.rules?.some((rule)=>rule.id==='actions-evidence-required'));
   container.innerHTML=actions.map((item,index)=>{
     const apClass=index<2?'ap1':index<4?'ap2':'ap3';
     return `<div class="action-item"><div class="ap ${apClass}">Öncelik ${index+1}</div><div><div class="at">${escapeHtml(item.title)}</div><div class="ad">${escapeHtml(item.detail)}</div></div></div>`;
   }).join('');
   const helper=document.querySelector('#rdt-actions > div:first-child p');
   if(helper){
-    helper.textContent=aiMode==='ai_enriched'
-      ? 'AI analist + denetçi + kural motoru ile önceliklendirildi'
-      : 'Kural motoru ile üretildi, AI ile zenginleşebilir';
+    helper.textContent=evidenceRequired
+      ? 'Somut veri dayanağı ve öncelik etkisine göre sıralandı'
+      : (aiMode==='ai_enriched'
+        ? 'AI analist + denetçi + kural motoru ile önceliklendirildi'
+        : 'Kural motoru ile üretildi, AI ile zenginleşebilir');
   }
 }
 function setActionFeedbackType(type){
@@ -1297,35 +1924,108 @@ function getPriceData(){
   const offerPrices=alignPriceScale(offers.map(item=>safeNumber(item.price)), scaleAnchor);
   const similarPrices=alignPriceScale(similarProducts.map(item=>safeNumber(item.price)), scaleAnchor);
   const comparisonPrices=offerPrices.length?offerPrices:similarPrices;
-  const minPrice=normalizeComparablePrice(
+  const competitorMinPrice=normalizeComparablePrice(
     safeNumber(summary?.min_price) ?? safeNumber(marketSummary?.lowestCompetitorPrice),
     scaleAnchor
   ) ?? (comparisonPrices.length?Math.min(...comparisonPrices):null);
-  const avgPrice=normalizeComparablePrice(
+  const competitorAvgPrice=normalizeComparablePrice(
     safeNumber(summary?.avg_price) ?? safeNumber(marketSummary?.averageCompetitorPrice),
     scaleAnchor
   ) ?? (comparisonPrices.length?Number((comparisonPrices.reduce((a,b)=>a+b,0)/comparisonPrices.length).toFixed(2)):null);
-  const maxPrice=normalizeComparablePrice(
+  const competitorMaxPrice=normalizeComparablePrice(
     safeNumber(summary?.max_price) ?? safeNumber(marketSummary?.highestCompetitorPrice),
     scaleAnchor
   ) ?? (comparisonPrices.length?Math.max(...comparisonPrices):null);
-  return { ownPrice,minPrice,avgPrice,maxPrice };
+  const rangePrices=[ownPrice,...comparisonPrices].filter((price)=>price!=null);
+  const minPrice=rangePrices.length?Math.min(...rangePrices):competitorMinPrice;
+  const maxPrice=rangePrices.length?Math.max(...rangePrices):competitorMaxPrice;
+  const ownIsMin=ownPrice!=null && minPrice!=null && ownPrice<=minPrice;
+  const ownIsMax=ownPrice!=null && maxPrice!=null && ownPrice>=maxPrice;
+  return {
+    ownPrice,
+    minPrice,
+    avgPrice:competitorAvgPrice,
+    maxPrice,
+    competitorMinPrice,
+    competitorMaxPrice,
+    ownIsMin,
+    ownIsMax,
+  };
+}
+function getPriceRangeChartData(){
+  const priceData=getPriceData();
+  const bars=[
+    {
+      key:'min',
+      label:priceData.ownIsMin?'Bu Ürün (Min Fiyat)':'Min Fiyat',
+      value:priceData.minPrice,
+      color:priceData.ownIsMin?AC:'rgba(0,212,168,.4)',
+    },
+    {
+      key:'own',
+      label:'Bu Ürün',
+      value:priceData.ownPrice,
+      color:AC,
+    },
+    {
+      key:'avg',
+      label:'Rakip Ort.',
+      value:priceData.avgPrice,
+      color:'rgba(245,158,11,.5)',
+    },
+    {
+      key:'max',
+      label:priceData.ownIsMax?'Bu Ürün (Maks Fiyat)':'Maks Fiyat',
+      value:priceData.maxPrice,
+      color:priceData.ownIsMax?AC:'rgba(239,68,68,.4)',
+    },
+  ]
+    .filter((item)=>item.value!=null)
+    .filter((item)=>{
+      if(item.key==='own' && (priceData.ownIsMin || priceData.ownIsMax)) return false;
+      return true;
+    })
+    .sort((a,b)=>Number(b.value)-Number(a.value));
+
+  return {
+    labels:bars.map((item)=>item.label),
+    values:bars.map((item)=>item.value),
+    colors:bars.map((item)=>item.color),
+  };
 }
 function getCompetitiveAdvantageData(){
   const r=currentReportData||{};
-  const summary=r.otherSellersSummary||null;
-  if(!summary){
+  const offers=Array.isArray(r.otherSellerOffers)?r.otherSellerOffers:[];
+  if(!offers.length){
     return null;
   }
-  const officialCount=safeNumber(summary.official_count) ?? 0;
-  const fastDeliveryCount=safeNumber(summary.fast_delivery_count) ?? 0;
-  const freeShippingCount=safeNumber(summary.free_shipping_count) ?? 0;
-  const otherCount=Math.max(0,(safeNumber(summary.total_sellers) ?? 0)-officialCount-fastDeliveryCount-freeShippingCount);
+  const normalizedOffers=offers
+    .map((offer)=>({
+      sellerName:String(offer?.seller_name || offer?.sellerName || 'Bilinmeyen Satıcı'),
+      price:safeNumber(offer?.price),
+      isOfficial:offer?.is_official===true,
+      hasFastDelivery:offer?.has_fast_delivery===true || /1-2 gün|yarın|hızlı/i.test(String(offer?.delivery_text || offer?.deliveryText || '')),
+      hasCampaign:Array.isArray(offer?.promotion_labels) && offer.promotion_labels.length>0,
+      hasDiscount:(safeNumber(offer?.discount_rate) ?? 0) > 0,
+      isAnomalyPrice:(safeNumber(offer?.price) ?? Number.POSITIVE_INFINITY) <= 1.5,
+    }))
+    .filter((offer)=>offer.price!=null);
+  const officialCount=normalizedOffers.filter((offer)=>offer.isOfficial).length;
+  const fastDeliveryCount=normalizedOffers.filter((offer)=>offer.hasFastDelivery).length;
+  const campaignCount=normalizedOffers.filter((offer)=>offer.hasCampaign).length;
+  const discountCount=normalizedOffers.filter((offer)=>offer.hasDiscount).length;
+  const anomalyOffers=normalizedOffers.filter((offer)=>offer.isAnomalyPrice);
   return {
-    officialCount,
+    labels:['Kampanyalı','İndirimli','Hızlı Teslimat','Resmi Satıcı'],
+    values:[campaignCount,discountCount,fastDeliveryCount,officialCount],
+    colors:[WN,'rgba(79,127,255,.6)',AC,'rgba(239,68,68,.55)'],
+    campaignCount,
+    discountCount,
     fastDeliveryCount,
-    freeShippingCount,
-    otherCount,
+    officialCount,
+    anomalyCount:anomalyOffers.length,
+    anomalyNames:anomalyOffers.map((offer)=>offer.sellerName).slice(0,3),
+    totalOffers:normalizedOffers.length,
   };
 }
 function formatCurrencyTRY(value){
@@ -1346,9 +2046,22 @@ function getOtherSellerOffersData(){
     sellerName:item?.seller_name||item?.sellerName||'Bilinmeyen Satıcı',
     price:normalizeComparablePrice(safeNumber(item?.price), ownPrice),
     sellerScore:safeNumber(item?.seller_score ?? item?.sellerScore),
-    freeShipping:item?.free_shipping===true || item?.has_free_shipping===true,
+    freeShipping:isTrendyolFreeShippingEligible(
+      normalizeComparablePrice(safeNumber(item?.price), ownPrice)
+    ),
     deliveryText:item?.delivery_text || item?.delivery || item?.delivery_range || '—',
   })).filter(item=>item.price!=null).sort((a,b)=>a.price-b.price).slice(0,10);
+}
+function getPriceComparisonPalette(count){
+  const palette=[
+    'rgba(79,127,255,.55)',
+    'rgba(0,212,168,.55)',
+    'rgba(245,158,11,.55)',
+    'rgba(239,68,68,.5)',
+    'rgba(124,92,252,.52)',
+    'rgba(56,189,248,.5)',
+  ];
+  return Array.from({length:count},(_,index)=>palette[index%palette.length]);
 }
 function getPricePositionChartData(){
   const r=currentReportData||{};
@@ -1358,7 +2071,7 @@ function getPricePositionChartData(){
     return {
       labels:['Bu Ürün',...offers.map(item=>item.sellerName)],
       values:[ownPrice,...offers.map(item=>item.price)],
-      colors:[AC,...offers.map(()=> 'rgba(255,255,255,.1)')],
+      colors:[AC,...getPriceComparisonPalette(offers.length)],
     };
   }
   const similarProducts=Array.isArray(r.similarProducts)?r.similarProducts:[];
@@ -1372,7 +2085,7 @@ function getPricePositionChartData(){
   return {
     labels:['Bu Ürün',...normalizedSimilar.map(item=>item.label)],
     values:[ownPrice,...normalizedSimilar.map(item=>item.price)],
-    colors:[AC,...normalizedSimilar.map(()=> 'rgba(255,255,255,.1)')],
+    colors:[AC,...getPriceComparisonPalette(normalizedSimilar.length)],
   };
 }
 function renderOtherSellerOffers(){
@@ -1387,7 +2100,7 @@ function renderOtherSellerOffers(){
     return;
   }
   block.style.display='';
-  const ownShippingTag=r.freeShipping===true?'<span class="tag t-g">Ücretsiz</span>':'<span class="tag t-n">Ücretli</span>';
+  const ownShippingTag=isTrendyolFreeShippingEligible(safeNumber(r.normalizedPrice))?'<span class="tag t-g">Ücretsiz</span>':'<span class="tag t-n">Ücretli</span>';
   const ownScore=safeNumber(r.sellerScore);
   const ownRowHtml=`<div class="seller-row this-product"><div style="font-weight:600;">${r.sellerName||'Bu Ürün'} <span class="tag t-b" style="margin-left:6px;font-size:9px;">Bu Ürün</span></div><div style="font-weight:700;color:var(--accent);">${formatCurrencyTRY(r.normalizedPrice)}</div><div style="color:${getSellerScoreTone(ownScore)};">${ownScore!=null?`${ownScore.toFixed(1)} ⭐`:'—'}</div><div>${ownShippingTag}</div><div style="color:var(--muted);">${r.deliveryText||'—'}</div></div>`;
   const offerRowsHtml=offers.map(item=>{
@@ -1433,6 +2146,14 @@ function updatePriceKpis(){
   const avgCompetitorPriceNoteEl=document.getElementById('rdAvgCompetitorPriceNote');
   const cheaperCountEl=document.getElementById('rdCheaperCount');
   const cheaperCountNoteEl=document.getElementById('rdCheaperCountNote');
+  const couponValueEl=document.getElementById('rdCouponValue');
+  const couponNoteEl=document.getElementById('rdCouponNote');
+  const promotionLabels=Array.isArray(r.promotionLabels)?r.promotionLabels.map(item=>String(item||'').trim()).filter(Boolean):[];
+  const campaignLabel=String(r.campaignLabel || '').trim();
+  const couponCandidates=[campaignLabel,...promotionLabels].filter((item,index,array)=>item && array.indexOf(item)===index);
+  const couponSignalLabels=couponCandidates.filter((item)=>/kupon/i.test(item));
+  const hasCoupon=couponSignalLabels.length>0;
+  const hasCampaignSignal=r.hasCampaign===true || couponCandidates.length>0;
   if(currentPriceEl) currentPriceEl.textContent=formatCurrencyTRY(currentPrice);
   if(currentPriceNoteEl){
     currentPriceNoteEl.textContent=actualDiscountRate>0?`↓ %${actualDiscountRate} indirimli`:'↓ % indirimli';
@@ -1481,6 +2202,15 @@ function updatePriceKpis(){
       cheaperCountNoteEl.className=`kpi-note ${cheaperCount>0?'dn':'up'}`;
     }
   }
+  if(couponValueEl) couponValueEl.textContent=hasCoupon?'Var':'Yok';
+  if(couponNoteEl){
+    couponNoteEl.textContent=hasCoupon
+      ? couponSignalLabels[0]
+      : hasCampaignSignal
+        ? (campaignLabel || promotionLabels[0] || 'Kampanya var, kupon sinyali görünmüyor')
+        : 'Kupon sinyali görünmüyor';
+    couponNoteEl.className=`kpi-note ${hasCoupon?'up':hasCampaignSignal?'ne':'dn'}`;
+  }
 }
 function getContentSeoData(){
   const r=currentReportData||{};
@@ -1488,23 +2218,27 @@ function getContentSeoData(){
   const categoryAverages=r.categoryAverages||{};
   const questionAnalysis=r.questionAnalysis||{};
   const keywordInsight=r.trendyolScorecard?.keywordInsight||{};
-  const rawPrimaryKeywords=[
-    typeof keywordInsight.primaryKeyword==='string'?keywordInsight.primaryKeyword:'',
-    ...(Array.isArray(keywordInsight.secondaryKeywords)?keywordInsight.secondaryKeywords:[]),
-  ].map(item=>String(item||'').trim()).filter(Boolean);
   const fallbackKeywords=(Array.isArray(r.primaryKeywords)?r.primaryKeywords:[]).map(item=>String(item||'').trim()).filter(Boolean);
-  const primaryKeywords=[...new Set((rawPrimaryKeywords.length?rawPrimaryKeywords:fallbackKeywords))].slice(0,3);
-  const keywordSource=keywordInsight.source|| (primaryKeywords.length?'fallback':'none');
-  const descriptionLength=safeNumber(r.descriptionLength) ?? 280;
+  const titleFallbackKeywords=extractPrimaryKeywordsFromTitle(r.title);
+  const primaryKeywords=[...new Set((fallbackKeywords.length?fallbackKeywords:titleFallbackKeywords))].slice(0,3);
+  const keywordSource=fallbackKeywords.length?'algorithm':titleFallbackKeywords.length?'title_fallback':'none';
+  const descriptionLength=safeNumber(r.descriptionLength);
+  const metaDescription=String(r.metaDescription || '').trim();
   const imageCount=safeNumber(r.imageCount) ?? 4;
   const bulletPointCount=safeNumber(r.bulletPointCount) ?? 3;
   const generalQuestionCount=safeNumber(questionAnalysis.general?.count);
   const sellerQuestionCount=safeNumber(questionAnalysis.seller?.count);
   const isSingleSellerQuestionPool=questionAnalysis.is_single_seller===true;
   const questionCount=safeNumber(r.questionCount) ?? generalQuestionCount ?? 28;
-  const qaSnippetCount=safeNumber(r.qaSnippetCount) ?? 12;
+  const qaSnippetCount=safeNumber(r.qaSnippetCount) ?? 0;
   const unansweredQuestionCount=safeNumber(r.unansweredQuestionCount) ?? safeNumber(questionAnalysis.seller?.unansweredCount) ?? safeNumber(questionAnalysis.general?.unansweredCount);
   const hasSpecs=r.hasSpecs!==false;
+  const promotionLabels=Array.isArray(r.promotionLabels)?r.promotionLabels.map(item=>String(item||'').trim()).filter(Boolean):[];
+  const campaignLabel=String(r.campaignLabel || '').trim();
+  const couponCandidates=[campaignLabel,...promotionLabels].filter((item,index,array)=>item && array.indexOf(item)===index);
+  const couponSignalLabels=couponCandidates.filter((item)=>/kupon/i.test(item));
+  const hasCoupon=couponSignalLabels.length>0;
+  const hasCampaignSignal=r.hasCampaign===true || couponCandidates.length>0;
   const searchVisibilityScore=clamp(safeNumber(r.seoScore) ?? 61,0,100);
   const categoryFit=r.categoryFit||{};
   const descriptionBenchmark=safeNumber(categoryAverages.descriptionLength) ?? safeNumber(benchmark.descriptionLength) ?? 1240;
@@ -1513,7 +2247,9 @@ function getContentSeoData(){
   const imageBenchmarkSource=safeNumber(categoryAverages.imageCount)!=null?'category':'reference';
   const bulletBenchmark=safeNumber(benchmark.bulletPointCount) ?? 6;
   const targetScore=safeNumber(benchmark.targetSeoScore) ?? 75;
-  const descriptionLengthScore=clamp((descriptionLength/descriptionBenchmark)*100,0,100);
+  const hasDescriptionContent=descriptionLength!=null && descriptionLength>=40;
+  const effectiveDescriptionLength=descriptionLength ?? 0;
+  const descriptionLengthScore=hasDescriptionContent?clamp((effectiveDescriptionLength/descriptionBenchmark)*100,0,100):0;
   const imageScore=clamp((imageCount/imageBenchmark)*100,0,100);
   const bulletScore=clamp((bulletPointCount/bulletBenchmark)*100,0,100);
   const specScore=hasSpecs?85:35;
@@ -1522,19 +2258,36 @@ function getContentSeoData(){
   const unresolvedQuestionCount=Math.max(0,Math.round(unansweredQuestionCount ?? Math.max(questionCount-qaSnippetCount,0)));
   const qaStatusTone=unresolvedQuestionCount>0?'risk':(questionCount>0?'good':'neutral');
   const keywordCoverageScore=clamp(primaryKeywords.length>=3?88:primaryKeywords.length===2?72:primaryKeywords.length===1?55:30,0,100);
-  const descriptionScore=clamp(
-    descriptionLengthScore*0.35 +
-    bulletScore*0.2 +
-    specScore*0.2 +
-    qaCoverageScore*0.15 +
-    keywordCoverageScore*0.1,
+  const descriptionRules=scoreDescriptionRules({
+    hasDescriptionContent,
+    effectiveDescriptionLength,
+    descriptionBenchmark,
+    metaDescription,
+    bulletPointCount,
+    hasSpecs,
+    primaryKeywords,
+    imageCount,
+    qaSnippetCount,
+    questionCount,
+  });
+  const descriptionScore=descriptionRules.score;
+  const titleScore=clamp(searchVisibilityScore+8,0,100);
+  const inferredCategoryFit=inferCategoryFitFromText(r.title,r.cat,primaryKeywords);
+  const categoryFitScore=clamp(
+    Math.max(safeNumber(categoryFit.score) ?? 0,inferredCategoryFit.score),
     0,
     100
   );
-  const titleScore=clamp(searchVisibilityScore+8,0,100);
-  const categoryFitScore=clamp(safeNumber(categoryFit.score) ?? ((r.cat&&keywordInsight.primaryKeyword)?88:(r.cat?72:45)),0,100);
-  const categoryFitLabel=typeof categoryFit.label==='string'&&categoryFit.label.trim().length>0?categoryFit.label.trim():(categoryFitScore>=80?'Yüksek':categoryFitScore>=55?'Orta':'Zayıf');
-  const categoryFitNote=typeof categoryFit.note==='string'&&categoryFit.note.trim().length>0?categoryFit.note.trim():(categoryFitScore>=80?'AI uyumu güçlü buldu':categoryFitScore>=55?'Kategori ilişkisi kabul edilebilir':'Kategori uyumu zayıf');
+  const categoryFitLabel=categoryFitScore===inferredCategoryFit.score
+    ? inferredCategoryFit.label
+    : typeof categoryFit.label==='string'&&categoryFit.label.trim().length>0
+      ? categoryFit.label.trim()
+      : (getLegacyContentBand(categoryFitScore)==='strong'?'Yüksek':getLegacyContentBand(categoryFitScore)==='medium'?'Orta':'Zayıf');
+  const categoryFitNote=categoryFitScore===inferredCategoryFit.score
+    ? inferredCategoryFit.note
+    : typeof categoryFit.note==='string'&&categoryFit.note.trim().length>0
+      ? categoryFit.note.trim()
+      : (getLegacyContentBand(categoryFitScore)==='strong'?'Kategori ile güçlü eşleşme görülüyor':getLegacyContentBand(categoryFitScore)==='medium'?'Kategori ilişkisi kabul edilebilir':'Kategori uyumu zayıf');
   const categoryVisibilityScore=
     safeNumber(categoryAverages.searchVisibility) ??
     (
@@ -1556,13 +2309,8 @@ function getContentSeoData(){
           100
         )
       : null;
-  const descriptionLabel=descriptionScore>=80?'Güçlü':descriptionScore>=55?'Orta':'Zayıf';
-  const descriptionNote=
-    descriptionScore>=80
-      ? 'Ürünü net anlatıyor, özellik ve fayda kapsamı iyi'
-      : descriptionScore>=55
-        ? 'Temel bilgi var ama ikna ve kapsam derinliği sınırlı'
-        : 'Ürünü hızlı anlatma ve ikna etme gücü zayıf';
+  const descriptionLabel=descriptionRules.label;
+  const descriptionNote=descriptionRules.note;
   const questionCardValue=String(questionCount);
   const questionCardNote=
     isSingleSellerQuestionPool || sellerQuestionCount==null
@@ -1588,12 +2336,22 @@ function getContentSeoData(){
         : 'Soru alanı görünmüyor';
   const qaValueTone=unresolvedQuestionCount>0?'c-r':questionCount>0?'c-b':'c-w';
   const qaNoteTone=unresolvedQuestionCount>0?'dn':questionCount>0?'ne':'dn';
+  const couponValue=hasCoupon?'Var':'Yok';
+  const couponNote=hasCoupon
+    ? couponSignalLabels[0]
+    : hasCampaignSignal
+      ? (campaignLabel || promotionLabels[0] || 'Kampanya var, kupon sinyali görünmüyor')
+      : 'Kupon sinyali görünmüyor';
+  const couponValueTone=hasCoupon?'c-g':hasCampaignSignal?'c-w':'c-r';
+  const couponNoteTone=hasCoupon?'up':hasCampaignSignal?'ne':'dn';
   return {
     primaryKeywords,keywordSource,categoryFitScore,categoryFitLabel,categoryFitNote,
     descriptionLength,imageCount,bulletPointCount,questionCount,qaSnippetCount,unresolvedQuestionCount,qaStatusTone,hasSpecs,searchVisibilityScore,
     descriptionBenchmark,imageBenchmark,bulletBenchmark,targetScore,descriptionBenchmarkSource,imageBenchmarkSource,
     descriptionScore,descriptionLabel,descriptionNote,imageScore,bulletScore,specScore,questionSignalScore,titleScore,
+    descriptionRules,
     questionCardValue,questionCardNote,questionCardTone,questionNoteTone,qaStatusValue,qaStatusNote,qaValueTone,qaNoteTone,
+    couponValue,couponNote,couponValueTone,couponNoteTone,
     keywordCoverageScore,
     categoryVisibilityScore
   };
@@ -1620,10 +2378,21 @@ function setKeywordRankState(lines,note,tone='ne'){
 async function updateKeywordRankCard(){
   const token=++keywordRankRequestToken;
   const content=getContentSeoData();
+  const keywordRankCacheRule=hasResolvedRule('content_seo','content-keyword-ranking-cache-first');
   const url=currentReportData?.url;
+  const reportId=currentReportData?.reportId;
   const keywords=content.primaryKeywords.slice(0,3);
   if(!url || keywords.length===0){
     setKeywordRankState(['Kontrol edilmedi'],'URL veya anahtar kelime eksik','dn');
+    return;
+  }
+  const cachedResult=loadKeywordRankCache(reportId,url,keywords);
+  if(cachedResult){
+    setKeywordRankState(
+      cachedResult.lines,
+      keywordRankCacheRule ? `${cachedResult.note} · son bulunan sonuc` : cachedResult.note,
+      cachedResult.tone
+    );
     return;
   }
   setKeywordRankState(['Kontrol ediliyor…'],'Trendyol arama sırası alınıyor','ne');
@@ -1648,7 +2417,10 @@ async function updateKeywordRankCard(){
       return `${index+1}. ${keyword}: bulunamadı`;
     });
     const foundCount=results.filter(item=>item.data?.found && typeof item.data.rank==='number').length;
-    setKeywordRankState(lines,foundCount>0?'Canlı Trendyol arama sonucu':'İlk sonuçlarda bulunamadı',foundCount>0?'up':'dn');
+    const note=foundCount>0?'Canlı Trendyol arama sonucu':'İlk sonuçlarda bulunamadı';
+    const tone=foundCount>0?'up':'dn';
+    saveKeywordRankCache(reportId,url,keywords,{lines,note,tone});
+    setKeywordRankState(lines,note,tone);
   }catch{
     if(token!==keywordRankRequestToken) return;
     setKeywordRankState(['Sıra alınamadı'],'Canlı arama kontrolü başarısız','dn');
@@ -1656,28 +2428,49 @@ async function updateKeywordRankCard(){
 }
 function updateContentSeoCards(){
   const content=getContentSeoData();
+  const contentRules=getResolvedRuleSection('content_seo');
+  const metaIsSecondary=Boolean(contentRules?.rules?.some((rule)=>rule.id==='content-meta-is-secondary'));
+  const algorithmFirstKeywords=Boolean(contentRules?.rules?.some((rule)=>rule.id==='content-primary-keywords-algorithm-first'));
+  const categoryBand=getLegacyContentBand(content.categoryFitScore);
+  const descriptionBand=getLegacyContentBand(content.descriptionScore);
+  const descriptionTone=content.descriptionLabel==='Sınırlı'
+    ? 'c-w'
+    : descriptionBand==='strong'
+      ? 'c-g'
+      : descriptionBand==='medium'
+        ? 'c-w'
+        : 'c-r';
+  const descriptionNoteTone=content.descriptionLabel==='Sınırlı'
+    ? 'ne'
+    : descriptionBand==='strong'
+      ? 'up'
+      : descriptionBand==='medium'
+        ? 'ne'
+        : 'dn';
+  const imageBand=getLegacyContentBand(content.imageScore);
+  const bulletBand=getLegacyContentBand(content.bulletScore);
   setText('contentPrimaryKeywordsValue',content.primaryKeywords.length?content.primaryKeywords.join(' · '):'—');
-  setText('contentPrimaryKeywordsNote',content.primaryKeywords.length?(content.keywordSource==='ai_enriched'?'AI tarafından seçilen 3 ana arama niyeti':'Çıkarılan 3 ana arama niyeti'):'AI anahtar kelime çıkaramadı');
+  setText('contentPrimaryKeywordsNote',content.primaryKeywords.length?(content.keywordSource==='title_fallback'?'Ürün başlığından türetildi':(algorithmFirstKeywords?'Algoritma öncelikli çıkarım':'Algoritma tarafından çıkarıldı')):'Algoritma anahtar kelime çıkaramadı');
   setClass(document.getElementById('contentPrimaryKeywordsValue'),'sig-val',content.primaryKeywords.length?'c-b':'c-r');
   setClass(document.getElementById('contentPrimaryKeywordsNote'),'sig-note',content.primaryKeywords.length?'ne':'dn');
   setText('contentCategoryFitValue',content.categoryFitLabel);
   setText('contentCategoryFitNote',content.categoryFitNote);
-  setClass(document.getElementById('contentCategoryFitValue'),'sig-val',content.categoryFitScore>=80?'c-g':content.categoryFitScore>=55?'c-w':'c-r');
-  setClass(document.getElementById('contentCategoryFitNote'),'sig-note',content.categoryFitScore>=80?'up':content.categoryFitScore>=55?'ne':'dn');
+  setClass(document.getElementById('contentCategoryFitValue'),'sig-val',categoryBand==='strong'?'c-g':categoryBand==='medium'?'c-w':'c-r');
+  setClass(document.getElementById('contentCategoryFitNote'),'sig-note',categoryBand==='strong'?'up':categoryBand==='medium'?'ne':'dn');
   setText('contentDescriptionValue',content.descriptionLabel);
-  setText('contentDescriptionNote',content.descriptionNote);
-  setClass(document.getElementById('contentDescriptionValue'),'sig-val',content.descriptionScore>=80?'c-g':content.descriptionScore>=55?'c-w':'c-r');
-  setClass(document.getElementById('contentDescriptionNote'),'sig-note',content.descriptionScore>=80?'up':content.descriptionScore>=55?'ne':'dn');
+  setText('contentDescriptionNote',metaIsSecondary && /meta/i.test(String(content.descriptionNote||'')) ? 'Meta ikincil sinyal, açıklama ana belirleyici değil' : content.descriptionNote);
+  setClass(document.getElementById('contentDescriptionValue'),'sig-val',descriptionTone);
+  setClass(document.getElementById('contentDescriptionNote'),'sig-note',descriptionNoteTone);
 
   setText('contentImageValue',String(content.imageCount));
   setText('contentImageNote',`${content.imageBenchmarkSource==='category'?'Kategori Ort.':'Referans'}: ${String(content.imageBenchmark).replace('.',',')}`);
-  setClass(document.getElementById('contentImageValue'),'sig-val',content.imageScore>=80?'c-g':content.imageScore>=55?'c-w':'c-r');
-  setClass(document.getElementById('contentImageNote'),'sig-note',content.imageScore>=80?'up':content.imageScore>=55?'ne':'dn');
+  setClass(document.getElementById('contentImageValue'),'sig-val',imageBand==='strong'?'c-g':imageBand==='medium'?'c-w':'c-r');
+  setClass(document.getElementById('contentImageNote'),'sig-note',imageBand==='strong'?'up':imageBand==='medium'?'ne':'dn');
 
   setText('contentBulletValue',String(content.bulletPointCount));
   setText('contentBulletNote',`Önerilen: ${content.bulletBenchmark}+`);
-  setClass(document.getElementById('contentBulletValue'),'sig-val',content.bulletScore>=80?'c-g':content.bulletScore>=55?'c-w':'c-r');
-  setClass(document.getElementById('contentBulletNote'),'sig-note',content.bulletScore>=80?'up':content.bulletScore>=55?'ne':'dn');
+  setClass(document.getElementById('contentBulletValue'),'sig-val',bulletBand==='strong'?'c-g':bulletBand==='medium'?'c-w':'c-r');
+  setClass(document.getElementById('contentBulletNote'),'sig-note',bulletBand==='strong'?'up':bulletBand==='medium'?'ne':'dn');
 
   setText('contentQuestionValue',content.questionCardValue);
   setText('contentQuestionNote',content.questionCardNote);
@@ -1688,6 +2481,11 @@ function updateContentSeoCards(){
   setText('contentSpecsNote',content.hasSpecs?'Teknik alan mevcut':'Teknik alan eksik');
   setClass(document.getElementById('contentSpecsValue'),'sig-val',content.hasSpecs?'c-g':'c-r');
   setClass(document.getElementById('contentSpecsNote'),'sig-note',content.hasSpecs?'up':'dn');
+
+  setText('contentCouponValue',content.couponValue);
+  setText('contentCouponNote',content.couponNote);
+  setClass(document.getElementById('contentCouponValue'),'sig-val',content.couponValueTone);
+  setClass(document.getElementById('contentCouponNote'),'sig-note',content.couponNoteTone);
 
   setText('contentQaValue',content.qaStatusValue);
   setText('contentQaNote',content.qaStatusNote);
@@ -1734,6 +2532,8 @@ function getCampaignScenarioData(){
   const reviewAnalysis=r.reviewAnalysis||null;
   const general=reviewAnalysis?.general||null;
   const seller=reviewAnalysis?.seller||null;
+  const demandData=getDemandData();
+  const priceData=getPriceData();
   const breakdown=(general?.rating_breakdown)||{};
   const totalRatings=safeNumber(breakdown.total) || safeNumber(general?.total_comment_count) || 0;
   const lowRated=((safeNumber(breakdown.one_star)||0)+(safeNumber(breakdown.two_star)||0));
@@ -1752,7 +2552,7 @@ function getCampaignScenarioData(){
   ,0,1);
   const operationScore=clamp(
     (0.35*clamp((safeNumber(r.sellerScore) ?? 8.5)/10,0,1))+
-    (0.25*(r.freeShipping?0.9:0.65))+
+    (0.25*(isTrendyolFreeShippingEligible(safeNumber(r.normalizedPrice))?0.9:0.65))+
     (0.20*(r.hasReturnInfo?0.85:0.55))+
     (0.20*(String(r.deliveryText||'').includes('1-2')?0.9:String(r.deliveryText||'').includes('1-3')?0.82:0.68))
   ,0,1);
@@ -1760,33 +2560,72 @@ function getCampaignScenarioData(){
   const penalty=(lowRatedRatio>=0.2?0.85:1)*(reviewAnalysis?.is_single_seller===false && (safeNumber(seller?.total_comment_count)||0)>0 && (safeNumber(seller?.average_rating)||5)<3 ? 0.82 : 1);
   const discountRate=clamp(currentCampaignState.discountRate ?? safeNumber(r.discountRate) ?? 15,1,50);
   const campaignDays=Math.round(clamp(currentCampaignState.campaignDays ?? safeNumber(r.campaignDays) ?? 7,1,30));
+  const demandScore=clamp((safeNumber(demandData.finalScore) ?? 56)/100,0,1);
+  const momentumScore=clamp((safeNumber(demandData.commercialMomentumScore) ?? 54)/100,0,1);
+  const priceAdvantageRatio=
+    priceData.avgPrice!=null && priceData.ownPrice!=null && priceData.avgPrice>0
+      ? clamp((priceData.avgPrice-priceData.ownPrice)/priceData.avgPrice,-0.35,0.35)
+      : 0;
   const basePotential=clamp(
-    22+
-    ((safeNumber(r.conversionScore) ?? 68)*0.18)+
-    ((safeNumber(r.favoriteCount) ?? safeNumber(general?.total_comment_count) ?? 80)>0 ? Math.min(9,Math.log10((safeNumber(r.favoriteCount) ?? safeNumber(general?.total_comment_count) ?? 80)+1)*3.2) : 0)+
-    (generalRating*12)
-  ,18,58);
-  const discountEffect=0.22*(1-Math.exp(-discountRate/16));
-  const listingEffect=(listingScore-0.5)*0.22;
-  const trustEffect=(trustScore-0.5)*0.24;
-  const operationEffect=(operationScore-0.5)*0.18;
-  const penaltyEffect=(penalty-1)*0.45;
+    16+
+    ((safeNumber(r.conversionScore) ?? 68)*0.14)+
+    (demandScore*16)+
+    (momentumScore*9)+
+    (generalRating*8)+
+    (priceAdvantageRatio*18)
+  ,14,64);
+  const discountStrength=clamp(discountRate/45,0,1);
+  const readinessScore=clamp(
+    listingScore*0.34 +
+    trustScore*0.36 +
+    operationScore*0.3,
+    0,
+    1
+  );
+  const promoSensitivity=clamp(
+    0.55 +
+    ((1-readinessScore)*0.18) +
+    (demandScore*0.14) +
+    (Math.max(0,priceAdvantageRatio)*0.22),
+    0.35,
+    1.05
+  );
+  const discountLift=(Math.pow(discountStrength,0.82)*26 + Math.max(0,discountRate-20)*0.22) * promoSensitivity;
+  const durationLift=(campaignDays<=3?1.5:campaignDays<=7?4.2:campaignDays<=14?6.8:8.6) * (0.82 + momentumScore*0.32);
+  const qualityLift=((listingScore-0.5)*18)+((trustScore-0.5)*20)+((operationScore-0.5)*16);
+  const penaltyDrag=(1-penalty)*(12 + (1-trustScore)*20 + lowRatedRatio*24);
+  const peakDay=Math.round(clamp(2 + discountStrength*4 + momentumScore*3 - (trustScore<0.55?1:0),2,9));
+  const decayStart=Math.round(clamp(peakDay + 2 + readinessScore*4,4,16));
+  const launchMagnitude=clamp(5 + discountStrength*10 + momentumScore*7 + Math.max(0,priceAdvantageRatio)*16,4,24);
+  const fatigueRate=clamp(
+    0.2 +
+    ((campaignDays/30)*0.55) +
+    ((1-readinessScore)*0.45) +
+    (lowRatedRatio*0.9) -
+    (trustScore*0.18),
+    0.12,
+    1.2
+  );
   const labels=Array.from({length:campaignDays},(_,i)=>`${i+1}. gün`);
   const data=labels.map((_,index)=>{
     const day=index+1;
-    const launchBoost=day===1?0:day===2?3.5:day===3?5.5:day<=5?4.5:day<=7?3.2:day<=14?1.8:0.8;
-    const fatigue=day<=7?0:(day-7)*0.28;
+    const prePeakLift=day<=peakDay
+      ? (day/peakDay)*launchMagnitude
+      : Math.max(launchMagnitude - ((day-peakDay)*(1.1 + (1-momentumScore)*0.9)),0);
+    const fatigue=day<=decayStart ? 0 : Math.pow(day-decayStart,1.08)*fatigueRate;
+    const urgencyBoost=(campaignDays<=3?3.5:campaignDays<=7?2.2:0.8) * discountStrength;
+    const sustainedTrustLift=trustScore*3.5 + readinessScore*2.8;
     const scenarioScore=
       basePotential +
-      (discountRate*discountEffect) +
-      (launchBoost) +
-      (campaignDays>=14?2.5:campaignDays>=7?1.2:0) +
-      (listingEffect*100) +
-      (trustEffect*100) +
-      (operationEffect*100) +
-      (penaltyEffect*100) -
+      discountLift +
+      durationLift +
+      qualityLift +
+      prePeakLift +
+      urgencyBoost +
+      sustainedTrustLift -
+      penaltyDrag -
       fatigue;
-    return Number(clamp(scenarioScore,8,96).toFixed(1));
+    return Number(clamp(scenarioScore,8,99).toFixed(1));
   });
   return { labels,data };
 }
@@ -1803,23 +2642,82 @@ function setCampaignDays(value){
 }
 
 const VIEWS={
-  'overview':['Genel Bakış','Son 30 gün · Ahmet 👋'],
+  'overview':['Genel Bakış','Son 30 gün · Kullanıcı 👋'],
   'reports':['Raporlarım','Tüm analiz raporların'],
   'new-analysis':['Yeni Analiz','URL gir, sistem otomatik analiz etsin'],
   'account':['Hesabım','Profil ve plan bilgilerin'],
+  'settings':['Ayarlar','Bildirim, guvenlik ve tercih ayarlari'],
   'report-detail':['Rapor Detayı','← Raporlara dön'],
 };
 
-function gv(id){
+function gv(id,options={}){
+  saveDashboardScrollPosition();
+  const isEmbedded=window.top!==window;
+  if(!isEmbedded){
+    syncDashboardUrl(id,options.reportId);
+  }
+  if(options.notifyParent!==false){
+    notifyParentNavigation(id,options.reportId);
+  }
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+id).classList.add('active');
   document.querySelectorAll('.sb-item').forEach(b=>b.classList.remove('act'));
-  const [t,s]=VIEWS[id]||[id,''];
+  let [t,s]=VIEWS[id]||[id,''];
+  if(id==='reports'){
+    if(reportsFilterMode==='favorites'){
+      t='Favori Raporlar';
+      s='Yıldızladığın raporlar';
+    }else{
+      t='Raporlarım';
+      s='Tüm analiz raporların';
+    }
+  }
+  if(id==='overview'){
+    s=`Son 30 gün · ${currentUserProfile.firstName || 'Kullanıcı'} 👋`;
+  }
   document.getElementById('tbTitle').textContent=t;
   document.getElementById('tbSub').textContent=s;
-  const map={'overview':0,'new-analysis':1,'reports':2,'account':4};
+  const map={'overview':0,'new-analysis':1,'account':4,'settings':5};
   if(map[id]!==undefined) document.querySelectorAll('.sb-item')[map[id]]?.classList.add('act');
+  if(id==='reports') applyReportsNavActiveState();
   if(id==='overview') setTimeout(initOverview,80);
+}
+
+async function logoutUser(){
+  try{
+    const csrfRes=await fetch('/api/auth/csrf',{cache:'no-store'});
+    const csrfPayload=await csrfRes.json().catch(()=>null);
+    const csrfToken=String(csrfPayload?.csrfToken||'').trim();
+    if(!csrfToken) throw new Error('csrf_missing');
+    const body=new URLSearchParams();
+    body.set('csrfToken',csrfToken);
+    body.set('callbackUrl','/login');
+    body.set('json','true');
+    await fetch('/api/auth/signout',{
+      method:'POST',
+      headers:{'content-type':'application/x-www-form-urlencoded'},
+      body:body.toString(),
+    });
+  }catch{}
+  try{
+    if(window.top && window.top!==window){
+      window.top.location.href='/login';
+      return;
+    }
+  }catch{}
+  window.location.href='/login';
+}
+
+async function applyExternalWorkspaceRoute(view, reportId){
+  if(view==='report-detail'){
+    const loaded=await loadReportById(reportId);
+    if(!loaded){
+      openReport(0);
+    }
+    return;
+  }
+  gv(view,{reportId,notifyParent:false});
+  setTimeout(restoreDashboardScrollPosition,80);
 }
 
 function formatDetailDate(value){
@@ -1850,10 +2748,60 @@ function pickEmojiForCategory(category){
   if(/saat|aksesuar|bileklik/.test(text)) return '⌚';
   return '📦';
 }
+function normalizeImageUrl(value){
+  const raw=String(value||'').trim();
+  if(!raw) return null;
+  if(/^https?:\/\//i.test(raw)) return raw;
+  if(raw.startsWith('//')) return `https:${raw}`;
+  return null;
+}
+function resolveReportThumbnail(payload,extracted){
+  const candidates=[
+    payload?.thumbnail,
+    payload?.image,
+    payload?.imageUrl,
+    extracted?.primary_image,
+    Array.isArray(extracted?.images)?extracted.images[0]:null,
+    extracted?.image,
+    extracted?.image_url,
+  ];
+  for(const candidate of candidates){
+    const normalized=normalizeImageUrl(candidate);
+    if(normalized) return normalized;
+  }
+  return null;
+}
+function getReportThumbHtml(report){
+  const thumbnail=normalizeImageUrl(report?.thumbnail);
+  if(thumbnail){
+    return `<img src="${escapeHtml(thumbnail)}" alt="${escapeHtml(String(report?.title||'Ürün görseli'))}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.parentElement.textContent='${escapeHtml(String(report?.emoji||'📦'))}'">`;
+  }
+  return escapeHtml(String(report?.emoji||'📦'));
+}
+function updateReportDetailImage(report){
+  const el=document.getElementById('rdImg');
+  if(!el) return;
+  const thumbnail=normalizeImageUrl(report?.thumbnail);
+  if(thumbnail){
+    el.innerHTML=`<img src="${escapeHtml(thumbnail)}" alt="${escapeHtml(String(report?.title||'Ürün görseli'))}" loading="eager" referrerpolicy="no-referrer" onerror="this.onerror=null;this.parentElement.textContent='${escapeHtml(String(report?.emoji||'📦'))}'">`;
+    return;
+  }
+  el.textContent=String(report?.emoji||'📦');
+}
+function normalizeReportSourceLabel(value){
+  const text=String(value||'').trim();
+  if(!text) return 'Gerçek Veri';
+  return text
+    .replace(/\bruntime_xhr\b/gi,'canlı çekim')
+    .replace(/\bembedded_json\b/gi,'gömülü veri')
+    .replace(/\bparser_inference\b/gi,'çıkarım')
+    .replace(/\bhtml\b/gi,'html yakalama');
+}
 
 function toReportDataFromStored(item){
   const extracted=item?.extractedData&&typeof item.extractedData==='object'?item.extractedData:{};
   return adaptApiResultToReportData({
+    id:item?.id || null,
     url:item?.url || null,
     category:item?.category || extracted?.category || null,
     seoScore:safeNumber(item?.seoScore),
@@ -1872,13 +2820,268 @@ function toReportDataFromStored(item){
   });
 }
 
-function getCurrentReports(){
+function getAllReports(){
   return liveReportsCache.length?liveReportsCache:getDemoReports();
 }
 
-function getScoreStatus(score){
-  if(score>=80) return {label:'Güçlü',tag:'t-g',scoreClass:'sco-g',color:'var(--accent)'};
-  if(score>=60) return {label:'İyileştir',tag:'t-w',scoreClass:'sco-w',color:'var(--warn)'};
+async function ensureHasAuthenticatedSession(){
+  if(typeof hasAuthenticatedSessionCache==='boolean') return hasAuthenticatedSessionCache;
+  if(authSessionCheckPromise) return authSessionCheckPromise;
+  authSessionCheckPromise=(async ()=>{
+    try{
+      const sessionRes=await fetch('/api/auth/session',{cache:'no-store'});
+      if(!sessionRes.ok){
+        authSessionPayloadCache=null;
+        hasAuthenticatedSessionCache=false;
+        return false;
+      }
+      const sessionPayload=await sessionRes.json().catch(()=>null);
+      authSessionPayloadCache=sessionPayload;
+      hasAuthenticatedSessionCache=Boolean(sessionPayload?.user);
+      return hasAuthenticatedSessionCache;
+    }catch{
+      authSessionPayloadCache=null;
+      hasAuthenticatedSessionCache=false;
+      return false;
+    }finally{
+      authSessionCheckPromise=null;
+    }
+  })();
+  return authSessionCheckPromise;
+}
+
+async function getAuthSessionPayload(){
+  const hasSession=await ensureHasAuthenticatedSession();
+  if(!hasSession) return null;
+  if(authSessionPayloadCache!==undefined) return authSessionPayloadCache;
+  try{
+    const sessionRes=await fetch('/api/auth/session',{cache:'no-store'});
+    if(!sessionRes.ok){
+      authSessionPayloadCache=null;
+      return null;
+    }
+    authSessionPayloadCache=await sessionRes.json().catch(()=>null);
+    return authSessionPayloadCache;
+  }catch{
+    authSessionPayloadCache=null;
+    return null;
+  }
+}
+
+function formatPlanLabel(plan){
+  const normalized=String(plan||'FREE').trim().toUpperCase();
+  if(normalized==='PREMIUM') return 'Premium Plan';
+  if(normalized==='PRO') return 'Pro Plan';
+  return 'Free Plan';
+}
+
+function getInitials(name){
+  const parts=String(name||'')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0,2);
+  if(!parts.length) return 'K';
+  return parts.map((part)=>part.charAt(0).toUpperCase()).join('');
+}
+
+function syncCurrentUserUi(){
+  const profileName=currentUserProfile.name || 'Kullanıcı';
+  const firstName=currentUserProfile.firstName || profileName;
+  const lastName=currentUserProfile.lastName || '';
+  const username=currentUserProfile.username || 'kullanici';
+  const email=currentUserProfile.email || '';
+  const planLabel=formatPlanLabel(currentUserProfile.plan);
+  const avatar=getInitials(profileName);
+
+  const sbUserName=document.getElementById('sbUserName');
+  if(sbUserName) sbUserName.textContent=username;
+  const sbUserPlan=document.getElementById('sbUserPlan');
+  if(sbUserPlan) sbUserPlan.textContent=planLabel;
+  const sbUserAvatar=document.getElementById('sbUserAvatar');
+  if(sbUserAvatar) sbUserAvatar.textContent=avatar;
+  const accountFirstName=document.getElementById('accountFirstName');
+  if(accountFirstName) accountFirstName.value=firstName;
+  const accountLastName=document.getElementById('accountLastName');
+  if(accountLastName) accountLastName.value=lastName;
+  const accountUsername=document.getElementById('accountUsername');
+  if(accountUsername) accountUsername.value=username;
+  const accountUsernameHidden=document.getElementById('accountUsernameHidden');
+  if(accountUsernameHidden) accountUsernameHidden.value=username;
+  const accountEmail=document.getElementById('accountEmail');
+  if(accountEmail) accountEmail.value=email;
+  const accountPlanName=document.getElementById('accountPlanName');
+  if(accountPlanName) accountPlanName.textContent=planLabel;
+}
+
+async function loadCurrentUserProfile(){
+  const sessionPayload=await getAuthSessionPayload();
+  if(!sessionPayload?.user){
+    syncCurrentUserUi();
+    return;
+  }
+  try{
+    const rawName=String(sessionPayload?.user?.name||'').trim();
+    const email=String(sessionPayload?.user?.email||'').trim();
+    const nameParts=rawName ? rawName.split(/\s+/).filter(Boolean) : [];
+    const firstName=nameParts[0] || 'Kullanıcı';
+    const lastName=nameParts.slice(1).join(' ');
+    currentUserProfile={
+      name:rawName || firstName,
+      firstName,
+      lastName,
+      email,
+      username:String(sessionPayload?.user?.username || '').trim() || (email.split('@')[0] || rawName || 'kullanici').trim(),
+      plan:String(sessionPayload?.user?.plan || 'FREE').trim().toUpperCase(),
+    };
+  }catch{}
+  syncCurrentUserUi();
+}
+
+function getReportStableKey(report){
+  const reportId=String(report?.reportId||'').trim();
+  if(reportId) return `id:${reportId}`;
+  const url=String(report?.url||'').trim();
+  if(url) return `url:${url}`;
+  const title=String(report?.title||'').trim();
+  if(!title) return null;
+  const date=String(report?.createdAt||report?.date||'').trim();
+  return `title:${title}|${date}`;
+}
+
+async function loadFavoriteReportKeys(){
+  if(favoriteReportsSyncPromise) return favoriteReportsSyncPromise;
+  favoriteReportsSyncPromise=(async ()=>{
+    const hasSession=await ensureHasAuthenticatedSession();
+    if(hasSession){
+      try{
+        const res=await fetch('/api/reports/favorites',{cache:'no-store'});
+        const payload=await res.json().catch(()=>null);
+        if(res.ok && Array.isArray(payload?.reportIds)){
+          favoriteReportKeySet=new Set(
+            payload.reportIds
+              .map((item)=>String(item||'').trim())
+              .filter(Boolean)
+              .map((reportId)=>`id:${reportId}`)
+          );
+          return favoriteReportKeySet;
+        }
+      }catch{}
+      favoriteReportKeySet=new Set();
+      return favoriteReportKeySet;
+    }
+    try{
+      const raw=localStorage.getItem(FAVORITE_REPORTS_STORAGE_KEY);
+      if(!raw){
+        favoriteReportKeySet=new Set();
+        return favoriteReportKeySet;
+      }
+      const parsed=JSON.parse(raw);
+      if(!Array.isArray(parsed)){
+        favoriteReportKeySet=new Set();
+        return favoriteReportKeySet;
+      }
+      favoriteReportKeySet=new Set(parsed.map((item)=>String(item||'').trim()).filter(Boolean));
+    }catch{
+      favoriteReportKeySet=new Set();
+    }
+    return favoriteReportKeySet;
+  })();
+  try{
+    return await favoriteReportsSyncPromise;
+  }finally{
+    favoriteReportsSyncPromise=null;
+  }
+}
+
+function saveFavoriteReportKeys(){
+  try{
+    localStorage.setItem(FAVORITE_REPORTS_STORAGE_KEY,JSON.stringify([...favoriteReportKeySet]));
+  }catch{}
+}
+
+function isReportFavorite(report){
+  const key=getReportStableKey(report);
+  return Boolean(key && favoriteReportKeySet.has(key));
+}
+
+async function setReportFavorite(report,active){
+  const key=getReportStableKey(report);
+  if(!key) return false;
+  const hasSession=await ensureHasAuthenticatedSession();
+  if(hasSession){
+    const reportId=String(report?.reportId||'').trim();
+    if(!reportId) return false;
+    try{
+      const res=await fetch('/api/reports/favorites',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({reportId,active}),
+      });
+      if(!res.ok) return false;
+    }catch{
+      return false;
+    }
+    if(active) favoriteReportKeySet.add(key);
+    else favoriteReportKeySet.delete(key);
+    return true;
+  }
+  if(active) favoriteReportKeySet.add(key);
+  else favoriteReportKeySet.delete(key);
+  saveFavoriteReportKeys();
+  return true;
+}
+
+function getFavoriteReportsCount(){
+  return getAllReports().filter((report)=>isReportFavorite(report)).length;
+}
+
+function updateSidebarBadges(){
+  const allBadge=document.getElementById('sbReportsAllBadge');
+  if(allBadge) allBadge.textContent=String(getAllReports().length);
+  const favoritesBadge=document.getElementById('sbReportsFavoritesBadge');
+  if(favoritesBadge) favoritesBadge.textContent=String(getFavoriteReportsCount());
+}
+
+function applyReportsNavActiveState(){
+  const allBtn=document.getElementById('sbReportsAllBtn');
+  const favoritesBtn=document.getElementById('sbReportsFavoritesBtn');
+  if(allBtn) allBtn.classList.toggle('act',reportsFilterMode!=='favorites');
+  if(favoritesBtn) favoritesBtn.classList.toggle('act',reportsFilterMode==='favorites');
+}
+
+function goReportsAll(){
+  reportsFilterMode='all';
+  try{localStorage.setItem(REPORTS_FILTER_MODE_STORAGE_KEY,reportsFilterMode);}catch{}
+  renderReportTables();
+  gv('reports');
+}
+
+function goReportsFavorites(){
+  reportsFilterMode='favorites';
+  try{localStorage.setItem(REPORTS_FILTER_MODE_STORAGE_KEY,reportsFilterMode);}catch{}
+  renderReportTables();
+  gv('reports');
+}
+
+function getCurrentReports(){
+  const allReports=getAllReports();
+  if(reportsFilterMode==='favorites'){
+    return allReports.filter((report)=>isReportFavorite(report));
+  }
+  return allReports;
+}
+
+function getLegacyOverallBand(score){
+  if(score>=80) return 'strong';
+  if(score>=60) return 'medium';
+  return 'weak';
+}
+
+function getLegacyOverallStatus(score){
+  const band=getLegacyOverallBand(score);
+  if(band==='strong') return {label:'Güçlü',tag:'t-g',scoreClass:'sco-g',color:'var(--accent)'};
+  if(band==='medium') return {label:'İyileştir',tag:'t-w',scoreClass:'sco-w',color:'var(--warn)'};
   return {label:'Kritik',tag:'t-r',scoreClass:'sco-r',color:'var(--danger)'};
 }
 
@@ -1886,10 +3089,13 @@ function buildReportRowHtml(report,index){
   const score=Math.round(safeNumber(report?.overallScore) ?? 0);
   const seoScore=Math.round(safeNumber(report?.seoScore) ?? 0);
   const conversionScore=Math.round(safeNumber(report?.conversionScore) ?? 0);
-  const status=getScoreStatus(score);
+  const status=getLegacyOverallStatus(score);
+  const favoriteActive=isReportFavorite(report);
+  const favoriteTitle=favoriteActive?'Favoriden çıkar':'Favoriye ekle';
+  const favoriteIcon=favoriteActive?'★':'☆';
   return `<div class="rt-row" onclick="openReport(${index})">
     <div class="rt-prod">
-      <div class="rt-thumb">${escapeHtml(String(report?.emoji||'📦'))}</div>
+      <div class="rt-thumb">${getReportThumbHtml(report)}</div>
       <div><div class="rt-pname">${escapeHtml(String(report?.title||'Ürün'))}</div><div class="rt-pcat">${escapeHtml(String(report?.cat||'Kategori'))}</div></div>
     </div>
     <div><div class="sco ${status.scoreClass}">${score}</div></div>
@@ -1897,15 +3103,27 @@ function buildReportRowHtml(report,index){
     <div style="font-size:12.5px;color:${status.color};">${conversionScore}</div>
     <div><span class="tag ${status.tag}">${status.label}</span></div>
     <div style="font-size:12px;color:var(--muted);">${escapeHtml(String(report?.date||''))}</div>
-    <div class="rt-acts"><div class="act-btn" title="Detay">→</div><div class="act-btn" title="Export">↓</div></div>
+    <div class="rt-acts">
+      <div class="act-btn" title="${favoriteTitle}" onclick="event.stopPropagation();toggleFavoriteByIndex(${index});">${favoriteIcon}</div>
+      <div class="act-btn" title="Detay">→</div>
+      <div class="act-btn" title="Export">↓</div>
+    </div>
   </div>`;
 }
 
 function renderReportTables(){
   const reports=getCurrentReports();
+  updateSidebarBadges();
+  const activeViewId=document.querySelector('.view.active')?.id;
+  if(activeViewId==='view-reports'){
+    applyReportsNavActiveState();
+  }
   const overviewTable=document.getElementById('overviewReportsTable');
   if(overviewTable){
-    const rows=reports.slice(0,4).map((report,index)=>buildReportRowHtml(report,index)).join('');
+    const overviewRows=reports.slice(0,4);
+    const rows=overviewRows.length
+      ? overviewRows.map((report,index)=>buildReportRowHtml(report,index)).join('')
+      : `<div class="rt-row" style="grid-template-columns:1fr;padding:14px 18px;cursor:default;"><div style="font-size:12px;color:var(--muted);">Henüz favori rapor yok. Bir raporu yıldızlayarak ekleyebilirsin.</div></div>`;
     overviewTable.innerHTML=`<div class="rt-head">
       <div class="rt-hc">Ürün (title · brand)</div>
       <div class="rt-hc">Genel</div>
@@ -1918,7 +3136,9 @@ function renderReportTables(){
   }
   const reportsTable=document.getElementById('reportsTable');
   if(reportsTable){
-    const rows=reports.map((report,index)=>buildReportRowHtml(report,index)).join('');
+    const rows=reports.length
+      ? reports.map((report,index)=>buildReportRowHtml(report,index)).join('')
+      : `<div class="rt-row" style="grid-template-columns:1fr;padding:14px 18px;cursor:default;"><div style="font-size:12px;color:var(--muted);">${reportsFilterMode==='favorites'?'Henüz favori rapor yok.':'Henüz rapor bulunmuyor.'}</div></div>`;
     reportsTable.innerHTML=`<div class="rt-head">
       <div class="rt-hc">Ürün</div>
       <div class="rt-hc">Genel</div>
@@ -1931,8 +3151,50 @@ function renderReportTables(){
   }
   const reportsCount=document.getElementById('reportsTotalCountLabel');
   if(reportsCount){
-    reportsCount.textContent=`· ${reports.length} rapor`;
+    reportsCount.textContent=reportsFilterMode==='favorites'
+      ? `· ${reports.length} favori`
+      : `· ${reports.length} rapor`;
   }
+}
+
+async function toggleFavoriteByIndex(index){
+  const reports=getCurrentReports();
+  const report=reports[index];
+  if(!report) return;
+  const nextFavorite=!isReportFavorite(report);
+  if(!await setReportFavorite(report,nextFavorite)) return;
+  if(currentReportData && getReportStableKey(currentReportData)===getReportStableKey(report)){
+    updateReportDetailFavoriteButton();
+  }
+  renderReportTables();
+  if(reportsFilterMode==='favorites' && !nextFavorite){
+    const remaining=getCurrentReports();
+    if(!remaining.length){
+      gv('reports');
+    }
+  }
+}
+
+function updateReportDetailFavoriteButton(){
+  const btn=document.getElementById('rdFavoriteBtn');
+  if(!btn || !currentReportData) return;
+  if(isReportFavorite(currentReportData)){
+    btn.textContent='★ Favorilerden Çıkar';
+    btn.classList.remove('btn-o');
+    btn.classList.add('btn-p');
+  }else{
+    btn.textContent='☆ Favoriye Ekle';
+    btn.classList.remove('btn-p');
+    btn.classList.add('btn-o');
+  }
+}
+
+async function toggleCurrentReportFavorite(){
+  if(!currentReportData) return;
+  const nextFavorite=!isReportFavorite(currentReportData);
+  if(!await setReportFavorite(currentReportData,nextFavorite)) return;
+  updateReportDetailFavoriteButton();
+  renderReportTables();
 }
 
 function rollingMonthLabels(lastN){
@@ -1960,6 +3222,10 @@ async function ensureLiveReportsLoaded(){
   if(reportsFetchPromise) return reportsFetchPromise;
   reportsFetchPromise=(async ()=>{
     try{
+      const hasSession=await ensureHasAuthenticatedSession();
+      if(!hasSession){
+        return liveReportsCache;
+      }
       const res=await fetch('/api/reports/list?detail=full&take=100',{cache:'no-store'});
       const payload=await res.json().catch(()=>null);
       if(res.ok && Array.isArray(payload?.reports) && payload.reports.length){
@@ -1977,20 +3243,20 @@ async function ensureLiveReportsLoaded(){
 function getDemoReports(){
   return [
     {
-      emoji:'💄',title:'Philips HP8321/00 Saç Düzleştirici',meta:'Brand: Philips · SKU: HP8321 · Model: 00',date:'24 Mart 2026',cat:'Kişisel Bakım',src:'Gerçek Veri · runtime_xhr',
+      emoji:'💄',title:'Philips HP8321/00 Saç Düzleştirici',meta:'Brand: Philips · SKU: HP8321 · Model: 00',date:'24 Mart 2026',cat:'Kişisel Bakım',src:'Gerçek Veri · canlı çekim',
       overallScore:76,seoScore:61,conversionScore:83,discountRate:15,campaignDays:7,sellerName:'Philips Official Store',sellerScore:9.6,hasReturnInfo:true,normalizedPrice:849,originalPrice:999,freeShipping:true,deliveryText:'1-2 gün',
       primaryKeywords:['saç düzleştirici','philips düzleştirici','seramik düzleştirici'],
-      categoryFit:{score:92,label:'Yüksek',note:'AI başlık ile kategoriyi uyumlu buldu'},
+      categoryFit:{score:92,label:'Yüksek',note:'Başlık ile kategori güçlü eşleşiyor'},
       questionAnalysis:{is_single_seller:true,general:{count:28,answeredCount:16,unansweredCount:12},seller:{count:28,answeredCount:16,unansweredCount:12}},
       descriptionLength:280,imageCount:4,bulletPointCount:3,questionCount:28,qaSnippetCount:12,hasSpecs:true,hasFaq:false,contentBenchmark:{descriptionLength:1240,imageCount:8.3,bulletPointCount:6,targetSeoScore:75},
       similarProducts:[{title:'Arzum Saç Düzleştirici',price:799},{title:'Remington S3500',price:899},{title:'Fakir Ion Shine',price:949},{title:'Sinbo Düzleştirici',price:729}],
       reviewAnalysis:{is_single_seller:true,seller_filter_available:false,general:{average_rating:4.7,total_comment_count:842,rating_breakdown:{five_star:520,four_star:180,three_star:72,two_star:38,one_star:32,total:842},monthly_trend:[{month:'2025-10',count:62,low_rated_count:4,average_rating:4.6},{month:'2025-11',count:88,low_rated_count:5,average_rating:4.7},{month:'2025-12',count:110,low_rated_count:8,average_rating:4.6},{month:'2026-01',count:74,low_rated_count:5,average_rating:4.5},{month:'2026-02',count:95,low_rated_count:9,average_rating:4.4},{month:'2026-03',count:120,low_rated_count:6,average_rating:4.7}],top_positive_review_hits:[{label:'ürün kalitesi',count:187},{label:'hızlı kargo',count:134},{label:'saç hasarı yok',count:98},{label:'fiyat performans',count:76}],top_negative_review_hits:[{label:'kablo kısa',count:42},{label:'ısınma süresi',count:28},{label:'ambalaj hasarlı',count:19},{label:'beklenti farkı',count:11}]}}
     },
     {
-      emoji:'👟',title:'Nike Air Max 270 React Erkek',meta:'Brand: Nike · SKU: AM270R · Model: 2024',date:'23 Mart 2026',cat:'Ayakkabı',src:'Gerçek Veri · embedded_json',
+      emoji:'👟',title:'Nike Air Max 270 React Erkek',meta:'Brand: Nike · SKU: AM270R · Model: 2024',date:'23 Mart 2026',cat:'Ayakkabı',src:'Gerçek Veri · gömülü veri',
       overallScore:84,seoScore:82,conversionScore:79,discountRate:10,campaignDays:14,sellerName:'Nike Official Store',sellerScore:9.4,hasReturnInfo:true,normalizedPrice:169999,originalPrice:188888,freeShipping:true,deliveryText:'1-2 gün',
       primaryKeywords:['nike air max 270','erkek spor ayakkabı','nike koşu ayakkabısı'],
-      categoryFit:{score:89,label:'Yüksek',note:'AI ürün tipi ile kategori eşleşmesini güçlü buldu'},
+      categoryFit:{score:89,label:'Yüksek',note:'Ürün tipi ile kategori eşleşmesi güçlü görünüyor'},
       questionAnalysis:{is_single_seller:false,general:{count:117,answeredCount:104,unansweredCount:13},seller:{count:2,answeredCount:2,unansweredCount:0}},
       descriptionLength:1180,imageCount:9,bulletPointCount:6,questionCount:16,qaSnippetCount:9,hasSpecs:true,hasFaq:true,contentBenchmark:{descriptionLength:950,imageCount:7.5,bulletPointCount:5,targetSeoScore:78},
       otherSellerOffers:[{seller_name:'TechMarket Plus',price:167500,seller_score:7.8,free_shipping:true,delivery_text:'3-5 gün'},{seller_name:'ElektronikDünyası',price:168900,seller_score:8.2,free_shipping:false,delivery_text:'2-4 gün'},{seller_name:'GlobalTech TR',price:172450,seller_score:9.1,free_shipping:true,delivery_text:'1-3 gün'},{seller_name:'SporMax',price:174990,seller_score:8.8,free_shipping:true,delivery_text:'2-3 gün'}],
@@ -1998,20 +3264,20 @@ function getDemoReports(){
       reviewAnalysis:{is_single_seller:false,seller_filter_available:true,general:{average_rating:4.6,total_comment_count:94,rating_breakdown:{five_star:68,four_star:14,three_star:5,two_star:3,one_star:4,total:94},monthly_trend:[{month:'2025-09',count:7,low_rated_count:0,average_rating:5},{month:'2025-10',count:1,low_rated_count:0,average_rating:5},{month:'2025-12',count:1,low_rated_count:0,average_rating:4},{month:'2026-01',count:2,low_rated_count:0,average_rating:4.5},{month:'2026-02',count:3,low_rated_count:1,average_rating:3.67},{month:'2026-03',count:3,low_rated_count:1,average_rating:3.67}],top_positive_review_hits:[{label:'teşekkür',count:11},{label:'kargo',count:10},{label:'beğendim',count:9},{label:'paketleme',count:9}],top_negative_review_hits:[{label:'telefonu',count:4},{label:'olmuyor',count:3},{label:'destek',count:2},{label:'değil',count:2}]},seller:{average_rating:1,total_comment_count:1,rating_breakdown:{five_star:0,four_star:0,three_star:0,two_star:0,one_star:1,total:1},monthly_trend:[{month:'2026-02',count:1,low_rated_count:1,average_rating:1}],top_positive_review_hits:[],top_negative_review_hits:[{label:'açılmış ürün',count:1},{label:'tekrar etiket',count:1}]}}
     },
     {
-      emoji:'🎮',title:'Logitech G502 X Oyuncu Mouse',meta:'Brand: Logitech · SKU: G502X · Model: Hero',date:'22 Mart 2026',cat:'Bilgisayar Çevre',src:'Gerçek Veri · html',
+      emoji:'🎮',title:'Logitech G502 X Oyuncu Mouse',meta:'Brand: Logitech · SKU: G502X · Model: Hero',date:'22 Mart 2026',cat:'Bilgisayar Çevre',src:'Gerçek Veri · html yakalama',
       overallScore:58,seoScore:55,conversionScore:68,discountRate:7,campaignDays:7,sellerName:'Logitech Gaming TR',sellerScore:8.9,hasReturnInfo:true,normalizedPrice:2499,originalPrice:2687.1,freeShipping:false,deliveryText:'2-4 gün',
       primaryKeywords:['oyuncu mouse','logitech g502 x','gaming mouse'],
-      categoryFit:{score:81,label:'Yüksek',note:'AI ürün ailesi ile kategori arasında güçlü uyum gördü'},
+      categoryFit:{score:81,label:'Yüksek',note:'Ürün ailesi ile kategori arasında güçlü uyum var'},
       questionAnalysis:{is_single_seller:true,general:{count:9,answeredCount:5,unansweredCount:4},seller:{count:9,answeredCount:5,unansweredCount:4}},
       descriptionLength:420,imageCount:5,bulletPointCount:2,questionCount:9,qaSnippetCount:4,hasSpecs:true,hasFaq:false,contentBenchmark:{descriptionLength:1100,imageCount:8,bulletPointCount:6,targetSeoScore:75},
       similarProducts:[{title:'Razer Basilisk V3',price:2399},{title:'SteelSeries Rival 5',price:2199},{title:'Corsair M65',price:2699},{title:'HyperX Pulsefire',price:1999}],
       reviewAnalysis:{is_single_seller:true,seller_filter_available:false,general:{average_rating:4.1,total_comment_count:215,rating_breakdown:{five_star:132,four_star:38,three_star:18,two_star:12,one_star:15,total:215},monthly_trend:[{month:'2025-10',count:18,low_rated_count:2,average_rating:4.4},{month:'2025-11',count:26,low_rated_count:3,average_rating:4.2},{month:'2025-12',count:31,low_rated_count:4,average_rating:4.1},{month:'2026-01',count:29,low_rated_count:5,average_rating:4.0},{month:'2026-02',count:42,low_rated_count:8,average_rating:3.9},{month:'2026-03',count:35,low_rated_count:5,average_rating:4.0}],top_positive_review_hits:[{label:'ergonomi',count:39},{label:'hızlı teslimat',count:26},{label:'performans',count:24},{label:'kalite',count:18}],top_negative_review_hits:[{label:'çift tıklama',count:14},{label:'scroll',count:11},{label:'fiyat yüksek',count:9},{label:'paketleme',count:6}]}}
     },
     {
-      emoji:'☕',title:'DeLonghi Dedica EC 685 Espresso',meta:'Brand: DeLonghi · SKU: EC685 · Model: Dedica',date:'21 Mart 2026',cat:'Ev Aletleri',src:'Kısmi Veri · parser_inference',
+      emoji:'☕',title:'DeLonghi Dedica EC 685 Espresso',meta:'Brand: DeLonghi · SKU: EC685 · Model: Dedica',date:'21 Mart 2026',cat:'Ev Aletleri',src:'Kısmi Veri · çıkarım',
       overallScore:41,seoScore:38,conversionScore:49,discountRate:20,campaignDays:14,sellerName:'DeLonghi Türkiye',sellerScore:8.2,hasReturnInfo:false,normalizedPrice:10999,originalPrice:13749,freeShipping:true,deliveryText:'1-3 gün',
       primaryKeywords:['espresso makinesi','delonghi dedica','kahve makinesi'],
-      categoryFit:{score:63,label:'Orta',note:'AI kategori uyumunu kabul edilebilir ama net değil gördü'},
+      categoryFit:{score:63,label:'Orta',note:'Kategori uyumu kabul edilebilir ama net değil'},
       questionAnalysis:{is_single_seller:false,general:{count:31,answeredCount:18,unansweredCount:13},seller:{count:6,answeredCount:3,unansweredCount:3}},
       descriptionLength:310,imageCount:4,bulletPointCount:1,questionCount:3,qaSnippetCount:2,hasSpecs:false,hasFaq:false,contentBenchmark:{descriptionLength:1300,imageCount:8.5,bulletPointCount:6,targetSeoScore:76},
       otherSellerOffers:[{seller_name:'KahveSepeti',price:10499,seller_score:8.7,free_shipping:true,delivery_text:'2-3 gün'},{seller_name:'BaristaHome',price:10890,seller_score:9.0,free_shipping:true,delivery_text:'1-2 gün'},{seller_name:'MutfakPlus',price:11350,seller_score:7.9,free_shipping:false,delivery_text:'3-5 gün'},{seller_name:'Espresso Dünyası',price:11990,seller_score:8.4,free_shipping:true,delivery_text:'2-4 gün'}],
@@ -2044,14 +3310,19 @@ function adaptApiResultToReportData(payload){
   const sku=extracted.model_code?`Model: ${extracted.model_code}`:null;
   const meta=[brand,sku].filter(Boolean).join(' · ');
   const questionCount=safeNumber(extracted.question_count) ?? 0;
+  const thumbnail=resolveReportThumbnail(payload,extracted);
+  const descriptionText=String(extracted.description_text || '').trim();
+  const descriptionLength=safeNumber(extracted.description_length) ?? (descriptionText.length?descriptionText.length:null);
   return {
+    reportId:payload?.id || payload?.reportId || null,
     emoji:pickEmojiForCategory(payload?.category || extracted.category || title),
+    thumbnail,
     title,
     meta:meta || sellerName,
     date:formatDetailDate(payload?.createdAt || new Date().toISOString()),
     createdAt:payload?.createdAt || null,
     cat:String(payload?.category || extracted.category || 'Kategori bilgisi yok'),
-    src:String(payload?.dataSource || 'Gerçek Veri'),
+    src:normalizeReportSourceLabel(payload?.dataSource || 'Gerçek Veri'),
     url:payload?.url || null,
     overallScore:overallScore ?? 0,
     dataCompletenessScore:safeNumber(payload?.dataCompletenessScore) ?? null,
@@ -2062,21 +3333,45 @@ function adaptApiResultToReportData(payload){
     sellerName,
     sellerScore:safeNumber(extracted.seller_score),
     hasReturnInfo:typeof extracted.has_return_info==='boolean'?extracted.has_return_info:false,
+    ratingValue:safeNumber(extracted.rating_value),
+    reviewCount:safeNumber(extracted.review_count),
+    favoriteCount:safeNumber(extracted.favorite_count),
     normalizedPrice:safeNumber(extracted.normalized_price),
     originalPrice:safeNumber(extracted.original_price),
-    freeShipping:typeof extracted.has_free_shipping==='boolean'?extracted.has_free_shipping:false,
+    freeShipping:isTrendyolFreeShippingEligible(safeNumber(extracted.normalized_price)),
+    shippingDays:safeNumber(extracted.shipping_days),
+    officialSeller:extracted.official_seller===true,
+    hasCampaign:extracted.has_campaign===true,
+    campaignLabel:String(extracted.campaign_label || ''),
+    promotionLabels:Array.isArray(extracted.promotion_labels)?extracted.promotion_labels.map(item=>String(item||'').trim()).filter(Boolean):[],
+    otherSellersCount:safeNumber(extracted.other_sellers_count),
     deliveryText:String(extracted.delivery_type || (safeNumber(extracted.shipping_days)!=null?`${extracted.shipping_days} gün`:'Teslimat bilgisi sınırlı')),
-    primaryKeywords:Array.isArray(payload?.trendyolScorecard?.keywordInsight?.primaryKeywords)
-      ? payload.trendyolScorecard.keywordInsight.primaryKeywords.slice(0,3)
-      : [],
-    categoryFit:payload?.trendyolScorecard?.contentFit?.categoryFit || {score:70,label:'Orta',note:'Kategori uyumu AI ile yeniden değerlendirilecek'},
+    metaDescription:String(extracted.meta_description || ''),
+    primaryKeywords:extractPrimaryKeywordsFromTitle(title),
+    categoryFit:(()=>{
+      const contentFit=payload?.trendyolScorecard?.contentFit || null;
+      const score=safeNumber(contentFit?.score);
+      const bandForScore=(score!=null?getLegacyContentBand(score):'medium');
+      const label=typeof contentFit?.label==='string' && contentFit.label.trim().length>0
+        ? contentFit.label.trim()
+        : score!=null
+          ? (bandForScore==='strong'?'Yüksek':bandForScore==='medium'?'Orta':'Zayıf')
+          : 'Orta';
+      const note=Array.isArray(contentFit?.evidence) && contentFit.evidence.length
+        ? String(contentFit.evidence[0] || '').trim()
+        : score!=null
+          ? (bandForScore==='strong'?'Kategori ile güçlü eşleşme görülüyor':bandForScore==='medium'?'Kategori ilişkisi kabul edilebilir':'Kategori uyumu zayıf')
+          : 'Kategori sinyali sınırlı';
+      return {score:score ?? 70,label,note};
+    })(),
     questionAnalysis:{
       is_single_seller: payload?.reviewAnalysis?.is_single_seller===true,
       general:{count:questionCount,answeredCount:null,unansweredCount:null},
       seller:{count:questionCount,answeredCount:null,unansweredCount:null},
     },
     unansweredQuestionCount:null,
-    descriptionLength:safeNumber(extracted.description_length),
+    descriptionText,
+    descriptionLength,
     imageCount:safeNumber(extracted.image_count),
     bulletPointCount:safeNumber(extracted.bullet_point_count),
     questionCount,
@@ -2108,6 +3403,7 @@ function saveRecentAnalysis(report){
     const next=[
       {
         emoji:report.emoji || '📦',
+        thumbnail:report.thumbnail || null,
         title:report.title,
         url:report.url || '',
         overallScore:Math.round(safeNumber(report.overallScore) ?? 0),
@@ -2135,9 +3431,14 @@ function renderRecentAnalyses(){
   }
   el.innerHTML=items.slice(0,3).map((item)=>{
     const score=safeNumber(item.overallScore);
-    const scoreColor=score>=80?'var(--accent)':score>=60?'var(--brand)':'var(--warn)';
+    const scoreBand=getLegacyOverallBand(score ?? 0);
+    const scoreColor=scoreBand==='strong'?'var(--accent)':scoreBand==='medium'?'var(--brand)':'var(--warn)';
+    const thumbnail=normalizeImageUrl(item.thumbnail);
+    const thumbHtml=thumbnail
+      ? `<span class="rt-thumb" style="width:30px;height:30px;font-size:13px;"><img src="${escapeHtml(thumbnail)}" alt="Ürün görseli" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.parentElement.textContent='${escapeHtml(String(item.emoji||'📦'))}'"></span>`
+      : `<span style="font-size:16px;">${escapeHtml(String(item.emoji||'📦'))}</span>`;
     return `<div class="ru-item" onclick="document.getElementById('analyzeInput').value='${escapeHtml(String(item.url||''))}'">
-      <span style="font-size:16px;">${escapeHtml(String(item.emoji||'📦'))}</span>
+      ${thumbHtml}
       <span class="ru-url">${escapeHtml(String(item.url||''))}</span>
       <span style="font-size:12px;font-weight:700;color:${scoreColor};">${score!=null?score:'—'}</span>
       <span style="font-size:11px;color:var(--dim);">${escapeHtml(String(item.date||''))}</span>
@@ -2149,12 +3450,13 @@ function openReportData(r){
   currentReportData=r;
   currentCampaignState.discountRate=safeNumber(r.discountRate) ?? 15;
   currentCampaignState.campaignDays=Math.round(clamp(safeNumber(r.campaignDays) ?? 7,1,30));
-  document.getElementById('rdImg').textContent=r.emoji;
+  updateReportDetailImage(r);
   document.getElementById('rdTitle').textContent=r.title;
   document.getElementById('rdMeta').textContent=r.meta;
   document.getElementById('rdDate').textContent=r.date;
   document.getElementById('rdCat').textContent=r.cat;
   document.getElementById('rdDataSource').textContent=r.src;
+  updateReportDetailFavoriteButton();
   const overallScoreValue=typeof r.overallScore==='number'?Math.max(0,Math.min(100,Math.round(r.overallScore))):null;
   const seoScoreValue=typeof r.seoScore==='number'?Math.max(0,Math.min(100,Math.round(r.seoScore))):null;
   const overallScoreEl=document.getElementById('rdOverallScore');
@@ -2169,11 +3471,12 @@ function openReportData(r){
   syncCampaignControls();
   renderOtherSellerOffers();
   document.querySelectorAll('.rd-tab').forEach(t=>t.classList.remove('act'));
-  document.querySelectorAll('.rd-tab')[0].classList.add('act');
-  document.querySelectorAll('.rd-sec').forEach(s=>s.classList.remove('active'));
-  document.getElementById('rdt-summary').classList.add('active');
-  gv('report-detail');
+  gv('report-detail',{reportId:r.reportId});
+  const initialSection=getReportTabSectionFromHash();
+  activateReportDetailTab(initialSection);
+  syncReportTabHash(initialSection,true);
   setTimeout(initRdSummary,100);
+  setTimeout(restoreDashboardScrollPosition,120);
 }
 
 function openReport(idx){
@@ -2197,11 +3500,45 @@ async function loadReportById(reportId){
 }
 
 function rTab(btn,secId){
-  document.querySelectorAll('.rd-tab').forEach(t=>t.classList.remove('act'));
-  btn.classList.add('act');
-  document.querySelectorAll('.rd-sec').forEach(s=>s.classList.remove('active'));
-  document.getElementById(secId).classList.add('active');
-  setTimeout(()=>initRdSec(secId),80);
+  activateReportDetailTab(secId);
+  syncReportTabHash(secId,false);
+}
+
+async function startAnalysisJob(normalizedUrl){
+  const res=await fetch('/api/analyze/jobs',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({url:normalizedUrl})
+  });
+  const data=await res.json();
+  if(!res.ok || !data?.jobId){
+    throw new Error(data?.message || 'Analiz başlatılamadı');
+  }
+  return data;
+}
+
+async function waitForAnalysisJob(jobId,onProgress){
+  for(;;){
+    const res=await fetch(`/api/analyze/jobs/${encodeURIComponent(String(jobId))}`,{
+      method:'GET',
+      headers:{'Content-Type':'application/json'},
+      cache:'no-store',
+    });
+    const data=await res.json();
+    if(!res.ok || !data){
+      throw new Error(data?.message || 'Analiz durumu alınamadı');
+    }
+    if(typeof onProgress==='function'){
+      onProgress(data);
+    }
+    if(data.status==='completed' && data.result){
+      return data;
+    }
+    if(data.status==='failed'){
+      throw new Error(data?.message || 'Analiz sırasında bir hata oluştu.');
+    }
+    await new Promise(resolve=>setTimeout(resolve,1500));
+  }
 }
 
 async function startAnalysis(){
@@ -2218,15 +3555,12 @@ async function startAnalysis(){
 
   try{
     const normalized=/^https?:\/\//i.test(v)?v:`https://${v}`;
-    const res=await fetch('/api/analyze',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({url:normalized})
+    const job=await startAnalysisJob(normalized);
+    const data=await waitForAnalysisJob(job.jobId,(payload)=>{
+      if(btn && payload?.progress?.label){
+        btn.textContent=String(payload.progress.label);
+      }
     });
-    const data=await res.json();
-    if(!res.ok || !data?.result){
-      throw new Error(data?.message || 'Analiz başlatılamadı');
-    }
     const report=adaptApiResultToReportData(data.result);
     saveRecentAnalysis(report);
     renderRecentAnalyses();
@@ -2252,10 +3586,35 @@ function initAnalyzeInputHandlers(){
     }
   });
 }
+function applyAnalyzeQueryPrefill(options={}){
+  const params=options.params instanceof URLSearchParams ? options.params : new URLSearchParams(window.location.search);
+  const input=document.getElementById('analyzeInput');
+  if(!input) return;
+  const prefillUrl=String(params.get('prefillUrl') || '').trim();
+  if(prefillUrl){
+    input.value=prefillUrl;
+  }
+  const shouldAutorun=params.get('autorun')==='1';
+  if(
+    shouldAutorun &&
+    prefillUrl &&
+    options.allowAutorun===true &&
+    input.dataset.autorunApplied!=='1'
+  ){
+    input.dataset.autorunApplied='1';
+    setTimeout(()=>startAnalysis(),120);
+  }
+}
 
 function initOverview(){
   const reports=getCurrentReports();
   if(!reports.length) return;
+  const sharedRules=getResolvedRuleSection('shared');
+  const trustRules=getResolvedRuleSection('trust_reviews');
+  const demandRules=getResolvedRuleSection('demand_signals');
+  const nullMeansMissing=Boolean(sharedRules?.rules?.some((item)=>item.id==='shared-null-is-not-zero'));
+  const estimatedLanguageRule=Boolean(sharedRules?.rules?.some((item)=>item.id==='shared-estimated-language'));
+  const separateProductVsSeller=Boolean(trustRules?.rules?.some((item)=>item.id==='trust-general-vs-seller-review-separation'));
 
   const avgOverall=Math.round(
     reports.reduce((sum,item)=>sum+(safeNumber(item.overallScore) ?? 0),0) / reports.length
@@ -2263,11 +3622,12 @@ function initOverview(){
   const avgCompleteness=Math.round(
     reports.reduce((sum,item)=>sum+(safeNumber(item.dataCompletenessScore) ?? 70),0) / reports.length
   );
-  const criticalCount=reports.filter((item)=>(safeNumber(item.overallScore) ?? 0)<60).length;
+  const criticalCount=reports.filter((item)=>getLegacyOverallBand(safeNumber(item.overallScore) ?? 0)==='weak').length;
   const pendingActions=reports.reduce((sum,item)=>sum+(Array.isArray(item.priorityActions)?Math.min(3,item.priorityActions.length):1),0);
+  const avgOverallBand=getLegacyOverallBand(avgOverall);
 
   setText('ovAvgScoreVal',String(avgOverall));
-  setText('ovAvgScoreNote',avgOverall>=80?'↑ Güçlü ortalama skor':avgOverall>=60?'→ İyileştirme alanı var':'↓ Kritik seviye');
+  setText('ovAvgScoreNote',avgOverallBand==='strong'?'↑ Güçlü ortalama skor':avgOverallBand==='medium'?'→ İyileştirme alanı var':'↓ Kritik seviye');
   const avgFill=document.getElementById('ovAvgScoreFill');
   if(avgFill) avgFill.style.width=`${clamp(avgOverall,0,100)}%`;
 
@@ -2314,8 +3674,8 @@ function initOverview(){
     ]
   },{plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:12}}},scales:{y:{grid:{color:GC},position:'left',beginAtZero:true},y1:{grid:{display:false},position:'right',min:40,max:100}}});
 
-  const strong=reports.filter((item)=>(safeNumber(item.overallScore) ?? 0)>=80).length;
-  const medium=reports.filter((item)=>{const s=safeNumber(item.overallScore) ?? 0; return s>=60 && s<80;}).length;
+  const strong=reports.filter((item)=>getLegacyOverallBand(safeNumber(item.overallScore) ?? 0)==='strong').length;
+  const medium=reports.filter((item)=>getLegacyOverallBand(safeNumber(item.overallScore) ?? 0)==='medium').length;
   const critical=Math.max(0,reports.length-strong-medium);
   mk('scoreDistChart','doughnut',{
     labels:['Güçlü (80+)','Orta (60-79)','Kritik (<60)'],
@@ -2350,14 +3710,14 @@ function initOverview(){
 
   const trustPoints=reports.map((item)=>{
     const seller=safeNumber(item?.sellerScore);
-    const reviews=safeNumber(item?.reviewAnalysis?.general?.total_comment_count) ?? 0;
+    const reviews=safeNumber(item?.reviewAnalysis?.general?.total_comment_count) ?? (nullMeansMissing?null:0);
     const rating=safeNumber(item?.reviewAnalysis?.general?.average_rating);
     const deliveryText=String(item?.deliveryText||'').toLocaleLowerCase('tr-TR');
     const delivery=/1-2 gün|yarın|hızlı/.test(deliveryText)?9:/2-3 gün/.test(deliveryText)?8:/3-5 gün/.test(deliveryText)?6.8:5.6;
     return {
       seller:seller!=null?Math.min(10,Math.max(0,seller)):7,
-      reviewDepth:Math.min(10,Math.max(2,Math.log10(reviews+1)*3.4)),
-      rating:rating!=null?Math.min(10,Math.max(0,rating*2)):7.4,
+      reviewDepth:reviews!=null?Math.min(10,Math.max(2,Math.log10(reviews+1)*3.4)):4.2,
+      rating:rating!=null?Math.min(10,Math.max(0,rating*2)):6.2,
       returns:item?.hasReturnInfo===true?8.2:5.5,
       delivery,
     };
@@ -2373,6 +3733,12 @@ function initOverview(){
     labels:['Satıcı','Yorum','Puan','İade','Teslimat'],
     datasets:[{data:avgTrust,borderColor:AC,backgroundColor:'rgba(0,212,168,.12)',pointRadius:3,pointBackgroundColor:AC}]
   },{plugins:{legend:{display:false}},scales:{r:{max:10,ticks:{display:false},grid:{color:GC},pointLabels:{font:{size:9}}}}});
+  const overviewTrustSubEl=document.querySelector('#custTrustChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(overviewTrustSubEl){
+    overviewTrustSubEl.textContent=separateProductVsSeller
+      ? `Ürün geneli + satıcı operasyon sinyalleri · ort. ${reports.length} rapor`
+      : `customer_trust · ort. ${reports.length} rapor`;
+  }
 
   const avgMarket=Math.round(
     reports.reduce((sum,item)=>{
@@ -2386,6 +3752,12 @@ function initOverview(){
     labels:['Bu Ürün','Kalan'],
     datasets:[{data:[avgMarket,100-avgMarket],backgroundColor:[BR,'rgba(255,255,255,.05)'],borderWidth:0}]
   },{cutout:'70%',plugins:{legend:{display:false}}});
+  const overviewMarketSubEl=document.querySelector('#mktPosChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(overviewMarketSubEl){
+    overviewMarketSubEl.textContent=estimatedLanguageRule && demandRules?.section
+      ? 'Tahmini rekabet konumu · son raporlar'
+      : 'market_position · son raporlar';
+  }
 
   const challengeCounts={title:0,image:0,desc:0,faq:0,seller:0};
   reports.forEach((item)=>{
@@ -2399,6 +3771,10 @@ function initOverview(){
     labels:['Başlık','image_count','desc_length','has_faq','seller_score'],
     datasets:[{data:[challengeCounts.title,challengeCounts.image,challengeCounts.desc,challengeCounts.faq,challengeCounts.seller],backgroundColor:'rgba(239,68,68,.5)',borderRadius:4,borderSkipped:false}]
   },{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:GC},beginAtZero:true},y:{grid:{display:false}}}});
+  const overviewChallengesSubEl=document.querySelector('#challengesChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(overviewChallengesSubEl){
+    overviewChallengesSubEl.textContent='Kural bazlı zorluk frekansı';
+  }
 
   renderReportTables();
 }
@@ -2415,28 +3791,64 @@ function initRdSec(sec){
 function initRdSummary(){
   updateSummaryDiagnosis();
   const r=currentReportData||{};
+  const sharedRules=getResolvedRuleSection('shared');
+  const demandRules=getResolvedRuleSection('demand_signals');
   const content=getContentSeoData();
   const trust=getTrustData();
   const demand=getDemandData();
   const priceData=getPriceData();
   const compAdvData=getCompetitiveAdvantageData();
   const summary=r.otherSellersSummary||{};
+  const estimatedLanguageRule=Boolean(sharedRules?.rules?.some((item)=>item.id==='shared-estimated-language'));
+  const coreDemandRule=Boolean(demandRules?.rules?.some((item)=>item.id==='demand-core-four-signal-formula'));
 
   const hasPriceComparison=priceData.ownPrice!=null && priceData.avgPrice!=null && priceData.avgPrice>0;
   const offerScore=hasPriceComparison
     ? clamp(Math.round(50+(((priceData.avgPrice-priceData.ownPrice)/priceData.avgPrice)*50)),0,100)
     : clamp(Math.round(demand.relativeScore),0,100);
-  const trustScore=clamp(
-    Math.round(
-      ((safeNumber(trust.ratingValue) ?? 4.2)/5)*45 +
-      ((safeNumber(r.sellerScore) ?? 8)/10)*35 +
-      (r.hasReturnInfo===true?20:8)
+  const favoriteSummaryScore=clamp(Math.log10((safeNumber(r.favoriteCount) ?? demand.favoriteEstimate ?? 0)+1)/4.2*100,0,100);
+  const reviewTrustScore=clamp(
+    (
+      clamp((safeNumber(trust.reviewCount) ?? 0) > 0 ? Math.log10((safeNumber(trust.reviewCount) ?? 0)+1)/3*100 : 0,0,100)*0.5 +
+      clamp(((safeNumber(trust.ratingValue) ?? 0)/5)*100,0,100)*0.5
     ),
     0,
     100
   );
+  const seoScoreValue=clamp(Math.round(
+    content.titleScore*0.15 +
+    content.categoryFitScore*0.10 +
+    content.specScore*0.20 +
+    content.imageScore*0.10 +
+    offerScore*0.15 +
+    favoriteSummaryScore*0.10 +
+    reviewTrustScore*0.15 +
+    clamp(content.searchVisibilityScore,0,100)*0.05
+  ),0,100);
+  const deliveryText=String(r.deliveryText||'').toLocaleLowerCase('tr-TR');
+  const deliveryScore=/1-2 gün|yarın|hızlı/.test(deliveryText)?90:/2-3 gün/.test(deliveryText)?78:/3-5 gün/.test(deliveryText)?62:50;
+  const conversionScoreValue=clamp(Math.round(
+    clamp(((safeNumber(trust.ratingValue) ?? 0)/5)*100,0,100)*0.15 +
+    clamp((safeNumber(trust.reviewCount) ?? 0) > 0 ? Math.log10((safeNumber(trust.reviewCount) ?? 0)+1)/3*100 : 0,0,100)*0.10 +
+    content.descriptionScore*0.10 +
+    content.imageScore*0.10 +
+    offerScore*0.15 +
+    (isTrendyolFreeShippingEligible(safeNumber(r.normalizedPrice))?85:45)*0.10 +
+    deliveryScore*0.10 +
+    content.questionSignalScore*0.05 +
+    clamp((safeNumber(r.sellerScore) ?? 0)/10*100,0,100)*0.15
+  ),0,100);
+  const trustScore=clamp(Math.round(
+    clamp((safeNumber(r.sellerScore) ?? 0)/10*100,0,100)*0.25 +
+    (r.officialSeller===true?90:55)*0.10 +
+    ((r.hasReturnInfo===true?85:45) + (String(r.deliveryText||'').trim()?80:50))/2*0.15 +
+    deliveryScore*0.15 +
+    (r.lowStock===true?42:76)*0.10 +
+    reviewTrustScore*0.15 +
+    (Math.max(0,100-(((((safeNumber(trust.generalBreakdown?.one_star)||0)+(safeNumber(trust.generalBreakdown?.two_star)||0))/Math.max(1,safeNumber(trust.generalBreakdown?.total) || safeNumber(trust.reviewCount) || 1))*100*1.8)))*0.10)
+  ),0,100);
   const contentStrengthScore=clamp(
-    Math.round(content.descriptionScore*0.45 + content.imageScore*0.35 + content.keywordCoverageScore*0.2),
+    Math.round(content.descriptionScore*0.40 + content.imageScore*0.25 + content.keywordCoverageScore*0.20 + content.specScore*0.15),
     0,
     100
   );
@@ -2450,8 +3862,6 @@ function initRdSummary(){
     0,
     100
   );
-  const seoScoreValue=clamp(Math.round(safeNumber(r.seoScore) ?? content.searchVisibilityScore),0,100);
-  const conversionScoreValue=clamp(Math.round(safeNumber(r.conversionScore) ?? demand.finalScore),0,100);
   const productRadar=[seoScoreValue,conversionScoreValue,trustScore,offerScore,contentStrengthScore,competitionScore];
   const categoryRadar=[
     clamp(Math.round((content.categoryVisibilityScore ?? 70)+4),0,100),
@@ -2475,13 +3885,11 @@ function initRdSummary(){
 
   const marketPositionShare=clamp(Math.round(demand.relativeScore),10,95);
 
-  const deliveryText=String(r.deliveryText||'').toLocaleLowerCase('tr-TR');
-  const deliveryScore=/1-2 gün|yarın|hızlı/.test(deliveryText)?90:/2-3 gün/.test(deliveryText)?78:/3-5 gün/.test(deliveryText)?62:50;
   const ownSellerScore=clamp(Math.round((safeNumber(r.sellerScore) ?? 7.5)*10),0,100);
   const ownComp=[offerScore,deliveryScore,ownSellerScore,content.imageScore,content.descriptionScore];
 
   const compTotal=compAdvData
-    ? Math.max(1,compAdvData.officialCount+compAdvData.fastDeliveryCount+compAdvData.freeShippingCount+compAdvData.otherCount)
+    ? Math.max(1,compAdvData.totalOffers)
     : Math.max(1,sellerTotal);
   const rivalPrice=hasPriceComparison?clamp(100-offerScore+10,35,95):65;
   const rivalDelivery=compAdvData?clamp(Math.round((compAdvData.fastDeliveryCount/compTotal)*100),45,90):65;
@@ -2489,6 +3897,18 @@ function initRdSummary(){
   const rivalVisual=clamp(Math.round((content.imageBenchmark/Math.max(1,content.imageCount))*45+42),45,95);
   const rivalContent=clamp(Math.round((content.descriptionBenchmark/Math.max(1,content.descriptionLength))*42+45),45,95);
   const rivalComp=[rivalPrice,rivalDelivery,rivalSeller,rivalVisual,rivalContent];
+  const summaryRadarSubEl=document.querySelector('#summaryRadarChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(summaryRadarSubEl){
+    summaryRadarSubEl.textContent=coreDemandRule
+      ? 'Kural bazlı görünürlük + dönüşüm + güven birleşimi'
+      : 'Özet performans dağılımı';
+  }
+  const summaryMarketSubEl=document.querySelector('#rdMktPosChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(summaryMarketSubEl){
+    summaryMarketSubEl.textContent=demand.demandConfidence>=0.75
+      ? 'Rakiplere karşı göreli konum'
+      : (estimatedLanguageRule?'Sınırlı veriyle tahmini rekabet konumu':'Göreli pazar konumu');
+  }
 
   mk('summaryRadarChart','radar',{
     labels:['SEO','Dönüşüm','Güven','Teklif','İçerik','Rekabet'],
@@ -2505,18 +3925,40 @@ function initRdSummary(){
 }
 
 function initRdPrice(){
+  const priceRules=getResolvedRuleSection('price_competition');
+  const dedupeOwnBar=Boolean(priceRules?.rules?.some((rule)=>rule.id==='price-no-duplicate-own-bar'));
+  const offerSignalRule=Boolean(priceRules?.rules?.some((rule)=>rule.id==='price-competitor-advantages-from-offer-signals'));
   const pricePositionChart=getPricePositionChartData();
   mk('priceBarChart','bar',{labels:pricePositionChart.labels,datasets:[{data:pricePositionChart.values,backgroundColor:pricePositionChart.colors,borderRadius:6,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:GC}},x:{grid:{display:false}}}});
   const campaignScenario=getCampaignScenarioData();
   mk('discountChart','line',{labels:campaignScenario.labels,datasets:[{label:'Tahmini Dönüşüm Potansiyeli',data:campaignScenario.data,borderColor:WN,backgroundColor:'rgba(245,158,11,.1)',fill:true,tension:.4,pointRadius:4,pointBackgroundColor:WN}]},{plugins:{legend:{display:false}},scales:{y:{min:0,max:100,grid:{color:GC}},x:{grid:{display:false}}}});
-  const priceData=getPriceData();
+  const priceRangeChart=getPriceRangeChartData();
   const compAdvData=getCompetitiveAdvantageData();
-  mk('priceRangeChart','bar',{labels:['Min Fiyat','Bu Ürün','Ort. Fiyat','Maks Fiyat'],datasets:[{data:[priceData.minPrice,priceData.ownPrice,priceData.avgPrice,priceData.maxPrice],backgroundColor:['rgba(0,212,168,.4)',AC,'rgba(245,158,11,.5)','rgba(239,68,68,.4)'],borderRadius:5,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:GC}},x:{grid:{display:false}}}});
-  mk('compAdvChart','doughnut',{labels:compAdvData?['Resmi Satıcı','Hızlı Teslimat','Ücretsiz Kargo','Diğer']:[],datasets:[{data:compAdvData?[compAdvData.officialCount,compAdvData.fastDeliveryCount,compAdvData.freeShippingCount,compAdvData.otherCount]:[],backgroundColor:[BR,AC,WN,'rgba(255,255,255,.08)'],borderWidth:0,hoverOffset:4}]},{cutout:'55%',plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:10}}}});
+  mk('priceRangeChart','bar',{labels:priceRangeChart.labels,datasets:[{data:priceRangeChart.values,backgroundColor:priceRangeChart.colors,borderRadius:5,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:GC}},x:{grid:{display:false}}}});
+  const priceRangeSubEl=document.querySelector('#priceRangeChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(priceRangeSubEl && dedupeOwnBar) priceRangeSubEl.textContent='Bu ürün + rakipler, min/ort/max tekilleştirilmiş';
+  mk('compAdvChart','bar',{labels:compAdvData?compAdvData.labels:[],datasets:[{data:compAdvData?compAdvData.values:[],backgroundColor:compAdvData?compAdvData.colors:[],borderRadius:6,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:GC},ticks:{precision:0},suggestedMax:compAdvData?Math.max(...compAdvData.values,2):4},x:{grid:{display:false}}}});
+  const compAdvSubEl=document.querySelector('#compAdvChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(compAdvSubEl && offerSignalRule) compAdvSubEl.textContent='Teklif bazli kampanya, indirim ve teslimat sinyalleri';
+  const compAdvNoteEl=document.getElementById('compAdvNote');
+  if(compAdvNoteEl){
+    if(!compAdvData){
+      compAdvNoteEl.textContent=offerSignalRule?'Rakip teklif sinyali bulunamadı.':'Rakip kampanya sinyali bulunamadı.';
+    }else if(compAdvData.anomalyCount>0){
+      compAdvNoteEl.textContent=`Uyarı: ${compAdvData.anomalyCount} rakip teklifte 1 TL / anomali fiyat görünüyor${compAdvData.anomalyNames.length?` (${compAdvData.anomalyNames.join(', ')})`:''}.`;
+    }else{
+      compAdvNoteEl.textContent=offerSignalRule
+        ? `Toplam ${compAdvData.totalOffers} rakip teklifte kampanya, indirim ve teslimat sinyalleri ozetleniyor.`
+        : `Toplam ${compAdvData.totalOffers} rakip teklifte kampanya, indirim ve teslimat sinyalleri özetleniyor.`;
+    }
+  }
 }
 
 function initRdContent(){
   const content=getContentSeoData();
+  const ruleBasedRadar=hasResolvedRule('content_seo','content-radar-axes-are-rule-based');
+  const imageBand=getLegacyContentBand(content.imageScore);
+  const descriptionBand=getLegacyContentBand(content.descriptionScore);
   updateContentSeoCards();
   const categoryRadarData=[
     content.categoryVisibilityScore!=null?clamp(content.categoryVisibilityScore+4,0,100):82,
@@ -2526,23 +3968,62 @@ function initRdContent(){
     clamp((content.imageBenchmark/8)*100,55,95),
     80
   ];
+  const contentRadarSubEl=document.querySelector('#contentRadarChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(contentRadarSubEl && ruleBasedRadar){
+    contentRadarSubEl.textContent='Rule-based eksenler, not yoksa legacy korunur';
+  }
   mk('contentRadarChart','radar',{labels:['Başlık Uyumu','Anahtar Kelime','Kategori Uyumu','Açıklama','Görseller','Teknik'],datasets:[{label:'Bu Ürün',data:[content.titleScore,content.keywordCoverageScore,content.categoryFitScore,content.descriptionScore,content.imageScore,content.specScore],borderColor:BR,backgroundColor:'rgba(79,127,255,.13)',pointBackgroundColor:BR,pointRadius:4},{label:'Kategori Ort.',data:categoryRadarData,borderColor:'rgba(255,255,255,.2)',backgroundColor:'rgba(255,255,255,.04)',pointRadius:3,borderDash:[4,4]}]},{plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:10}}},scales:{r:{ticks:{stepSize:25,backdropColor:'transparent'},grid:{color:GC},pointLabels:{font:{size:10}}}}});
-  mk('imgCountChart','bar',{labels:['Bu Ürün','Kategori Ort.','Güçlü Rakip 1','Güçlü Rakip 2'],datasets:[{data:[content.imageCount,content.imageBenchmark,Math.max(content.imageBenchmark+1.5,content.imageCount+1),Math.max(content.imageBenchmark+0.5,content.imageCount)],backgroundColor:[content.imageScore>=80?AC:content.imageScore>=55?WN:DG,BR,AC,AC],borderRadius:6,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:GC},suggestedMax:Math.max(14,content.imageBenchmark+4)},x:{grid:{display:false}}}});
-  mk('descLenChart','bar',{labels:['Bu Ürün','Rakip A','Rakip B','Rakip C','Kategori Ort.'],datasets:[{data:[content.descriptionLength,Math.round(content.descriptionBenchmark*1.15),Math.round(content.descriptionBenchmark*0.8),Math.round(content.descriptionBenchmark*0.97),content.descriptionBenchmark],backgroundColor:[content.descriptionScore>=80?AC:content.descriptionScore>=55?WN:DG,BR2,BR2,BR2,BR],borderRadius:5,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:GC}},x:{grid:{display:false}}}});
+  mk('imgCountChart','bar',{labels:['Bu Ürün','Kategori Ort.','Güçlü Rakip 1','Güçlü Rakip 2'],datasets:[{data:[content.imageCount,content.imageBenchmark,Math.max(content.imageBenchmark+1.5,content.imageCount+1),Math.max(content.imageBenchmark+0.5,content.imageCount)],backgroundColor:[imageBand==='strong'?AC:imageBand==='medium'?WN:DG,BR,AC,AC],borderRadius:6,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:GC},suggestedMax:Math.max(14,content.imageBenchmark+4)},x:{grid:{display:false}}}});
+  mk('descLenChart','bar',{labels:['Bu Ürün','Rakip A','Rakip B','Rakip C','Kategori Ort.'],datasets:[{data:[content.descriptionLength,Math.round(content.descriptionBenchmark*1.15),Math.round(content.descriptionBenchmark*0.8),Math.round(content.descriptionBenchmark*0.97),content.descriptionBenchmark],backgroundColor:[descriptionBand==='strong'?AC:descriptionBand==='medium'?WN:DG,BR2,BR2,BR2,BR],borderRadius:5,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:GC}},x:{grid:{display:false}}}});
   mk('seoFieldChart','bar',{labels:['Anahtar Kelime','Kategori Uyumu','Açıklama','Görsel','Soru Yoğunluğu','Teknik Alan'],datasets:[{label:'Bu Ürün %',data:[content.keywordCoverageScore,content.categoryFitScore,content.descriptionScore,content.imageScore,content.questionSignalScore,content.specScore],backgroundColor:'rgba(79,127,255,.6)',borderRadius:4,borderSkipped:false},{label:'Kategori Ort. %',data:[categoryRadarData[1],categoryRadarData[2],categoryRadarData[3],categoryRadarData[4],66,categoryRadarData[5]],backgroundColor:'rgba(255,255,255,.07)',borderRadius:4,borderSkipped:false}]},{plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:10}}},scales:{y:{max:100,grid:{color:GC}},x:{grid:{display:false}}}}); 
 }
 
 function initRdTrust(){
   const trust=getTrustData();
+  const trustRules=getResolvedRuleSection('trust_reviews');
+  const sharedRules=getResolvedRuleSection('shared');
+  const separateProductVsSeller=Boolean(trustRules?.rules?.some((item)=>item.id==='trust-general-vs-seller-review-separation')) || Boolean(sharedRules?.section?.productVsSellerMustBeSeparated);
+  const sampledRecentReviews=Boolean(trustRules?.rules?.some((item)=>item.id==='trust-recent-reviews-are-sampled'));
+  const proxyLabelRule=Boolean(trustRules?.rules?.some((item)=>item.id==='trust-dimensions-must-label-proxies'));
   updateTrustKpis(trust);
   renderThemeList('trustPositiveThemes',trust.generalPositive,[{label:'ürün kalitesi',count:187},{label:'hızlı kargo',count:134},{label:'saç hasarı yok',count:98},{label:'fiyat performans',count:76}],true);
   renderThemeList('trustNegativeThemes',trust.generalNegative,[{label:'kablo kısa',count:42},{label:'ısınma süresi',count:28},{label:'ambalaj hasarlı',count:19},{label:'beklenti farkı',count:11}],false);
+  const themeSubEl=document.querySelector('#trustPositiveThemes')?.closest('.cc')?.querySelector('.cc-sub');
+  if(themeSubEl) themeSubEl.textContent='Örneklenen genel ürün yorum temaları';
 
   const breakdown=trust.generalBreakdown||{};
-  mk('ratingBreakdownChart','bar',{labels:['5 ⭐','4 ⭐','3 ⭐','2 ⭐','1 ⭐'],datasets:[{data:[breakdown.five_star||0,breakdown.four_star||0,breakdown.three_star||0,breakdown.two_star||0,breakdown.one_star||0],backgroundColor:[AC,'rgba(0,212,168,.55)','rgba(245,158,11,.6)',WN,DG],borderRadius:4,borderSkipped:false}]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:GC}},y:{grid:{display:false}}}});
+  const ratingBreakdownSubEl=document.querySelector('#ratingBreakdownChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(trust.hasGeneralBreakdown){
+    if(ratingBreakdownSubEl) ratingBreakdownSubEl.textContent='Genel ürün yıldız dağılımı';
+    mk('ratingBreakdownChart','bar',{labels:['5 ⭐','4 ⭐','3 ⭐','2 ⭐','1 ⭐'],datasets:[{data:[breakdown.five_star||0,breakdown.four_star||0,breakdown.three_star||0,breakdown.two_star||0,breakdown.one_star||0],backgroundColor:[AC,'rgba(0,212,168,.55)','rgba(245,158,11,.6)',WN,DG],borderRadius:4,borderSkipped:false}]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:GC}},y:{grid:{display:false}}}});
+  }else{
+    dc('ratingBreakdownChart');
+    const chartEl=document.getElementById('ratingBreakdownChart');
+    if(chartEl){
+      const parent=chartEl.parentElement;
+      if(parent){
+        parent.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-size:12.5px;padding:18px;">Yıldız dağılımı verisi alınamadı</div>';
+      }
+    }
+    if(ratingBreakdownSubEl) ratingBreakdownSubEl.textContent='Yıldız dağılımı verisi bulunamadı';
+  }
 
-  const trend=trust.generalTrend||[];
-  mk('reviewTrendChart','bar',{labels:trend.map(item=>monthLabelTR(item.month)),datasets:[{label:'Yeni Yorum',data:trend.map(item=>item.count),backgroundColor:AC,borderRadius:5,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:GC}},x:{grid:{display:false}}}});
+  const trend=expandMonthlyTrend(trust.generalTrend||[],6);
+  const reviewTrendSubEl=document.querySelector('#reviewTrendChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(trust.hasGeneralTrend){
+    if(reviewTrendSubEl) reviewTrendSubEl.textContent='Aylık yorum akışı';
+    mk('reviewTrendChart','bar',{labels:trend.map(item=>monthLabelTR(item.month)),datasets:[{label:'Yeni Yorum',data:trend.map(item=>item.count),backgroundColor:AC,borderRadius:5,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:GC}},x:{grid:{display:false},ticks:{autoSkip:false,maxRotation:0,minRotation:0}}}});
+  }else{
+    dc('reviewTrendChart');
+    const chartEl=document.getElementById('reviewTrendChart');
+    if(chartEl){
+      const parent=chartEl.parentElement;
+      if(parent){
+        parent.innerHTML='<div style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-size:12.5px;padding:18px;">Yorum trend verisi alınamadı</div>';
+      }
+    }
+    if(reviewTrendSubEl) reviewTrendSubEl.textContent='Yorum trend verisi bulunamadı';
+  }
 
   const sellerScore=trust.sellerScore!=null?Math.min(10,trust.sellerScore):9.6;
   const ratingTrust=trust.ratingValue!=null?Math.min(10,Math.max(0,trust.ratingValue*2)):9.4;
@@ -2550,18 +4031,78 @@ function initRdTrust(){
   const returnTrust=trust.hasReturnInfo?8.2:5.5;
   const complaintRatio=(breakdown.total&&breakdown.total>0)?(((breakdown.one_star||0)+(breakdown.two_star||0))/breakdown.total):0;
   const complaintScore=Math.max(1,10-(complaintRatio*20));
+  const trustRadarSubEl=document.querySelector('#trustRadarChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(trustRadarSubEl){
+    trustRadarSubEl.textContent=proxyLabelRule
+      ? 'Dogrudan veri + proxy guven eksenleri birlikte okunur'
+      : (separateProductVsSeller
+        ? 'Ürün geneli + satıcı operasyon sinyalleri birlikte okunur'
+        : 'Ürün ve satıcı güven sinyalleri');
+  }
   mk('trustRadarChart','radar',{labels:['Satıcı Güveni','İade Kolaylığı','Yorum Derinliği','Ürün Puanı','Şikayet Riski'],datasets:[{label:'Güven Skoru',data:[sellerScore,returnTrust,reviewDepth,ratingTrust,complaintScore],borderColor:AC,backgroundColor:'rgba(0,212,168,.12)',pointBackgroundColor:AC,pointRadius:4}]},{plugins:{legend:{display:false}},scales:{r:{max:10,ticks:{stepSize:2,backdropColor:'transparent'},grid:{color:GC},pointLabels:{font:{size:10}}}}});
 
   const positiveHits=(trust.generalPositive||[]).slice(0,4);
   const negativeHits=(trust.generalNegative||[]).slice(0,4);
-  const labels=[...positiveHits.map(item=>item.label),...negativeHits.map(item=>item.label)];
-  mk('reviewHitsChart','bar',{labels,datasets:[{label:'Olumlu',data:[...positiveHits.map(item=>item.count),...negativeHits.map(()=>0)],backgroundColor:AC,borderRadius:4,borderSkipped:false},{label:'Olumsuz',data:[...positiveHits.map(()=>0),...negativeHits.map(item=>-item.count)],backgroundColor:DG,borderRadius:4,borderSkipped:false}]},{indexAxis:'y',plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:10}}},scales:{x:{grid:{color:GC}},y:{grid:{display:false}}}});
+  const recentReviewListEl=document.getElementById('recentReviewList');
+  const recentReviewSubEl=document.querySelector('#recentReviewList')?.closest('.cc')?.querySelector('.cc-sub');
+  if(recentReviewSubEl && sampledRecentReviews) recentReviewSubEl.textContent='Yildiz ve kisa yorum ozeti · orneklenmis veri';
+  if(recentReviewListEl){
+    const recentReviews=Array.isArray(trust.recentReviews)?trust.recentReviews:[];
+    if(recentReviews.length){
+      recentReviewListEl.innerHTML=recentReviews.map((item,index)=>{
+        const rating=item.rating!=null?`${Math.max(1,Math.min(5,Math.round(item.rating)))}★`:'—';
+        const tone=item.rating>=4?'var(--accent)':item.rating>=3?'var(--warn)':'var(--danger)';
+        return `<div style="display:grid;grid-template-columns:48px 1fr;gap:10px;align-items:start;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg3);">
+          <div style="font-size:12px;font-weight:800;color:${tone};letter-spacing:.02em;">${rating}</div>
+          <div style="font-size:12.5px;line-height:1.45;color:var(--text);">${escapeHtml(truncateSentence(item.text,trust.recentReviewPresentation?.truncateLength || 140))}</div>
+        </div>`;
+      }).join('');
+    }else{
+      recentReviewListEl.innerHTML='<div style="padding:18px;border:1px solid var(--border);border-radius:10px;background:var(--bg3);font-size:12.5px;color:var(--muted);text-align:center;">Son yorum verisi alınamadı</div>';
+    }
+  }
 }
 
 function initRdDemand(){
   const demand=getDemandData();
   const content=getContentSeoData();
+  const sharedRules=getResolvedRuleSection('shared');
+  const estimatedLanguageRule=Boolean(sharedRules?.rules?.some((item)=>item.id==='shared-estimated-language'));
+  const growthGapRule=hasResolvedRule('demand_signals','demand-growth-opportunity-is-gap-based');
+  const marketInterestCompositeRule=hasResolvedRule('demand_signals','demand-market-interest-is-composite');
+  const estimatedFunnelRule=hasResolvedRule('demand_signals','demand-funnel-is-estimated-not-real');
   updateDemandKpis(demand);
+  const salesStatusSubEl=document.querySelector('#salesStatusChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(salesStatusSubEl){
+    salesStatusSubEl.textContent=demand.demandConfidence>=0.75
+      ? 'Doğrudan talep ve destek sinyallerinden türetildi'
+      : (estimatedLanguageRule?'Sınırlı veriyle tahmini aylık akış':'Tahmini aylık akış');
+  }
+  const marketInterestSubEl=document.querySelector('#mktInterestChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(marketInterestSubEl){
+    marketInterestSubEl.textContent=demand.demandConfidence>=0.75
+      ? (marketInterestCompositeRule?'Birlesik ilgi sinyali: favori, yorum, soru ve goruntulenme':'Favori, yorum, soru ve görüntülenme sinyalleri birlikte okunur')
+      : 'Sınırlı veriyle ilgi sinyali özeti';
+  }
+  const growthSubEl=document.querySelector('#growthChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(growthSubEl && growthGapRule){
+    growthSubEl.textContent='Icerik, teklif, guven ve ivme acigi birlikte okunur';
+  }
+  const funnelSubEl=document.querySelector('#funnelChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(funnelSubEl){
+    funnelSubEl.textContent=estimatedFunnelRule
+      ? 'Gercek funnel degil, tahmini donusum akisi'
+      : (estimatedLanguageRule
+        ? 'Gerçek funnel değil, tahmini dönüşüm akışı'
+        : 'Görüntülenme, favori, sepet ve satış tahmini');
+  }
+  const demandOverviewSubEl=document.querySelector('#demandOverviewSales')?.closest('.cc');
+  const demandOverviewHeadSubEl=document.querySelector('#demandOverviewSales')?.closest('.cc')?.querySelector('.cc-sub');
+  if(demandOverviewSubEl && demandOverviewHeadSubEl){
+    demandOverviewHeadSubEl.textContent=estimatedLanguageRule
+      ? 'Tahmini ve gerçek sinyaller birlikte okunur'
+      : 'Talep seviyesi, fiyat avantajı, büyüme fırsatı ve baskı alanı birlikte okunur';
+  }
   mk('salesStatusChart','line',{labels:['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'],datasets:[{label:'Aylık Satış Tahmini',data:demand.salesSeriesBase,borderColor:BR,backgroundColor:'rgba(79,127,255,.1)',fill:true,tension:.4,pointRadius:3},{label:'Favori İvmesi',data:demand.favoriteSeries.map(value=>Math.round(value/10)),borderColor:BR2,backgroundColor:'transparent',tension:.4,pointRadius:3,borderDash:[4,4]}]},{plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:10}}},scales:{y:{grid:{color:GC}},x:{grid:{display:false}}}});
   mk('growthChart','bar',{labels:['İçerik','Görsel','Fiyat','Güven','Talep İvmesi'],datasets:[{label:'Mevcut',data:[content.searchVisibilityScore,content.imageScore,Math.round(demand.relativeScore),Math.round(demand.trustBalancer*100),Math.round(demand.commercialMomentumScore)],backgroundColor:'rgba(255,255,255,.06)',borderRadius:4,borderSkipped:false},{label:'Potansiyel',data:[Math.max(content.searchVisibilityScore,82),Math.max(content.imageScore,85),Math.max(Math.round(demand.relativeScore),78),Math.max(Math.round(demand.trustBalancer*100),84),Math.max(Math.round(demand.commercialMomentumScore),88)],backgroundColor:[BR,BR,BR,AC,'rgba(0,212,168,.4)'],borderRadius:4,borderSkipped:false}]},{plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:10}}},scales:{y:{max:100,grid:{color:GC}},x:{grid:{display:false}}}});
   mk('mktInterestChart','bar',{labels:['Favori','Yorum','Soru','Görüntüleme'],datasets:[{data:[Math.round(demand.favoriteEstimate),safeNumber(currentReportData?.reviewAnalysis?.general?.total_comment_count) ?? 0,safeNumber(currentReportData?.questionAnalysis?.general?.count) ?? safeNumber(currentReportData?.questionCount) ?? 0,Math.round(demand.viewEstimate)],backgroundColor:[BR2,AC,WN,BR],borderRadius:5,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:GC}},x:{grid:{display:false}}}});
@@ -2571,6 +4112,8 @@ function initRdDemand(){
 function initRdActions(){
   renderActionList();
   const {actions}=getActionData();
+  const relativeMatrixRule=hasResolvedRule('actions','actions-priority-matrix-is-relative');
+  const estimatedImprovementRule=hasResolvedRule('actions','actions-score-improvement-is-estimated');
   const currentScore=Math.round(safeNumber(currentReportData?.overallScore) ?? 72);
   const matrixDatasets=actions.map((item,index)=>({
     label:item.title,
@@ -2582,6 +4125,10 @@ function initRdActions(){
     backgroundColor:index===0?'rgba(239,68,68,.65)':index===1?'rgba(239,68,68,.45)':index===2?'rgba(245,158,11,.65)':index===3?'rgba(245,158,11,.45)':'rgba(0,212,168,.55)'
   }));
   mk('actionMatrixChart','bubble',{datasets:matrixDatasets},{plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:8}}},scales:{x:{title:{display:true,text:'Uygulama Kolaylığı →',color:'#8a93ad'},min:0,max:10,grid:{color:GC}},y:{title:{display:true,text:'Beklenen Etki →',color:'#8a93ad'},min:0,max:10,grid:{color:GC}}}});
+  const actionMatrixSubEl=document.querySelector('#actionMatrixChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(actionMatrixSubEl && relativeMatrixRule){
+    actionMatrixSubEl.textContent='Goreli etki x uygulama kolayligi';
+  }
   const scoreSteps=[currentScore];
   const topActions=actions.slice(0,4);
   topActions.forEach((item,index)=>{
@@ -2594,9 +4141,30 @@ function initRdActions(){
   const scoreData=[...scoreSteps.slice(0,scoreLabels.length-1),Math.min(100,(scoreSteps[scoreSteps.length-1]||currentScore)+2)];
   const scoreColors=['rgba(255,255,255,.07)',BR,BR2,AC,WN,'rgba(0,212,168,.3)'].slice(0,scoreData.length);
   mk('actionScoreChart','bar',{labels:scoreLabels,datasets:[{data:scoreData,backgroundColor:scoreColors,borderRadius:5,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{min:Math.max(0,currentScore-10),max:100,grid:{color:GC}},x:{grid:{display:false}}}});
+  const actionScoreSubEl=document.querySelector('#actionScoreChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(actionScoreSubEl && estimatedImprovementRule){
+    actionScoreSubEl.textContent='Her aksiyon sonrasi tahmini overallScore artisi';
+  }
 }
 
 async function bootstrapDashboard(){
+  await loadCurrentUserProfile();
+  await loadFavoriteReportKeys();
+  try{
+    const storedMode=localStorage.getItem(REPORTS_FILTER_MODE_STORAGE_KEY);
+    reportsFilterMode=storedMode==='favorites'?'favorites':'all';
+  }catch{
+    reportsFilterMode='all';
+  }
+  updateSidebarBadges();
+  applyReportsNavActiveState();
+  await ensureResolvedRulebookLoaded();
+  const main=document.querySelector('.main');
+  if(main && main.dataset.scrollBound!=='1'){
+    main.dataset.scrollBound='1';
+    main.addEventListener('scroll',saveDashboardScrollPosition,{passive:true});
+  }
+  window.addEventListener('beforeunload',saveDashboardScrollPosition);
   renderRecentAnalyses();
   initAnalyzeInputHandlers();
   await ensureLiveReportsLoaded();
@@ -2615,11 +4183,17 @@ async function bootstrapDashboard(){
   }
 
   if(hasKnownView){
+    const initialParams=new URLSearchParams(params.toString());
     gv(queryView);
+    if(queryView==='new-analysis'){
+      applyAnalyzeQueryPrefill({allowAutorun:true,params:initialParams});
+    }
+    setTimeout(restoreDashboardScrollPosition,80);
     if(queryView==='reports'){
       renderReportTables();
-      const requestedIndex=Number(params.get('demoIndex')||0);
-      if(Number.isFinite(requestedIndex) && requestedIndex>=0){
+      const hasDemoIndex=params.has('demoIndex');
+      const requestedIndex=Number(params.get('demoIndex'));
+      if(hasDemoIndex && Number.isFinite(requestedIndex) && requestedIndex>=0){
         const reports=getCurrentReports();
         if(reports[requestedIndex]){
           openReport(requestedIndex);
@@ -2629,10 +4203,23 @@ async function bootstrapDashboard(){
     return;
   }
 
+  applyAnalyzeQueryPrefill({allowAutorun:false,params:new URLSearchParams(params.toString())});
+
   gv('overview');
+  setTimeout(restoreDashboardScrollPosition,80);
 }
 
 bootstrapDashboard();
+
+window.addEventListener('message',(event)=>{
+  if(event.origin!==window.location.origin) return;
+  const data=event.data;
+  if(!data || typeof data!=='object' || data.type!=='sellboost:set-view') return;
+  const nextView=String(data.view||'').trim();
+  const reportId=data.reportId!=null?String(data.reportId):undefined;
+  if(!Object.prototype.hasOwnProperty.call(VIEWS,nextView)) return;
+  applyExternalWorkspaceRoute(nextView,reportId);
+});
 </script>
 </body>
 </html>

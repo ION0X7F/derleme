@@ -68,7 +68,7 @@ function normalizeRecipeLine(value: string | null | undefined) {
 function buildRecipeFromSuggestions(suggestions: AnalysisSuggestion[]) {
   return suggestions
     .filter((item) => cleanText(item.title) && cleanText(item.detail))
-    .slice(0, 3)
+    .slice(0, 6)
     .map((item) => `${item.title.trim()}: ${item.detail.trim()}`);
 }
 
@@ -81,7 +81,7 @@ export function buildStructuredSummary(params: {
   const recipeLines = params.strategicRecipe
     .map((item) => normalizeRecipeLine(item))
     .filter((item): item is string => !!item)
-    .slice(0, 3);
+    .slice(0, 6);
 
   while (recipeLines.length < 3) {
     recipeLines.push(

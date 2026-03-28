@@ -12,8 +12,8 @@ body {
 
 body {
   min-height: 100vh;
-  background: #ffffff;
-  color: #111827;
+  background: #09090e;
+  color: #eceff8;
   font-family: Inter, "Segoe UI", Arial, sans-serif;
 }
 
@@ -24,4 +24,8 @@ a {
 
 .sb-body {
   min-height: 100vh;
+  background:
+    radial-gradient(circle at top, rgba(79, 127, 255, 0.1), transparent 28%),
+    #09090e;
+  color: #eceff8;
 }

@@ -3,17 +3,22 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const USERNAME_PATTERN = /^[a-z0-9._-]+$/i;
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const name = body?.name?.trim();
+    const username = body?.username?.trim()?.toLowerCase();
     const email = body?.email?.trim()?.toLowerCase();
+    const phone = body?.phone?.trim();
+    const companyName = body?.companyName?.trim() || null;
+    const storeName = body?.storeName?.trim() || null;
     const password = body?.password;
 
-    if (!name || !email || !password) {
+    if (!name || !username || !email || !phone || !password) {
       return NextResponse.json(
-        { error: "Ad, email ve sifre zorunlu." },
+        { error: "Ad, kullanici adi, telefon, email ve sifre zorunlu." },
         { status: 400 }
       );
     }
@@ -32,6 +37,24 @@ export async function POST(req: Request) {
       );
     }
 
+    if (
+      username.length < 3 ||
+      username.length > 30 ||
+      !USERNAME_PATTERN.test(username)
+    ) {
+      return NextResponse.json(
+        { error: "Kullanici adi 3-30 karakter olmali ve sadece harf, rakam, nokta, tire veya alt cizgi icermeli." },
+        { status: 400 }
+      );
+    }
+
+    if (phone.length < 10 || phone.length > 24) {
+      return NextResponse.json(
+        { error: "Telefon numarasi gecersiz gorunuyor." },
+        { status: 400 }
+      );
+    }
+
     if (password.length < 6) {
       return NextResponse.json(
         { error: "Sifre en az 6 karakter olmali." },
@@ -46,13 +69,25 @@ export async function POST(req: Request) {
       );
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
+    const [existingEmailUser, existingUsernameUser] = await Promise.all([
+      prisma.user.findUnique({
+        where: { email },
+      }),
+      prisma.user.findUnique({
+        where: { username },
+      }),
+    ]);
 
-    if (existingUser) {
+    if (existingEmailUser) {
       return NextResponse.json(
         { error: "Bu email ile kayitli kullanici var." },
+        { status: 409 }
+      );
+    }
+
+    if (existingUsernameUser) {
+      return NextResponse.json(
+        { error: "Bu kullanici adi zaten kullaniliyor." },
         { status: 409 }
       );
     }
@@ -90,6 +125,10 @@ export async function POST(req: Request) {
       data: {
         name,
         email,
+        username,
+        phone,
+        companyName,
+        storeName,
         passwordHash,
         plan: "FREE",
         subscription: {
@@ -104,6 +143,7 @@ export async function POST(req: Request) {
         id: true,
         name: true,
         email: true,
+        username: true,
         role: true,
         plan: true,
       },

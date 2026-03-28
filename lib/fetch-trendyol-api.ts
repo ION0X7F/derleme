@@ -1,4 +1,5 @@
 import type { OtherSellerOffer, OtherSellersSummary } from "@/types/analysis";
+import { isTrendyolFreeShippingEligible } from "@/lib/trendyol-shipping";
 
 type TrendyolSeller = {
   merchant_id: number | null;
@@ -189,9 +190,7 @@ function buildBadgeList(
 function normalizeSellerOffer(raw: TrendyolApiSellerRecord): TrendyolSeller {
   const variant = Array.isArray(raw.variants) && raw.variants.length > 0 ? raw.variants[0] : null;
   const priceInfo = getPriceValue(variant?.price ?? raw.price ?? null);
-  const hasFreeShipping = Boolean(
-    raw.hasFreeCargo ?? raw.freeCargo ?? raw.freeShipping ?? variant?.hasFreeCargo ?? variant?.freeCargo
-  );
+  const hasFreeShipping = isTrendyolFreeShippingEligible(priceInfo.price);
 
   return {
     merchant_id: toFiniteNumber(raw.id) ?? toFiniteNumber(raw.sellerId),
@@ -370,10 +369,7 @@ export async function fetchTrendyolApi(url: string): Promise<TrendyolApiResult |
     const other_sellers_summary = buildOtherSellersSummary(other_sellers, discounted_price);
 
     // Ücretsiz kargo
-    const has_free_shipping =
-      data?.result?.product?.hasFreeCargo ||
-      data?.hasFreeCargo ||
-      false;
+    const has_free_shipping = isTrendyolFreeShippingEligible(discounted_price);
 
     // Varyant sayısı
     const variants =

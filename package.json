@@ -4,10 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:full": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/dev-full.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "db:push": "prisma db push",
+    "worker:analyze": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/analyze-job-worker.ts",
+    "worker:analyze:once": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/analyze-job-worker.ts --once",
     "db:seed": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs prisma/seed.ts",
     "test:ai-regression": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/ai-regression-test.ts",
     "test:ai-regression:auto": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/ai-regression-test.ts --mode=auto",

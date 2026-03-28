@@ -881,6 +881,19 @@ function findPrice($: cheerio.CheerioAPI, jsonLdPrice: string | null) {
 }
 
 function findDescription($: cheerio.CheerioAPI) {
+  const trendyolProductInfo = $('[data-testid="product-info"]').first();
+  if (trendyolProductInfo.length > 0) {
+    const trendyolDescriptionSelectors = [
+      '[class*="content-descriptions-description-content"]',
+      '[class*="content-description"] ul',
+      '[class*="content-description"]',
+    ];
+    for (const selector of trendyolDescriptionSelectors) {
+      const text = cleanText(trendyolProductInfo.find(selector).first().text());
+      if (text && text.length >= 20) return text;
+    }
+  }
+
   const selectors = [
     '[data-testid="product-description"]',
     '[data-test-id="product-description"]',
@@ -896,11 +909,7 @@ function findDescription($: cheerio.CheerioAPI) {
     const text = cleanText($(selector).first().text());
     if (text && text.length >= 40) return text;
   }
-  return (
-    cleanText($('meta[name="description"]').attr("content")) ||
-    cleanText($('meta[property="og:description"]').attr("content")) ||
-    null
-  );
+  return null;
 }
 
 function hasFaq($: cheerio.CheerioAPI, structuredDataTypes: string[]) {
@@ -919,6 +928,17 @@ function extractSpecsText($: cheerio.CheerioAPI) {
     const text = cleanText($(el).text());
     if (text) candidates.push(text);
   });
+
+  const trendyolSpecSelectors = [
+    '[data-testid="product-info"] [data-testid="attributes-section"]',
+    '[data-testid="product-info"] .product-attributes',
+    '[data-testid="product-info"] [class*="product-attributes"]',
+  ];
+  for (const selector of trendyolSpecSelectors) {
+    const text = cleanText($(selector).text());
+    if (text) candidates.push(text);
+  }
+
   const specSelectors = [
     ".specs", ".specifications", ".technical-specifications",
     ".product-specs", ".urun-ozellikleri", ".teknik-ozellikler",
@@ -931,6 +951,12 @@ function extractSpecsText($: cheerio.CheerioAPI) {
 }
 
 function hasSpecsTable($: cheerio.CheerioAPI) {
+  if ($('[data-testid="product-info"] [data-testid="attributes-section"]').length > 0) {
+    return true;
+  }
+  if ($('[data-testid="product-info"] [class*="product-attributes"]').length > 0) {
+    return true;
+  }
   if ($("table").length > 0) return true;
   const bodyText = toLowerSafe(cleanText($("body").text()));
   return (
@@ -1205,6 +1231,7 @@ export function extractBasicFields(html: string): ExtractedProductFields {
     top_positive_review_hits: null,
     top_negative_review_hits: null,
     question_count: null,
+    description_text: description,
     description_length: description ? description.length : null,
     bullet_point_count: null,
     has_add_to_cart,

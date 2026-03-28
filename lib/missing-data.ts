@@ -13,6 +13,7 @@ import type {
 import type { TrendyolApiResult } from "@/lib/fetch-trendyol-api";
 import type { DebugTraceHandle } from "@/lib/debug-observability";
 import { traceEvent, traceMissingField } from "@/lib/debug-observability";
+import { isTrendyolFreeShippingEligible } from "@/lib/trendyol-shipping";
 
 type MissingFieldPriority = "critical" | "important" | "optional";
 
@@ -575,7 +576,9 @@ function getMissingFieldReason(
     case "image_count":
       return "Urun gorselleri kaynak HTML icinde yeterince expose edilmedi.";
     case "description_length":
-      return "Aciklama blogu sayfada gec yukleniyor olabilir veya SSR icinde yer almiyor.";
+      return extracted.has_specs
+        ? "Urun bilgilerinde ozellik/ek bilgi alani var; ancak serbest aciklama blogu ayri olarak cozulmedi veya gec yukleniyor olabilir."
+        : "Aciklama blogu sayfada gec yukleniyor olabilir veya SSR icinde yer almiyor.";
     case "seller_name":
       return "Satici bilgisi HTML ve Trendyol API kaynaklarinda acik gorunmedi.";
     case "rating_value":
@@ -1107,9 +1110,10 @@ export function completeMissingFields(params: CompleteMissingFieldsParams) {
   strengthenBoolean(
     "has_free_shipping",
     Boolean(
-      params.platformFields.has_free_shipping ??
+      isTrendyolFreeShippingEligible(completed.normalized_price) ||
+      (params.platformFields.has_free_shipping ??
         apiSeller?.has_free_shipping ??
-        params.trendyolApiData?.has_free_shipping
+        params.trendyolApiData?.has_free_shipping)
     ),
     apiSeller?.has_free_shipping || params.trendyolApiData?.has_free_shipping
       ? "trendyol api free shipping"

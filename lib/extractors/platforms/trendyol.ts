@@ -1,6 +1,7 @@
 import type { CheerioAPI } from "cheerio";
 import type { Element } from "domhandler";
 import type { PlatformExtractor } from "@/lib/extractors/types";
+import { isTrendyolFreeShippingEligible } from "@/lib/trendyol-shipping";
 import type {
   OtherSellerOffer,
   OtherSellersSummary,
@@ -159,6 +160,10 @@ function normalizeImageUrl(url: string | null) {
 
 function pickFirstValid(values: Array<string | null>) {
   return values.find((value) => !!value && value.length >= 2) ?? null;
+}
+
+function uniqueNonEmptyStrings(values: Array<string | null | undefined>) {
+  return [...new Set(values.map((value) => cleanText(value)).filter((value): value is string => !!value))];
 }
 
 function collectJsonBlocks(html: string) {
@@ -823,10 +828,7 @@ function parseOtherSellerOffers(
   const ratingBreakdown = parseRatingBreakdown(ratingScoreRecord);
   const reviewSnippets = parseReviewSnippets(envoyProduct);
   const qaSnippets = parseQaSnippets(envoyProduct);
-  const winnerHasFreeShipping = Boolean(
-    getNestedValue(winnerVariantRecord, ["freeCargo"]) ??
-      getNestedValue(winnerVariantRecord, ["hasFreeCargo"])
-  );
+  const winnerHasFreeShipping = isTrendyolFreeShippingEligible(currentPrice);
   const stockQuantity =
     toFiniteNumber(getNestedValue(winnerVariantRecord, ["quantity"])) ??
     toFiniteNumber(getNestedValue(envoyProduct, ["stockQuantity"])) ??
@@ -926,7 +928,7 @@ function parseOtherSellerOffers(
           toFiniteNumber(record.sellerScore),
         is_official: Boolean(false),
         has_fast_delivery: Boolean(record.rushDelivery),
-        has_free_shipping: Boolean(record.freeCargo),
+        has_free_shipping: isTrendyolFreeShippingEligible(priceData.price),
         follower_count: null,
         stock_quantity:
           toFiniteNumber(getNestedValue(variantRecord, ["quantity"])) ??
@@ -2269,6 +2271,38 @@ function extractMerchantIdFromHtml($: CheerioAPI, decodedHtml: string) {
   return null;
 }
 
+function extractCouponLabel($: CheerioAPI, decodedHtml: string) {
+  const selectorTexts = [
+    cleanText($('[data-testid*="coupon"]').text()),
+    cleanText($('[class*="coupon"]').text()),
+    cleanText($('[class*="kupon"]').text()),
+  ].filter((value): value is string => !!value);
+
+  for (const text of selectorTexts) {
+    const amountMatch = text.match(/(\d{1,4}(?:[.,]\d{3})?\s*TL)/i);
+    if (amountMatch?.[1]) {
+      return `${amountMatch[1].replace(/\s+/g, " ").trim()} Kupon`;
+    }
+  }
+
+  const regexPatterns = [
+    /Kuponlar[\s\S]{0,600}?(\d{1,4}(?:[.,]\d{3})?\s*TL)/i,
+    /(\d{1,4}(?:[.,]\d{3})?\s*TL)\s*Kupon/gi,
+    /(\d{1,4}(?:[.,]\d{3})?\s*TL)\s*Kupon Fırsatı/gi,
+    /"couponAmount"\s*:\s*"?(.*?)"?(?:,|})/i,
+  ];
+
+  for (const pattern of regexPatterns) {
+    const match = decodedHtml.match(pattern);
+    const rawValue = cleanText(match?.[1] || null);
+    if (!rawValue) continue;
+    if (/kupon/i.test(rawValue)) return rawValue;
+    if (/tl/i.test(rawValue)) return `${rawValue} Kupon`;
+  }
+
+  return null;
+}
+
 export const extractTrendyolFields: PlatformExtractor = ({ $, html }) => {
   // 1. Tüm potansiyel veri kaynaklarını topla
   const decodedHtml = decodeUnicode(html);
@@ -2354,6 +2388,7 @@ export const extractTrendyolFields: PlatformExtractor = ({ $, html }) => {
 
   const questionCount = envoySignals.question_count; // Sadece envoy'dan gelen, daha güvenilir.
 
+  const couponLabel = extractCouponLabel($, decodedHtml);
   return {
     // En güvenilir kaynaktan (envoy) gelenler
     seller_name: envoySignals.seller_name ?? extractSellerFromHtml($, decodedHtml),
@@ -2390,7 +2425,10 @@ export const extractTrendyolFields: PlatformExtractor = ({ $, html }) => {
 
     // Fallback'li diğer alanlar
     category: envoySignals.category ?? extractCategory(jsonBlocks, decodedHtml),
-    has_free_shipping: envoySignals.has_free_shipping || detectFreeShipping($, decodedHtml),
+    has_free_shipping:
+      isTrendyolFreeShippingEligible(price) ||
+      envoySignals.has_free_shipping ||
+      detectFreeShipping($, decodedHtml),
     shipping_days: extractShippingDaysFromJson(jsonBlocks), // Genellikle sadece JSON-LD'de var.
     variant_count: envoySignals.variant_count ?? extractVariantCount($, decodedHtml, stateObjects),
     has_video: envoySignals.has_video || detectVideo($, decodedHtml, stateObjects),
@@ -2400,9 +2438,12 @@ export const extractTrendyolFields: PlatformExtractor = ({ $, html }) => {
     has_specs: envoySignals.has_specs || undefined,
     stock_status: envoySignals.stock_status ?? extractStockStatus($, decodedHtml, stateObjects),
     official_seller: envoySignals.official_seller || detectOfficialSeller($, decodedHtml),
-    has_campaign: envoySignals.has_campaign || detectCampaignSignal($, decodedHtml),
-    campaign_label: envoySignals.campaign_label ?? extractCampaignLabel($, decodedHtml),
-    promotion_labels: envoySignals.promotion_labels,
+    has_campaign: envoySignals.has_campaign || detectCampaignSignal($, decodedHtml) || !!couponLabel,
+    campaign_label: envoySignals.campaign_label ?? extractCampaignLabel($, decodedHtml) ?? couponLabel,
+    promotion_labels: (() => {
+      const labels = uniqueNonEmptyStrings([...(envoySignals.promotion_labels ?? []), couponLabel]);
+      return labels.length > 0 ? labels : null;
+    })(),
     delivery_type: extractDeliveryType($, decodedHtml),
   };
 };

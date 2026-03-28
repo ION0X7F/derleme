@@ -226,6 +226,9 @@ export function buildStoredExtractedData(params: {
 
   next.images = trimArray(Array.isArray(next.images) ? next.images : null, MAX_STORED_IMAGES);
   next.bullet_points = pickStringArray(next.bullet_points, MAX_STORED_BULLETS);
+  if (typeof next.description_text === "string") {
+    next.description_text = next.description_text.trim().slice(0, 4000);
+  }
   next.seller_badges = pickStringArray(next.seller_badges, MAX_STORED_LABELS);
   next.promotion_labels = pickStringArray(next.promotion_labels, MAX_STORED_LABELS);
   next.review_snippets = compactReviewSnippets(next.review_snippets);

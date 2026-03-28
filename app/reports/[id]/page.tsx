@@ -1,10 +1,11 @@
-import DashboardShellFrame from "../../_ui/dashboard-shell-frame";
+import { permanentRedirect } from "next/navigation";
+import { getCanonicalReportRoute } from "@/lib/workspace-routes";
 
-export default async function ReportDetailPage({
+export default async function LegacyReportDetailRedirect({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <DashboardShellFrame initialView="report-detail" reportId={id} />;
+  permanentRedirect(getCanonicalReportRoute(id));
 }

@@ -1,5 +1,13 @@
-import MarketingShellFrame from "../_ui/marketing-shell-frame";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import AuthPanel from "../_ui/auth-panel";
 
-export default function RegisterPage() {
-  return <MarketingShellFrame initialView="register" />;
+export default async function RegisterPage() {
+  const session = await auth();
+
+  if (session?.user?.id) {
+    redirect("/dashboard");
+  }
+
+  return <AuthPanel mode="register" />;
 }

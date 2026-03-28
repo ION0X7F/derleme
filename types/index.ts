@@ -315,6 +315,7 @@ type ExtractedDataSummary = {
   original_price?: number | null;
   discount_rate?: number | null;
   image_count?: number;
+  description_text?: string | null;
   description_length?: number | null;
   rating_value?: number | null;
   rating_breakdown?: {

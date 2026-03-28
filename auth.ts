@@ -51,6 +51,7 @@ async function ensureOAuthUser(params: {
       id: true,
       email: true,
       name: true,
+      username: true,
       role: true,
     },
   });
@@ -115,6 +116,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           id: user.id,
           name: user.name,
           email: user.email,
+          username: user.username,
           role: user.role,
           plan: planCode,
         };
@@ -171,6 +173,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.plan = planCode;
         token.email = dbUser.email;
         token.name = dbUser.name ?? token.name;
+        token.username = dbUser.username ?? token.username;
         return token;
       }
 
@@ -179,6 +182,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id = user.id;
         token.role = (user as { role?: string }).role ?? "USER";
         token.plan = (user as { plan?: string }).plan ?? "FREE";
+        token.username = (user as { username?: string | null }).username ?? null;
         return token;
       }
 
@@ -192,6 +196,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.id = String(token.id ?? "");
         session.user.role = String(token.role ?? "USER");
         session.user.plan = String(token.plan ?? "FREE");
+        session.user.username =
+          token.username == null ? null : String(token.username);
       }
       return session;
     },

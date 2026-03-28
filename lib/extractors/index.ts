@@ -447,6 +447,7 @@ function normalizePlatformFields(
     ...fields,
     title: cleanText(fields.title),
     meta_description: cleanText(fields.meta_description),
+    description_text: cleanText(fields.description_text),
     h1: cleanText(fields.h1),
     raw_h1: cleanText(fields.raw_h1),
     resolved_primary_heading: cleanText(fields.resolved_primary_heading),
@@ -605,6 +606,10 @@ function mergeExtractedFields(params: {
     question_count: pickNumber(
       platformFields.question_count,
       basicFields.question_count
+    ),
+    description_text: pickString(
+      platformFields.description_text,
+      basicFields.description_text
     ),
     description_length: pickNumber(
       platformFields.description_length,

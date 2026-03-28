@@ -16,8 +16,8 @@ export function getAnalyzeActor(target: AnalyzeUsageTarget) {
     : `guest:${target.guestId}`;
 }
 
-export async function resolveGuestAnalyzeUsageContext() {
-  const guestId = await getOrCreateGuestId();
+export async function resolveGuestAnalyzeUsageContext(existingGuestId?: string) {
+  const guestId = existingGuestId || (await getOrCreateGuestId());
   const usageTarget: AnalyzeUsageTarget = { type: "guest", guestId };
   const usageWindow = await checkAnalyzeLimit({
     type: "guest",

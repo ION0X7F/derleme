@@ -1,5 +1,1 @@
-import { getAnalyzeUsageResponse } from "@/lib/usage-route-response";
-
-export async function GET() {
-  return getAnalyzeUsageResponse();
-}
+export { GET } from "../route";

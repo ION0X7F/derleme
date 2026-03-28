@@ -123,6 +123,8 @@ nav.solid{background:rgba(9,9,14,.9);backdrop-filter:blur(20px);border-color:var
 .reveal-footer strong{color:var(--text);}
 .analyze-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;}
 .ghost-note{font-size:12px;color:var(--dim);}
+.ghost-note.err{color:#ffb4b4;}
+.btn[disabled]{opacity:.6;cursor:not-allowed;}
 @keyframes pulseRing{0%{box-shadow:0 0 0 0 rgba(79,127,255,.45);}70%{box-shadow:0 0 0 12px rgba(79,127,255,0);}100%{box-shadow:0 0 0 0 rgba(79,127,255,0);}}
 .stats-bar{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
 .stats-inner{display:grid;grid-template-columns:repeat(4,1fr);}
@@ -253,55 +255,55 @@ nav.solid{background:rgba(9,9,14,.9);backdrop-filter:blur(20px);border-color:var
             </div>
             <div class="signal-panel">
               <h3>Bekleme degeri</h3>
-              <p class="ghost-note">Bu alan artik bos spinner degil. Analiz ilerledikce bulgular tek tek sahneye cikiyor ve kullanici gercek ilerlemeyi hissediyor.</p>
+              <p class="ghost-note" id="analyzeStageHint">Bu alan artik bos spinner degil. Analiz ilerledikce bulgular tek tek sahneye cikiyor ve kullanici gercek ilerlemeyi hissediyor.</p>
             </div>
           </div>
           <div class="analyze-feed">
             <article class="reveal-card" data-reveal-step="0">
               <div class="reveal-step"><span class="reveal-chip">01</span>URL cozumleme</div>
-              <h3>Sayfa izi yakalandi, kritik sinyaller ayrisiyor.</h3>
-              <p>Urun sayfasi tarandi; title, fiyat, seller ve teslimat izi ilk katmanda cikarildi. Bu adim kullaniciya analiz gercekten calisiyor hissini hemen verir.</p>
+              <h3 id="analyzeCard0Title">Sayfa izi yakalandi, kritik sinyaller ayrisiyor.</h3>
+              <p id="analyzeCard0Body">Urun sayfasi tarandi; title, fiyat, seller ve teslimat izi ilk katmanda cikarildi. Bu adim kullaniciya analiz gercekten calisiyor hissini hemen verir.</p>
               <div class="reveal-metrics">
-                <div class="reveal-metric"><div class="reveal-metric-label">Platform</div><div class="reveal-metric-value">Trendyol</div><div class="reveal-metric-note">Kategori algisi ve seller izi birlikte acildi.</div></div>
-                <div class="reveal-metric"><div class="reveal-metric-label">Fiyat izi</div><div class="reveal-metric-value">849 TL</div><div class="reveal-metric-note">Ilk fiyat konumu benchmark icin kuyruga alindi.</div></div>
-                <div class="reveal-metric"><div class="reveal-metric-label">Teslimat</div><div class="reveal-metric-value">2 Gun</div><div class="reveal-metric-note">Hiz avantaji tek basina yetmiyor olabilir.</div></div>
+                <div class="reveal-metric"><div class="reveal-metric-label" id="analyzeCard0Metric0Label">Platform</div><div class="reveal-metric-value" id="analyzeCard0Metric0Value">Trendyol</div><div class="reveal-metric-note" id="analyzeCard0Metric0Note">Kategori algisi ve seller izi birlikte acildi.</div></div>
+                <div class="reveal-metric"><div class="reveal-metric-label" id="analyzeCard0Metric1Label">Fiyat izi</div><div class="reveal-metric-value" id="analyzeCard0Metric1Value">849 TL</div><div class="reveal-metric-note" id="analyzeCard0Metric1Note">Ilk fiyat konumu benchmark icin kuyruga alindi.</div></div>
+                <div class="reveal-metric"><div class="reveal-metric-label" id="analyzeCard0Metric2Label">Teslimat</div><div class="reveal-metric-value" id="analyzeCard0Metric2Value">2 Gun</div><div class="reveal-metric-note" id="analyzeCard0Metric2Note">Hiz avantaji tek basina yetmiyor olabilir.</div></div>
               </div>
             </article>
             <article class="reveal-card" data-reveal-step="1">
               <div class="reveal-step"><span class="reveal-chip">02</span>Rekabet katmani</div>
-              <h3>Rakip baskisi, fiyatin anlattigindan daha fazla sey soyluyor.</h3>
-              <p>Rakipler sadece ucuz degil; daha net teklif, daha guvenli seller izi ve daha derli toplu sayfa deneyimi sunuyor. Bekleme aninda bu karsilastirmayi parcali gostermek kuvvetli bir akis yaratir.</p>
-              <div class="reveal-highlight"><div><strong>Rakip avantaji</strong><span>Teklif dili guclu ama algilanan deger desteklenmiyor. Kullanici burada fiyat degil, teklifin neden zayif kaldigini gorur.</span></div><div class="reveal-score">+18</div></div>
-              <div class="reveal-footer"><span>Rakip baskisi yukseliyor</span><strong>Kargo hizi tek basina savunma olamiyor</strong></div>
+              <h3 id="analyzeCard1Title">Rakip baskisi, fiyatin anlattigindan daha fazla sey soyluyor.</h3>
+              <p id="analyzeCard1Body">Rakipler sadece ucuz degil; daha net teklif, daha guvenli seller izi ve daha derli toplu sayfa deneyimi sunuyor. Bekleme aninda bu karsilastirmayi parcali gostermek kuvvetli bir akis yaratir.</p>
+              <div class="reveal-highlight"><div><strong id="analyzeCard1HighlightTitle">Rakip avantaji</strong><span id="analyzeCard1HighlightText">Teklif dili guclu ama algilanan deger desteklenmiyor. Kullanici burada fiyat degil, teklifin neden zayif kaldigini gorur.</span></div><div class="reveal-score" id="analyzeCard1Score">+18</div></div>
+              <div class="reveal-footer"><span id="analyzeCard1FooterLeft">Rakip baskisi yukseliyor</span><strong id="analyzeCard1FooterRight">Kargo hizi tek basina savunma olamiyor</strong></div>
             </article>
             <article class="reveal-card" data-reveal-step="2">
               <div class="reveal-step"><span class="reveal-chip">03</span>Guven ve yorum</div>
-              <h3>Guven katmaninda kirilganlik var; yorum sesi var ama ikna gucu daginik.</h3>
-              <p>Yorum adedi, seller izi ve son geri bildirim tonu birlikte okunuyor. Bu kart geldikce bekleme pasif degil, karar ureten bir akisa donusuyor.</p>
+              <h3 id="analyzeCard2Title">Guven katmaninda kirilganlik var; yorum sesi var ama ikna gucu daginik.</h3>
+              <p id="analyzeCard2Body">Yorum adedi, seller izi ve son geri bildirim tonu birlikte okunuyor. Bu kart geldikce bekleme pasif degil, karar ureten bir akisa donusuyor.</p>
               <div class="reveal-metrics">
-                <div class="reveal-metric"><div class="reveal-metric-label">Yildiz</div><div class="reveal-metric-value">4.4</div><div class="reveal-metric-note">Yeterli ama tek basina ikna etmiyor.</div></div>
-                <div class="reveal-metric"><div class="reveal-metric-label">Yorum hacmi</div><div class="reveal-metric-value">312</div><div class="reveal-metric-note">Hacim var, vurucu guven dili zayif.</div></div>
-                <div class="reveal-metric"><div class="reveal-metric-label">Seller izi</div><div class="reveal-metric-value">52/100</div><div class="reveal-metric-note">Resmi satici etkisi net tasinmiyor.</div></div>
+                <div class="reveal-metric"><div class="reveal-metric-label" id="analyzeCard2Metric0Label">Yildiz</div><div class="reveal-metric-value" id="analyzeCard2Metric0Value">4.4</div><div class="reveal-metric-note" id="analyzeCard2Metric0Note">Yeterli ama tek basina ikna etmiyor.</div></div>
+                <div class="reveal-metric"><div class="reveal-metric-label" id="analyzeCard2Metric1Label">Yorum hacmi</div><div class="reveal-metric-value" id="analyzeCard2Metric1Value">312</div><div class="reveal-metric-note" id="analyzeCard2Metric1Note">Hacim var, vurucu guven dili zayif.</div></div>
+                <div class="reveal-metric"><div class="reveal-metric-label" id="analyzeCard2Metric2Label">Seller izi</div><div class="reveal-metric-value" id="analyzeCard2Metric2Value">52/100</div><div class="reveal-metric-note" id="analyzeCard2Metric2Note">Resmi satici etkisi net tasinmiyor.</div></div>
               </div>
             </article>
             <article class="reveal-card" data-reveal-step="3">
               <div class="reveal-step"><span class="reveal-chip">04</span>Icerik taramasi</div>
-              <h3>Icerik guzel gorunmuyor; anlatim satisa donusen netlik uretmiyor.</h3>
-              <p>Baslik, gorsel derinligi, aciklama ve SSS izleri asama asama aciliyor. Her kart geldikce asagida yeni bir aha noktasi olusuyor ve kullanici kaymaya devam ediyor.</p>
-              <div class="reveal-highlight"><div><strong>Birincil sorun</strong><span>Baslik ve gorsel seti urunun farkini hizli anlatsa da, karar seviyesinde ayristirici bir netlik kuramiyor.</span></div><div class="reveal-score">61</div></div>
-              <div class="reveal-footer"><span>Icerik skoru sahneye cikti</span><strong>Ilk kazanilacak alan: baslik + gorsel hikayesi</strong></div>
+              <h3 id="analyzeCard3Title">Icerik guzel gorunmuyor; anlatim satisa donusen netlik uretmiyor.</h3>
+              <p id="analyzeCard3Body">Baslik, gorsel derinligi, aciklama ve SSS izleri asama asama aciliyor. Her kart geldikce asagida yeni bir aha noktasi olusuyor ve kullanici kaymaya devam ediyor.</p>
+              <div class="reveal-highlight"><div><strong id="analyzeCard3HighlightTitle">Birincil sorun</strong><span id="analyzeCard3HighlightText">Baslik ve gorsel seti urunun farkini hizli anlatsa da, karar seviyesinde ayristirici bir netlik kuramiyor.</span></div><div class="reveal-score" id="analyzeCard3Score">61</div></div>
+              <div class="reveal-footer"><span id="analyzeCard3FooterLeft">Icerik skoru sahneye cikti</span><strong id="analyzeCard3FooterRight">Ilk kazanilacak alan: baslik + gorsel hikayesi</strong></div>
             </article>
             <article class="reveal-card" data-reveal-step="4">
               <div class="reveal-step"><span class="reveal-chip">05</span>Aksiyon cikisi</div>
-              <h3>Rapor hazir: once neyin degisecegi artik gorunur durumda.</h3>
-              <p>Bekleme sonu sadece analiz tamamlandi demiyor; kullaniciya ilk 3 hamleyi ve olasi etki seviyesini gosteriyor. Burasi uzun beklemeyi sahneli bir final anina cevirir.</p>
+              <h3 id="analyzeCard4Title">Rapor hazir: once neyin degisecegi artik gorunur durumda.</h3>
+              <p id="analyzeCard4Body">Bekleme sonu sadece analiz tamamlandi demiyor; kullaniciya ilk 3 hamleyi ve olasi etki seviyesini gosteriyor. Burasi uzun beklemeyi sahneli bir final anina cevirir.</p>
               <div class="reveal-metrics">
-                <div class="reveal-metric"><div class="reveal-metric-label">Oncelik 1</div><div class="reveal-metric-value">Baslik</div><div class="reveal-metric-note">Arama niyeti ve teklif farki ayni satirda netlesmeli.</div></div>
-                <div class="reveal-metric"><div class="reveal-metric-label">Oncelik 2</div><div class="reveal-metric-value">Gorsel</div><div class="reveal-metric-note">Ilk 3 gorsel urun avantajini daha hizli vurmali.</div></div>
-                <div class="reveal-metric"><div class="reveal-metric-label">Oncelik 3</div><div class="reveal-metric-value">Guven</div><div class="reveal-metric-note">Yorumdan gelen ispat daha belirgin tasinmali.</div></div>
+                <div class="reveal-metric"><div class="reveal-metric-label" id="analyzeCard4Metric0Label">Oncelik 1</div><div class="reveal-metric-value" id="analyzeCard4Metric0Value">Baslik</div><div class="reveal-metric-note" id="analyzeCard4Metric0Note">Arama niyeti ve teklif farki ayni satirda netlesmeli.</div></div>
+                <div class="reveal-metric"><div class="reveal-metric-label" id="analyzeCard4Metric1Label">Oncelik 2</div><div class="reveal-metric-value" id="analyzeCard4Metric1Value">Gorsel</div><div class="reveal-metric-note" id="analyzeCard4Metric1Note">Ilk 3 gorsel urun avantajini daha hizli vurmali.</div></div>
+                <div class="reveal-metric"><div class="reveal-metric-label" id="analyzeCard4Metric2Label">Oncelik 3</div><div class="reveal-metric-value" id="analyzeCard4Metric2Value">Guven</div><div class="reveal-metric-note" id="analyzeCard4Metric2Note">Yorumdan gelen ispat daha belirgin tasinmali.</div></div>
               </div>
               <div class="analyze-actions">
-                <button class="btn btn-primary" onclick="goPage('report')">Demo raporu ac</button>
+                <button id="analyzeOpenReportButton" class="btn btn-primary" onclick="openAnalyzedReport()">Raporu ac</button>
                 <button class="btn btn-ghost" onclick="restartInlineAnalyze()">Akisi tekrar oynat</button>
               </div>
             </article>
@@ -327,15 +329,19 @@ Chart.defaults.color='#8a93ad';Chart.defaults.borderColor='rgba(255,255,255,0.06
 const brand='#4f7fff',brand2='#7c5cfc',accent='#00d4a8',warn='#f59e0b',danger='#ef4444',gc='rgba(255,255,255,0.06)',ci={};
 function dc(id){if(ci[id]){ci[id].destroy();delete ci[id];}}
 function ch(id,type,data,opts){dc(id);const ctx=document.getElementById(id);if(!ctx)return;ci[id]=new Chart(ctx,{type,data,options:{responsive:true,maintainAspectRatio:false,...opts}});}
-const INLINE_ANALYZE_STEPS=['Urun sayfasi okunuyor','Rakip baskisi cozuluyor','Guven sinyalleri ayrisiyor','Icerik netligi olculuyor','Aksiyon matrisi hazirlaniyor'];
+const INLINE_ANALYZE_STEPS=['URL dogrulaniyor','Sayfa verisi okunuyor','Rekabet katmani kuruluyor','Guven ve icerik cozuluyor','Aksiyonlar hazirlaniyor'];
 let inlineAnalyzeRun=0;
+let inlineAnalyzeTimers=[];
+let lastAnalyzedReportId=null;
+let lastAnalyzedUrl='';
+let inlineAnalyzePollTimer=null;
 function getMarketingRoute(id){
   const routeMap={home:'/',features:'/features',pricing:'/pricing',login:'/login',register:'/register',report:'/report-demo'};
   return routeMap[id] || '/';
 }
 function notifyParentMarketingNavigation(id){
   try{
-    const href=getMarketingRoute(id);
+    const href=typeof id==='string' && id.startsWith('/') ? id : getMarketingRoute(id);
     if(!href || window.top===window) return;
     window.parent.postMessage({type:'sellboost:navigate',href},window.location.origin);
   }catch{}
@@ -368,11 +374,18 @@ function resetInlineAnalyzeVisuals(url){
   const progressFill=document.getElementById('analyzeProgressFill');
   const progressText=document.getElementById('analyzeProgressText');
   const progressCount=document.getElementById('analyzeProgressCount');
+  const hint=document.getElementById('analyzeStageHint');
+  const openReportButton=document.getElementById('analyzeOpenReportButton');
   if(stage) stage.classList.add('active');
   if(urlLabel) urlLabel.textContent=url;
   if(progressFill) progressFill.style.width='0%';
   if(progressText) progressText.textContent='Tarama baslatiliyor';
   if(progressCount) progressCount.textContent='0 / 5';
+  if(hint){
+    hint.textContent='Gercek analiz baslatildi. Sinyaller geldikce asagiya tek tek dusuyor.';
+    hint.className='ghost-note';
+  }
+  if(openReportButton) openReportButton.textContent='Rapor hazirlaniyor';
   document.querySelectorAll('[data-reveal-step]').forEach(card=>card.classList.remove('active'));
   document.querySelectorAll('[data-signal-step]').forEach(item=>item.classList.remove('active'));
 }
@@ -387,38 +400,360 @@ function scrollToAnalyzeStage(){
   if(!stage) return;
   stage.scrollIntoView({behavior:'smooth',block:'start'});
 }
-function playInlineAnalyzeSequence(runId){
+function clearInlineAnalyzeTimers(){
+  inlineAnalyzeTimers.forEach(timer=>window.clearTimeout(timer));
+  inlineAnalyzeTimers=[];
+}
+function clearInlineAnalyzePollTimer(){
+  if(inlineAnalyzePollTimer){
+    window.clearTimeout(inlineAnalyzePollTimer);
+    inlineAnalyzePollTimer=null;
+  }
+}
+function scheduleInlineAnalyze(fn,delay){
+  const timer=window.setTimeout(fn,delay);
+  inlineAnalyzeTimers.push(timer);
+}
+function setAnalyzeProgress(step,label){
   const progressFill=document.getElementById('analyzeProgressFill');
   const progressText=document.getElementById('analyzeProgressText');
   const progressCount=document.getElementById('analyzeProgressCount');
-  INLINE_ANALYZE_STEPS.forEach((label,index)=>{
-    window.setTimeout(()=>{
-      if(runId!==inlineAnalyzeRun) return;
-      const step=index+1;
-      const percent=(step/INLINE_ANALYZE_STEPS.length)*100;
-      const card=document.querySelector(`[data-reveal-step="${index}"]`);
-      const signal=document.querySelector(`[data-signal-step="${index}"]`);
-      if(card) card.classList.add('active');
-      if(signal) signal.classList.add('active');
-      if(progressFill) progressFill.style.width=`${percent}%`;
-      if(progressText) progressText.textContent=label;
-      if(progressCount) progressCount.textContent=`${step} / ${INLINE_ANALYZE_STEPS.length}`;
-      if(index===INLINE_ANALYZE_STEPS.length-1 && progressText){
-        window.setTimeout(()=>{
-          if(runId!==inlineAnalyzeRun) return;
-          progressText.textContent='Rapor canli onizleme akisi tamamlandi';
-        },380);
+  const percent=(step/INLINE_ANALYZE_STEPS.length)*100;
+  if(progressFill) progressFill.style.width=`${percent}%`;
+  if(progressText) progressText.textContent=label;
+  if(progressCount) progressCount.textContent=`${step} / ${INLINE_ANALYZE_STEPS.length}`;
+}
+function setAnalyzeButtonLoading(loading){
+  const button=document.getElementById('heroAnalyzeButton');
+  if(!button) return;
+  button.disabled=loading;
+  button.textContent=loading?'Analiz Ediliyor...':'Analiz Et →';
+}
+function setSignalRow(index,data){
+  const row=document.querySelector(`[data-signal-step="${index}"]`);
+  if(!row) return;
+  const nameEl=row.querySelector('.signal-name');
+  const traceEl=row.querySelector('.signal-trace');
+  const valueEl=row.querySelector('.signal-value');
+  if(nameEl) nameEl.textContent=String(data.name||'');
+  if(traceEl){
+    traceEl.innerHTML='';
+    const ping=document.createElement('span');
+    ping.className='trace-ping';
+    traceEl.appendChild(ping);
+    traceEl.appendChild(document.createTextNode(String(data.trace||'')));
+  }
+  if(valueEl) valueEl.textContent=String(data.value||'');
+}
+function setRevealMetric(cardIndex,metricIndex,metric){
+  const labelEl=document.getElementById(`analyzeCard${cardIndex}Metric${metricIndex}Label`);
+  const valueEl=document.getElementById(`analyzeCard${cardIndex}Metric${metricIndex}Value`);
+  const noteEl=document.getElementById(`analyzeCard${cardIndex}Metric${metricIndex}Note`);
+  if(labelEl) labelEl.textContent=String(metric.label||'');
+  if(valueEl) valueEl.textContent=String(metric.value||'');
+  if(noteEl) noteEl.textContent=String(metric.note||'');
+}
+function setRevealCard(index,data){
+  const titleEl=document.getElementById(`analyzeCard${index}Title`);
+  const bodyEl=document.getElementById(`analyzeCard${index}Body`);
+  if(titleEl) titleEl.textContent=String(data.title||'');
+  if(bodyEl) bodyEl.textContent=String(data.body||'');
+  if(Array.isArray(data.metrics)){
+    data.metrics.slice(0,3).forEach((metric,metricIndex)=>setRevealMetric(index,metricIndex,metric));
+  }
+  const highlightTitleEl=document.getElementById(`analyzeCard${index}HighlightTitle`);
+  const highlightTextEl=document.getElementById(`analyzeCard${index}HighlightText`);
+  const highlightScoreEl=document.getElementById(`analyzeCard${index}Score`);
+  if(highlightTitleEl && typeof data.highlightTitle==='string') highlightTitleEl.textContent=data.highlightTitle;
+  if(highlightTextEl && typeof data.highlightText==='string') highlightTextEl.textContent=data.highlightText;
+  if(highlightScoreEl && data.highlightScore!=null) highlightScoreEl.textContent=String(data.highlightScore);
+  const footerLeftEl=document.getElementById(`analyzeCard${index}FooterLeft`);
+  const footerRightEl=document.getElementById(`analyzeCard${index}FooterRight`);
+  if(footerLeftEl && typeof data.footerLeft==='string') footerLeftEl.textContent=data.footerLeft;
+  if(footerRightEl && typeof data.footerRight==='string') footerRightEl.textContent=data.footerRight;
+}
+function revealAnalyzeStep(runId,index,stepData){
+  if(runId!==inlineAnalyzeRun) return;
+  setSignalRow(index,stepData.signal || {});
+  setRevealCard(index,stepData.card || {});
+  const card=document.querySelector(`[data-reveal-step="${index}"]`);
+  const signal=document.querySelector(`[data-signal-step="${index}"]`);
+  if(card) card.classList.add('active');
+  if(signal) signal.classList.add('active');
+  setAnalyzeProgress(index+1,stepData.progressLabel || INLINE_ANALYZE_STEPS[index] || 'Analiz ilerliyor');
+}
+function buildLiveAnalyzeSteps(payload){
+  const result=payload?.result || {};
+  const extracted=result.extractedData || {};
+  const trace=result.analysisTrace || {};
+  const signals=Array.isArray(trace.topSignals)?trace.topSignals:[];
+  const price=typeof extracted.normalized_price==='number'?`${Math.round(extracted.normalized_price).toLocaleString('tr-TR')} TL`:'—';
+  const shipping=typeof extracted.shipping_days==='number'?`${extracted.shipping_days} gun`:(String(extracted.delivery_type||'').trim()||'Belirsiz');
+  const sellerScore=typeof extracted.seller_score==='number'?`${Number(extracted.seller_score).toFixed(1)}/10`:'—';
+  const reviewCount=typeof extracted.review_count==='number'?String(extracted.review_count):'—';
+  const ratingValue=typeof extracted.rating_value==='number' && extracted.rating_value>0?Number(extracted.rating_value).toFixed(1):'—';
+  const descriptionLength=typeof extracted.description_length==='number'?`${extracted.description_length} karakter`:'Gorunur degil';
+  const imageCount=typeof extracted.image_count==='number'?String(extracted.image_count):'—';
+  const hasSpecs=extracted.has_specs===true;
+  const actions=Array.isArray(result.priorityActions)?result.priorityActions:[];
+  const overallScore=typeof result.overallScore==='number'?String(result.overallScore):'—';
+  const seoScore=typeof result.seoScore==='number'?String(result.seoScore):'—';
+  const dataSource=String(result.dataSource || 'Gercek Veri');
+  const category=String(result.category || extracted.category || 'Kategori sinyali sinirli');
+  const priceCompetitiveness=String(result.priceCompetitiveness || 'Belirsiz');
+  const firstSignal=signals[0]?.detail || 'Ilk sinyaller ayrisiyor.';
+  const secondSignal=signals[1]?.detail || 'Rekabet katmani okunuyor.';
+  const summaryText=String(result.summary || '').trim();
+  return [
+    {
+      progressLabel:'URL dogrulandi, temel veri okunuyor',
+      signal:{name:'Sayfa tarandi',trace:`${String(extracted.platform || 'Trendyol')} HTML + metadata okundu`,value:dataSource},
+      card:{
+        title:'Sayfa izi yakalandi, kritik sinyaller ayrisiyor.',
+        body:firstSignal,
+        metrics:[
+          {label:'Platform',value:String(extracted.platform || 'Trendyol'),note:category},
+          {label:'Fiyat izi',value:price,note:`Veri kaynagi: ${dataSource}`},
+          {label:'Teslimat',value:shipping,note:'Ilk operasyon izi tarandi.'},
+        ],
+      },
+    },
+    {
+      progressLabel:'Rekabet katmani ve teklif farki okunuyor',
+      signal:{name:'Rekabet basinci',trace:'Rakip fiyat + teklif sinyalleri ayrildi',value:priceCompetitiveness},
+      card:{
+        title:'Rakip baskisi, teklifin gercek gucunu ortaya cikariyor.',
+        body:secondSignal,
+        highlightTitle:'Teklif durumu',
+        highlightText:`Mevcut fiyat, kampanya ve teslimat sinyalleri ${priceCompetitiveness.toLocaleLowerCase('tr-TR')} olarak yorumlandi.`,
+        highlightScore:typeof result.conversionScore==='number'?result.conversionScore:'+',
+        footerLeft:'Fiyat katmani guncellendi',
+        footerRight:typeof extracted.other_sellers_count==='number' ? `${extracted.other_sellers_count} diger satici gorundu` : 'Rakip verisi sinirli',
+      },
+    },
+    {
+      progressLabel:'Guven katmani ve yorum sinyalleri isleniyor',
+      signal:{name:'Guven sinyali',trace:'Yorum + satici izi toparlandi',value:sellerScore},
+      card:{
+        title:'Guven katmani urunun ikna esigini gostermeye basladi.',
+        body:'Yorum hacmi, puan, resmi satici ve iade sinyali birlikte okundu.',
+        metrics:[
+          {label:'Yildiz',value:ratingValue,note:'Urun puani sinyali'},
+          {label:'Yorum hacmi',value:reviewCount,note:'Sosyal kanit seviyesi'},
+          {label:'Seller izi',value:sellerScore,note:extracted.official_seller===true?'Resmi satici sinyali var':'Resmi satici sinyali zayif'},
+        ],
+      },
+    },
+    {
+      progressLabel:'Icerik ve SEO netligi cozuluyor',
+      signal:{name:'Icerik yeterliligi',trace:'Baslik, gorsel ve aciklama tarandi',value:typeof result.seoScore==='number'?`${result.seoScore}/100`:'Hazirlaniyor'},
+      card:{
+        title:'Icerik katmani artik gercek veriyle okunuyor.',
+        body:summaryText || 'Aciklama, gorsel ve teknik alan sinyalleri birlikte degerlendirildi.',
+        highlightTitle:'Icerik ozeti',
+        highlightText:`Aciklama ${descriptionLength}, gorsel sayisi ${imageCount}, teknik alan ${hasSpecs?'mevcut':'zayif'} gorunuyor.`,
+        highlightScore:seoScore,
+        footerLeft:'SEO ve listing sinyalleri geldi',
+        footerRight:'Baslik + aciklama + gorsel birlikte yorumlandi',
+      },
+    },
+    {
+      progressLabel:'Aksiyonlar hazirlandi',
+      signal:{name:'Aksiyon matrisi',trace:'Oncelik listesi olustu',value:'Hazir'},
+      card:{
+        title:'Rapor hazir: once neyin degisecegi artik gorunur durumda.',
+        body:'Gercek analiz tamamlandi. Oncelikli aksiyonlar artik bu URL icin veriyle uretildi.',
+        metrics:[
+          {label:'Genel skor',value:overallScore,note:'Genel performans puani'},
+          {label:'SEO skoru',value:seoScore,note:'Icerik ve listing etkisi'},
+          {label:'Oncelik 1',value:String(actions[0]?.title || 'Aksiyon yok'),note:String(actions[0]?.detail || 'Oncelikli aksiyon uretilemedi')},
+        ],
+      },
+    },
+  ];
+}
+function playInlineAnalyzeSequence(runId,steps){
+  clearInlineAnalyzeTimers();
+  steps.forEach((stepData,index)=>{
+    scheduleInlineAnalyze(()=>{
+      revealAnalyzeStep(runId,index,stepData);
+      if(index===steps.length-1){
+        const progressText=document.getElementById('analyzeProgressText');
+        const hint=document.getElementById('analyzeStageHint');
+        const openReportButton=document.getElementById('analyzeOpenReportButton');
+        if(progressText) progressText.textContent='Gercek veriyle rapor onizlemesi tamamlandi';
+        if(hint){
+          hint.textContent='Analiz tamamlandi. Asagidaki kartlar bu URL icin gercek ciktilarla dolduruldu.';
+          hint.className='ghost-note';
+        }
+        if(openReportButton) openReportButton.textContent=lastAnalyzedReportId?'Canli raporu ac':'Raporu ac';
       }
-    },index*850);
+    },index*620);
   });
+}
+function setAnalyzeError(message){
+  clearInlineAnalyzePollTimer();
+  const hint=document.getElementById('analyzeStageHint');
+  const progressText=document.getElementById('analyzeProgressText');
+  if(hint){
+    hint.textContent=message;
+    hint.className='ghost-note err';
+  }
+  if(progressText) progressText.textContent='Analiz tamamlanamadi';
+  setAnalyzeButtonLoading(false);
+}
+function applyAnalyzeJobProgress(runId,payload){
+  if(runId!==inlineAnalyzeRun || !payload?.progress) return;
+  const progress=payload.progress;
+  const stage=String(progress.stage || '');
+  const preview=progress.preview && typeof progress.preview==='object' ? progress.preview : {};
+  const stepMap={fetch:0,extract:1,reviews:2,deterministic:3,ai:4,finalize:4,completed:4};
+  const signalIndex=Object.prototype.hasOwnProperty.call(stepMap,stage)?stepMap[stage]:0;
+  const signalDataByStage={
+    fetch:{
+      name:'Sayfa tarandi',
+      trace:String(progress.detail || 'HTML ve platform verisi okunuyor'),
+      value:'Calisiyor',
+    },
+    extract:{
+      name:'Temel veri cikti',
+      trace:String(progress.detail || 'Fiyat, gorsel ve seller sinyalleri bulundu'),
+      value:preview.platform || preview.category || 'Hazir',
+    },
+    reviews:{
+      name:'Guven sinyali',
+      trace:String(progress.detail || 'Yorum ve satici verileri isleniyor'),
+      value:preview.sellerName || 'Cozuluyor',
+    },
+    deterministic:{
+      name:'Skor hesabi',
+      trace:String(progress.detail || 'Deterministik skorlar hesaplandi'),
+      value:preview.overallScore!=null?String(preview.overallScore):'Hazir',
+    },
+    ai:{
+      name:'AI yorumu',
+      trace:String(progress.detail || 'Aksiyon dili olusturuluyor'),
+      value:preview.mode || 'Calisiyor',
+    },
+    finalize:{
+      name:'Aksiyon matrisi',
+      trace:String(progress.detail || 'Rapor kapanis verileri hazirlaniyor'),
+      value:preview.overallScore!=null?`${preview.overallScore}/100`:'Hazir',
+    },
+    completed:{
+      name:'Aksiyon matrisi',
+      trace:String(progress.detail || 'Rapor hazir'),
+      value:'Hazir',
+    },
+  };
+  setAnalyzeProgress(Number(progress.step||0),String(progress.label || 'Analiz ilerliyor'));
+  setSignalRow(signalIndex,signalDataByStage[stage] || signalDataByStage.fetch);
+  const signal=document.querySelector(`[data-signal-step="${signalIndex}"]`);
+  if(signal) signal.classList.add('active');
+  const hint=document.getElementById('analyzeStageHint');
+  if(hint && progress.detail){
+    hint.textContent=String(progress.detail);
+    hint.className='ghost-note';
+  }
+}
+function pollAnalyzeJob(runId,jobId){
+  clearInlineAnalyzePollTimer();
+  window.fetch(`/api/analyze/jobs/${encodeURIComponent(jobId)}`,{
+    method:'GET',
+    headers:{'Content-Type':'application/json'},
+    cache:'no-store',
+  })
+    .then(async(res)=>{
+      const payload=await res.json().catch(()=>null);
+      if(runId!==inlineAnalyzeRun) return;
+      if(!res.ok || !payload){
+        throw new Error(payload?.message || 'Analiz durumu alinamadi');
+      }
+      if(payload.status==='completed' && payload.result){
+        clearInlineAnalyzePollTimer();
+        lastAnalyzedReportId=typeof payload.reportId==='string' && payload.reportId.trim()?payload.reportId:null;
+        const urlLabel=document.getElementById('analyzeStageUrl');
+        if(urlLabel) urlLabel.textContent=String(payload?.result?.url || lastAnalyzedUrl || getAnalyzeInputValue());
+        playInlineAnalyzeSequence(runId,buildLiveAnalyzeSteps(payload));
+        setAnalyzeButtonLoading(false);
+        return;
+      }
+      if(payload.status==='failed'){
+        throw new Error(payload?.message || 'Analiz tamamlanamadi');
+      }
+      applyAnalyzeJobProgress(runId,payload);
+      inlineAnalyzePollTimer=window.setTimeout(()=>pollAnalyzeJob(runId,jobId),1500);
+    })
+    .catch((error)=>{
+      if(runId!==inlineAnalyzeRun) return;
+      setAnalyzeError(error instanceof Error ? error.message : 'Analiz sirasinda hata olustu');
+    });
+}
+function openAnalyzedReport(){
+  if(lastAnalyzedReportId){
+    notifyParentMarketingNavigation(`/report/${lastAnalyzedReportId}`);
+    if(window.top===window) window.location.href=`/report/${lastAnalyzedReportId}`;
+    return;
+  }
+  const fallbackUrl=lastAnalyzedUrl || getAnalyzeInputValue();
+  const normalized=/^https?:\/\//i.test(fallbackUrl)?fallbackUrl:`https://${fallbackUrl}`;
+  const href=`/analyze?url=${encodeURIComponent(normalized)}&autorun=1`;
+  notifyParentMarketingNavigation(href);
+  if(window.top===window) window.location.href=href;
 }
 function startInlineAnalyze(){
   const url=getAnalyzeInputValue();
+  const button=document.getElementById('heroAnalyzeButton');
+  if(button && button.disabled) return;
   inlineAnalyzeRun+=1;
   const runId=inlineAnalyzeRun;
+  lastAnalyzedReportId=null;
+  lastAnalyzedUrl=/^https?:\/\//i.test(url)?url:`https://${url}`;
   resetInlineAnalyzeVisuals(url);
+  clearInlineAnalyzeTimers();
+  clearInlineAnalyzePollTimer();
+  setAnalyzeButtonLoading(true);
   window.setTimeout(scrollToAnalyzeStage,90);
-  playInlineAnalyzeSequence(runId);
+  revealAnalyzeStep(runId,0,{
+    progressLabel:'URL dogrulandi, analiz baslatiliyor',
+    signal:{name:'URL dogrulama',trace:'Platform ve link formati kontrol edildi',value:'Hazir'},
+    card:{
+      title:'Analiz istegi gonderildi, gercek veri bekleniyor.',
+      body:'URL alindi. Sistem bu urun icin sayfa, fiyat, satici ve rekabet sinyallerini topluyor.',
+      metrics:[
+        {label:'Platform',value:'Trendyol',note:'Link dogrulama tamamlandi'},
+        {label:'Analiz modu',value:'Gercek',note:'Mock yerine API cagrisi yapiliyor'},
+        {label:'Durum',value:'Basladi',note:'Sonuclar geldikce asagi acilacak'},
+      ],
+    },
+  });
+  window.fetch('/api/analyze/jobs',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({url:lastAnalyzedUrl}),
+  })
+    .then(async(res)=>{
+      const payload=await res.json().catch(()=>null);
+      if(runId!==inlineAnalyzeRun) return;
+      if(!res.ok || !payload?.jobId){
+        throw new Error(payload?.message || 'Analiz baslatilamadi');
+      }
+      applyAnalyzeJobProgress(runId,{
+        progress:{
+          stage:'queued',
+          step:1,
+          totalSteps:6,
+          label:'Analiz kuyruga alindi',
+          detail:'Sunucuda gercek analiz isi baslatildi.',
+          preview:null,
+        },
+      });
+      pollAnalyzeJob(runId,String(payload.jobId));
+    })
+    .catch((error)=>{
+      if(runId!==inlineAnalyzeRun) return;
+      setAnalyzeError(error instanceof Error ? error.message : 'Analiz sirasinda hata olustu');
+    });
 }
 function restartInlineAnalyze(){
   startInlineAnalyze();

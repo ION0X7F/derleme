@@ -79,10 +79,10 @@ const SKIP_GUIDANCE: AiGuidance = {
 
 const CAUTIOUS_GUIDANCE: AiGuidance = {
   preferDeterministicSummary: true,
-  allowNarrativeExpansion: false,
-  allowStrengthWeaknessRewrite: false,
+  allowNarrativeExpansion: true,
+  allowStrengthWeaknessRewrite: true,
   allowScoreOverrides: false,
-  maxSuggestions: 3,
+  maxSuggestions: 12,
   coverageConfidence: "medium",
 };
 
@@ -91,7 +91,7 @@ const FULL_GUIDANCE: AiGuidance = {
   allowNarrativeExpansion: true,
   allowStrengthWeaknessRewrite: true,
   allowScoreOverrides: true,
-  maxSuggestions: 10,
+  maxSuggestions: 24,
   coverageConfidence: "high",
 };
 

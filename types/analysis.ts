@@ -755,6 +755,7 @@ export type DecisionSupportPacket = {
     top_negative_review_hits: ReviewThemeHit[] | null;
     review_analysis?: ReviewAnalysis | null;
     question_count: number | null;
+    description_text?: string | null;
     description_length: number | null;
     bullet_point_count: number | null;
     has_add_to_cart: boolean;
@@ -836,6 +837,7 @@ export type ExtractedProductFields = {
   review_analysis?: ReviewAnalysis | null;
   question_count: number | null;
 
+  description_text?: string | null;
   description_length: number | null;
   bullet_point_count: number | null;
 

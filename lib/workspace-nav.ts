@@ -1,3 +1,5 @@
+import { getCanonicalReportRoute, WORKSPACE_ROUTES } from "@/lib/workspace-routes";
+
 type NavItem = {
   href: string;
   label: string;
@@ -8,14 +10,14 @@ export function getWorkspaceNav(params?: {
   reportId?: string | null;
 }): NavItem[] {
   const items: NavItem[] = [
-    { href: "/dashboard", label: "Dashboard" },
-    { href: "/analyze", label: "Yeni Analiz" },
-    { href: "/reports", label: "Raporlar" },
-    { href: "/account", label: "Hesap" },
+    { href: WORKSPACE_ROUTES.dashboard, label: "Dashboard" },
+    { href: WORKSPACE_ROUTES.analyze, label: "Yeni Analiz" },
+    { href: WORKSPACE_ROUTES.reports, label: "Raporlar" },
+    { href: WORKSPACE_ROUTES.account, label: "Hesap" },
   ];
 
   if (params?.reportId) {
-    items.push({ href: `/report/${params.reportId}`, label: "Rapor" });
+    items.push({ href: getCanonicalReportRoute(params.reportId), label: "Rapor" });
   }
 
   if (params?.includeAdmin) {

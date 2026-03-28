@@ -29,6 +29,8 @@ const REPORT_LIST_EXTRACTED_DATA_KEYS = [
   "h1",
   "product_title",
   "name",
+  "primary_image",
+  "images",
   "has_free_shipping",
   "has_return_info",
   "has_shipping_info",
@@ -73,8 +75,8 @@ function getPlanLimits(plan: "guest" | "free" | "pro" | "enterprise") {
   }
 
   return {
-    maxSuggestions: 10,
-    maxPriorityActions: 10,
+    maxSuggestions: 24,
+    maxPriorityActions: 24,
   };
 }
 

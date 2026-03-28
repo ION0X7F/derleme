@@ -54,17 +54,17 @@ export function buildAnalysisAccessState(plan: AccessPlan): AnalysisAccessState 
       plan: "pro",
       lockedSections: [],
       teaserSections: [],
-      maxFindings: 10,
-      maxSuggestions: 10,
-      maxPriorityActions: 10,
+      maxFindings: 18,
+      maxSuggestions: 24,
+      maxPriorityActions: 24,
     },
     enterprise: {
       plan: "enterprise",
       lockedSections: [],
       teaserSections: [],
-      maxFindings: 10,
-      maxSuggestions: 10,
-      maxPriorityActions: 10,
+      maxFindings: 24,
+      maxSuggestions: 24,
+      maxPriorityActions: 24,
     },
   };
 

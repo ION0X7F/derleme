@@ -68,6 +68,7 @@ function normalizeFields(
     title: cleanText(fields.title),
     meta_description: cleanText(fields.meta_description),
     meta_description_source: cleanText(fields.meta_description_source),
+    description_text: cleanText(fields.description_text),
     h1: cleanText(fields.h1),
     raw_h1: cleanText(fields.raw_h1),
     resolved_primary_heading: cleanText(fields.resolved_primary_heading),

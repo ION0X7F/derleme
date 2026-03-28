@@ -247,12 +247,25 @@ function createDataFieldFromMetadata<T>(
     (resolvedSource === "html-scrape" || resolvedSource === "unknown")
       ? 0.12
       : 0;
+  const questionCountCap =
+    fieldName === "question_count" &&
+    (resolvedSource === "derived" ||
+      resolvedSource === "html-scrape" ||
+      resolvedSource === "unknown")
+      ? 0.45
+      : 1;
 
   return {
     value,
     source: resolvedSource,
     confidence: clampConfidence(
-      confidence * fieldFactor - fallbackPenalty - derivationPenalty - conservativePenalty
+      Math.min(
+        confidence * fieldFactor -
+          fallbackPenalty -
+          derivationPenalty -
+          conservativePenalty,
+        questionCountCap
+      )
     ),
     reason:
       fieldMeta.extractionReason ||

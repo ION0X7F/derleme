@@ -118,6 +118,11 @@ type AiReviewerResult = {
   fixSuggestions: string[];
 };
 
+const MAX_AI_STRENGTHS = 8;
+const MAX_AI_WEAKNESSES = 10;
+const MAX_AI_SUGGESTIONS = 24;
+const MAX_AI_SUMMARY_PARAGRAPHS = 7;
+
 type AiBaselineContext = {
   summary?: string | null;
   strengths?: string[] | null;
@@ -447,19 +452,7 @@ function ensureStructuredSummary(params: {
     ? fallbackNormalized
     : normalized;
 
-  const blockedTerms = [
-    /\bdemand\b/gi,
-    /\bcapture\b/gi,
-    /\bsocial proof\b/gi,
-    /\bbottleneck\b/gi,
-    /\bconversion\b/gi,
-    /\bmomentum\b/gi,
-  ];
-
   let safe = candidate;
-  for (const pattern of blockedTerms) {
-    safe = safe.replace(pattern, "");
-  }
 
   safe = safe
     .replace(/\[(KRITIK TESHIS|VERI CARPISTIRMA|STRATEJIK RECETE|SISTEM OGRENISI)\]:?/gi, "")
@@ -483,7 +476,7 @@ function ensureStructuredSummary(params: {
   for (const item of sourceParagraphs) {
     if (!item) continue;
     paragraphs.push(item);
-    if (paragraphs.length >= 5) break;
+    if (paragraphs.length >= MAX_AI_SUMMARY_PARAGRAPHS) break;
   }
 
   if (paragraphs.length < 3) {
@@ -499,7 +492,7 @@ function ensureStructuredSummary(params: {
   }
 
   return paragraphs
-    .slice(0, Math.min(5, Math.max(3, paragraphs.length)))
+    .slice(0, Math.min(MAX_AI_SUMMARY_PARAGRAPHS, Math.max(3, paragraphs.length)))
     .join("\n\n");
 }
 
@@ -954,15 +947,17 @@ function alignSummaryWithMarket(params: {
 
   const mustRebuild =
     paragraphs.length < 3 ||
-    paragraphs.length > 5 ||
+    paragraphs.length > MAX_AI_SUMMARY_PARAGRAPHS ||
     contradiction ||
     !/pazar|magaza|rakip/.test(contradictionText) ||
     !/buyume|firsat/.test(contradictionText);
 
-  if (!mustRebuild) return paragraphs.slice(0, 5).join("\n\n");
+  if (!mustRebuild) {
+    return paragraphs.slice(0, MAX_AI_SUMMARY_PARAGRAPHS).join("\n\n");
+  }
 
   const rebuilt = buildAlignedParagraphs(params.input, confidence);
-  const limit = params.eligibility.level === "medium" ? 4 : 5;
+  const limit = params.eligibility.level === "medium" ? 5 : MAX_AI_SUMMARY_PARAGRAPHS;
   return rebuilt.slice(0, limit).join("\n\n");
 }
 
@@ -1020,20 +1015,22 @@ ${dataQualitySummary}
 ${confidenceWarning}
 
 CIKTI KURALLARI:
-1) summary tam 3 ila 5 kisa paragraf olsun.
+1) summary 3 ila 7 paragraf olabilir; veri yogunsa daha kapsamli, veri zayifsa daha kisa yaz.
 2) summary icinde baslik, madde imi veya sabit etiket kullanma.
 3) Paragraf sirasini koru:
    - 1. paragraf: genel durum (urun ne durumda)
    - 2. paragraf: diger magazalara gore durum + buyume firsati
    - 3. paragraf: en olasi baski alanlari (fiyat avantaji, musteri guveni, sayfa gucu vb.)
-   - 4. paragraf: oncelikli yapilacaklar (gerekiyorsa)
+   - 4. paragraf: oncelikli yapilacaklar
+   - 5. paragraf ve sonrasi: ek sinyaller, belirsizlikler, veri celiskileri, dikkat notlari
 4) Urun satis aliyor olabilecek bir seviyedeyse negatif acilis yapma.
-5) Teknik jargon, hikaye anlatimi ve pazarlama dili kullanma.
-6) Su kelimeleri kullanma: demand, capture, social proof, bottleneck, conversion, momentum.
-7) Su sade ifadeleri tercih et: urune ilgi, satis durumu, musteri guveni, diger magazalara gore durum, fiyat avantaji, sayfa gucu, buyume firsati, en buyuk engel.
-8) Veri zayifsa daha kisa ve daha temkinli yaz; kesin iddialardan kacinin.
-9) strengths en fazla 4, weaknesses en fazla 5, suggestions en fazla 10 olsun.
-10) weaknesses ve suggestions ogelerinde depends_on alanini doldur.
+5) Yorumu daha serbest yapabilirsin ama her iddian gozlenen veriye bagli olsun; veri yoksa bunu acikca soyle.
+6) Teknik jargon kullanabilirsin ancak aciklayici ol; sloganik veya sisirilmis pazarlama dili kullanma.
+7) Veri guclu ve zayif alanlari ayni anda acikca soyle; tek tarafa yaslanma.
+8) Eksik alanlari, belirsizlikleri ve tahmin olan kisimlari gizleme; seffafca belirt.
+9) Az sonuc vermek zorunda degilsin; veri destekliyorsa daha fazla bulgu ve aksiyon uret.
+10) strengths en fazla ${MAX_AI_STRENGTHS}, weaknesses en fazla ${MAX_AI_WEAKNESSES}, suggestions en fazla ${MAX_AI_SUGGESTIONS} olabilir.
+11) weaknesses ve suggestions ogelerinde depends_on alanini doldur.
 
 Veri:
 ${JSON.stringify(payload)}
@@ -1219,7 +1216,7 @@ function sanitizeWeaknesses(value: unknown) {
         depends_on: SupportedDependency[];
       } => item !== null
     )
-    .slice(0, 10);
+    .slice(0, MAX_AI_WEAKNESSES);
 }
 
 function sanitizeSuggestions(value: unknown) {
@@ -1252,7 +1249,7 @@ function sanitizeSuggestions(value: unknown) {
       };
     })
     .filter((item): item is AiSuggestionItem => item !== null)
-    .slice(0, 5);
+    .slice(0, MAX_AI_SUGGESTIONS);
 }
 
 function sanitizeAiResult(raw: unknown): RawAiAnalysisResult | null {
@@ -1261,7 +1258,7 @@ function sanitizeAiResult(raw: unknown): RawAiAnalysisResult | null {
   const record = raw as Record<string, unknown>;
   const summary =
     typeof record.summary === "string" ? record.summary.trim() : "";
-  const strengths = asStringArray(record.strengths, 4);
+  const strengths = asStringArray(record.strengths, MAX_AI_STRENGTHS);
   const weaknesses = sanitizeWeaknesses(record.weaknesses);
   const suggestions = sanitizeSuggestions(record.suggestions);
   const seo_score = scoreToRange(record.seo_score);
@@ -1894,7 +1891,7 @@ function buildStrategicSections(params: {
   }
 
   const recipeLines = suggestions
-    .slice(0, 3)
+    .slice(0, 6)
     .map((item, index) => `${index + 1}. ${item.title}: ${item.detail}`);
 
   while (recipeLines.length < 3) {
@@ -1923,9 +1920,9 @@ function buildStrategicSections(params: {
 
   return {
     summary,
-    strengths: strengths.slice(0, 4),
-    weaknesses: weaknesses.slice(0, 5),
-    suggestions: suggestions.slice(0, 5),
+    strengths: strengths.slice(0, MAX_AI_STRENGTHS),
+    weaknesses: weaknesses.slice(0, MAX_AI_WEAKNESSES),
+    suggestions: suggestions.slice(0, MAX_AI_SUGGESTIONS),
   };
 }
 
@@ -1976,14 +1973,14 @@ function buildDeterministicFallback(params: {
     summary,
     strengths: dedupeStrings(
       [...strategic.strengths, ...(params.baseline?.strengths ?? [])],
-      4
+      MAX_AI_STRENGTHS
     ),
     weaknesses: dedupeStrings(
       [
         ...strategic.weaknesses.map((item) => item.text),
         ...(params.baseline?.weaknesses ?? []),
       ],
-      5
+      MAX_AI_WEAKNESSES
     ),
     suggestions,
     seo_score:

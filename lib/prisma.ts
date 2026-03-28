@@ -11,7 +11,14 @@ const globalForPrisma = globalThis as unknown as {
 const databaseUrl = getRequiredDatabaseUrl();
 const adapter = createPrismaAdapter(databaseUrl);
 
-const prismaClient = globalForPrisma.prisma ?? new PrismaClient({ adapter });
+const needsFreshClient =
+  !!globalForPrisma.prisma &&
+  !("analyzeJob" in (globalForPrisma.prisma as PrismaClient & Record<string, unknown>));
+
+const prismaClient =
+  !globalForPrisma.prisma || needsFreshClient
+    ? new PrismaClient({ adapter })
+    : globalForPrisma.prisma;
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prismaClient;

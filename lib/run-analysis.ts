@@ -20,6 +20,7 @@ import { isAiAnalysisEligible } from "@/lib/ai-eligibility";
 import { createDebugTrace, emitDebugTrace, traceEvent } from "@/lib/debug-observability";
 import { getLearningContext } from "@/lib/learning-engine";
 import { fetchTrendyolReviewAnalysis } from "@/lib/trendyol-review-analysis";
+import { isTrendyolFreeShippingEligible } from "@/lib/trendyol-shipping";
 import { enrichTrendyolScorecardWithAi } from "@/lib/trendyol-scorecard";
 import {
   completeMissingFieldsWithMetadata,
@@ -56,6 +57,19 @@ type RunAnalysisPipelineParams = {
   planContext?: AccessPlan;
   learningSourceType?: "real" | "synthetic";
   includeSyntheticLearning?: boolean;
+  onProgress?: (update: {
+    stage:
+      | "fetch"
+      | "extract"
+      | "reviews"
+      | "deterministic"
+      | "ai";
+    step: number;
+    totalSteps: number;
+    label: string;
+    detail?: string;
+    preview?: Record<string, unknown> | null;
+  }) => void;
 };
 
 const PYTHON_BACKFILL_FIELDS: Array<keyof import("@/types/analysis").ExtractedProductFields> = [
@@ -250,6 +264,11 @@ const CRITICAL_FIELDS = [
 export async function runAnalysisPipeline(
   params: RunAnalysisPipelineParams
 ): Promise<AnalysisPipelineResult> {
+  const emitProgress = (update: NonNullable<RunAnalysisPipelineParams["onProgress"]> extends (arg: infer T) => void ? T : never) => {
+    if (params.onProgress) {
+      params.onProgress(update);
+    }
+  };
   const pipelineStartedAt = Date.now();
   const isTrendyol = params.url.toLocaleLowerCase("tr-TR").includes("trendyol.com");
   const debugTrace = createDebugTrace({
@@ -275,6 +294,15 @@ export async function runAnalysisPipeline(
     : Promise.resolve(null);
 
   let trendyolApiData: Awaited<ReturnType<typeof fetchTrendyolApi>> = null;
+
+  emitProgress({
+    stage: "fetch",
+    step: 1,
+    totalSteps: 6,
+    label: "Sayfa verisi toplanıyor",
+    detail: "HTML ve Trendyol kaynaklari ayni anda okunuyor.",
+    preview: null,
+  });
 
   try {
     [html, trendyolApiData] = await Promise.all([htmlPromise, trendyolApiPromise]);
@@ -394,6 +422,16 @@ export async function runAnalysisPipeline(
       }
 
       // Son olarak, birleştirilmiş veri API'den gelen bilgilerle zenginleştirilir ve eksik alanlar tamamlanır.
+      if (isTrendyol && isTrendyolFreeShippingEligible(mergedWithHtml.normalized_price)) {
+        mergedWithHtml.has_free_shipping = true;
+        initialMetadata.has_free_shipping = {
+          source: "derived",
+          confidence: "high",
+          timestamp: Date.now(),
+          reason: "trendyol free shipping threshold",
+        };
+      }
+
       return completeMissingFieldsWithMetadata(
         {
           platform: htmlExtraction.platform,
@@ -433,46 +471,20 @@ export async function runAnalysisPipeline(
     };
   })();
   extractionMs = Date.now() - extractionStartedAt;
-
-  if (
-    isTrendyol &&
-    extracted.follower_count == null &&
-    typeof extracted.merchant_id === "number"
-  ) {
-    const followerCount = await fetchTrendyolFollowerCountByMerchantId(
-      extracted.merchant_id
-    );
-    if (typeof followerCount === "number") {
-      extracted.follower_count = followerCount;
-      fieldMetadata.follower_count = {
-        source: "api",
-        confidence: "high",
-        timestamp: Date.now(),
-        reason: "trendyol sellerstore-follow api",
-      };
-      traceEvent(debugTrace, {
-        stage: "merge",
-        code: "follower_count_runtime_fallback_success",
-        message: "follower_count runtime fallback ile dolduruldu.",
-        field: "follower_count",
-        meta: {
-          merchantId: extracted.merchant_id,
-          followerCount,
-        },
-      });
-    } else {
-      traceEvent(debugTrace, {
-        stage: "merge",
-        level: "warn",
-        code: "follower_count_runtime_fallback_missed",
-        message: "follower_count runtime fallback denendi ama sonuc alinmadi.",
-        field: "follower_count",
-        meta: {
-          merchantId: extracted.merchant_id,
-        },
-      });
-    }
-  }
+  emitProgress({
+    stage: "extract",
+    step: 2,
+    totalSteps: 6,
+    label: "Temel sinyaller ayiklandi",
+    detail: "Baslik, fiyat, seller ve listing verisi normalize edildi.",
+    preview: {
+      platform: extracted.platform ?? null,
+      category: extracted.category ?? null,
+      price: extracted.normalized_price ?? null,
+      imageCount: extracted.image_count ?? null,
+      dataSource: extracted.extractor_status ?? null,
+    },
+  });
 
   // Adım 1.5: Veri Konsolidasyon Katmanı
   traceEvent(debugTrace, {
@@ -520,14 +532,64 @@ export async function runAnalysisPipeline(
     "General";
 
   if (isTrendyol) {
+    emitProgress({
+      stage: "reviews",
+      step: 3,
+      totalSteps: 6,
+      label: "Yorum ve satici katmani taraniyor",
+      detail: "Review analizi ve satici takip verileri toparlaniyor.",
+      preview: {
+        sellerName: extracted.seller_name ?? null,
+        merchantId: extracted.merchant_id ?? null,
+      },
+    });
     const reviewStartedAt = Date.now();
     try {
-      const reviewAnalysis = await fetchTrendyolReviewAnalysis({
-        url: params.url,
-        merchantId: extracted.merchant_id ?? null,
-        sellerName: extracted.seller_name ?? null,
-        otherSellersCount: extracted.other_sellers_count ?? null,
-      });
+      const shouldFetchFollowerCount =
+        extracted.follower_count == null &&
+        typeof extracted.merchant_id === "number";
+      const [reviewAnalysis, followerCount] = await Promise.all([
+        fetchTrendyolReviewAnalysis({
+          url: params.url,
+          merchantId: extracted.merchant_id ?? null,
+          sellerName: extracted.seller_name ?? null,
+          otherSellersCount: extracted.other_sellers_count ?? null,
+        }),
+        shouldFetchFollowerCount
+          ? fetchTrendyolFollowerCountByMerchantId(extracted.merchant_id!)
+          : Promise.resolve(null),
+      ]);
+
+      if (typeof followerCount === "number") {
+        extracted.follower_count = followerCount;
+        fieldMetadata.follower_count = {
+          source: "api",
+          confidence: "high",
+          timestamp: Date.now(),
+          reason: "trendyol sellerstore-follow api",
+        };
+        traceEvent(debugTrace, {
+          stage: "merge",
+          code: "follower_count_runtime_fallback_success",
+          message: "follower_count runtime fallback ile dolduruldu.",
+          field: "follower_count",
+          meta: {
+            merchantId: extracted.merchant_id,
+            followerCount,
+          },
+        });
+      } else if (shouldFetchFollowerCount) {
+        traceEvent(debugTrace, {
+          stage: "merge",
+          level: "warn",
+          code: "follower_count_runtime_fallback_missed",
+          message: "follower_count runtime fallback denendi ama sonuc alinmadi.",
+          field: "follower_count",
+          meta: {
+            merchantId: extracted.merchant_id,
+          },
+        });
+      }
 
       if (reviewAnalysis) {
         extracted.review_analysis = reviewAnalysis;
@@ -586,6 +648,18 @@ export async function runAnalysisPipeline(
     planContext: params.planContext ?? "pro",
   });
   deterministicMs = Date.now() - deterministicStartedAt;
+  emitProgress({
+    stage: "deterministic",
+    step: 4,
+    totalSteps: 6,
+    label: "Deterministik skorlar hesaplandi",
+    detail: "SEO, donusum ve genel skor ilk kez olustu.",
+    preview: {
+      overallScore: analysis.overallScore,
+      seoScore: analysis.seoScore,
+      conversionScore: analysis.conversionScore,
+    },
+  });
   traceEvent(debugTrace, {
     stage: "analysis",
     code: "build_analysis_completed",
@@ -638,7 +712,7 @@ export async function runAnalysisPipeline(
         Math.round(
           analysis.trendyolScorecard.overall.score * 0.65 +
             analysis.dataCompletenessScore * 0.2 +
-            analysis.conversionScore * 0.15
+            analysis.trendyolScorecard.conversionPotential.score * 0.15
         )
       )
     );
@@ -662,6 +736,17 @@ export async function runAnalysisPipeline(
   const shouldRunAi = contract.aiDecision.executed;
 
   if (shouldRunAi) {
+    emitProgress({
+      stage: "ai",
+      step: 5,
+      totalSteps: 6,
+      label: "AI yorumu uretiliyor",
+      detail: "Deterministik bulgular aciklamaya ve aksiyon diline donusuyor.",
+      preview: {
+        mode: contract.aiDecision.mode,
+        confidence: contract.confidence,
+      },
+    });
     const aiStartedAt = Date.now();
     aiResult = await analyzeWithAi({
       consolidatedInput,
@@ -777,7 +862,7 @@ export async function runAnalysisPipeline(
         Math.round(
           analysis.trendyolScorecard.overall.score * 0.65 +
             analysis.dataCompletenessScore * 0.2 +
-            analysis.conversionScore * 0.15
+            analysis.trendyolScorecard.conversionPotential.score * 0.15
         )
       )
     );
@@ -787,7 +872,7 @@ export async function runAnalysisPipeline(
     mode: aiResult ? "ai_enriched" : "deterministic",
     aiDecision: {
       eligible: aiEligibility.eligible,
-      executed: shouldRunAi,
+      executed: aiResult !== null,
       mode: contract.aiDecision.mode,
       reason: contract.aiDecision.reason,
       blockingFields:

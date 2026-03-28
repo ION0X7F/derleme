@@ -51,6 +51,7 @@ const PYTHON_SCRIPT = String.raw`
 import asyncio
 import json
 import sys
+import time
 from playwright.async_api import async_playwright
 
 review_url = sys.argv[1]
@@ -58,6 +59,8 @@ content_id = sys.argv[2]
 merchant_id = sys.argv[3] if len(sys.argv) > 3 and sys.argv[3] else None
 
 API_PREFIX = "https://apigw.trendyol.com/discovery-storefront-trproductgw-service/api/review-read/product-reviews/detailed"
+TARGET_MONTH_SPAN = 6
+MAX_PAGES = 120
 
 async def fetch_json(page, url):
     return await page.evaluate(
@@ -77,6 +80,28 @@ def build_url(page_index, seller_only=False):
         base += f"&onlySellerReviews=true&sellerId={merchant_id}"
     return base
 
+def month_key(timestamp_ms):
+    if not isinstance(timestamp_ms, (int, float)):
+        return None
+    try:
+        dt = time.gmtime(timestamp_ms / 1000)
+        return f"{dt.tm_year}-{dt.tm_mon:02d}"
+    except Exception:
+        return None
+
+def reached_six_month_window(reviews):
+    month_keys = []
+    seen = set()
+    for review in reviews:
+        if not isinstance(review, dict):
+            continue
+        created_at = review.get("createdAt") or review.get("lastModifiedAt")
+        key = month_key(created_at)
+        if key and key not in seen:
+            seen.add(key)
+            month_keys.append(key)
+    return len(month_keys) >= TARGET_MONTH_SPAN
+
 async def collect_payload(page, seller_only=False):
     first = await fetch_json(page, build_url(0, seller_only))
     if not first.get("ok") or not isinstance(first.get("json"), dict):
@@ -95,7 +120,7 @@ async def collect_payload(page, seller_only=False):
         if isinstance(raw_total_pages, int) and raw_total_pages > 0:
             total_pages = raw_total_pages
 
-    max_pages = min(total_pages, 12)
+    max_pages = min(total_pages, MAX_PAGES)
     for page_index in range(1, max_pages):
         item = await fetch_json(page, build_url(page_index, seller_only))
         if not item.get("ok") or not isinstance(item.get("json"), dict):
@@ -104,6 +129,8 @@ async def collect_payload(page, seller_only=False):
         item_result = item_root.get("result") if isinstance(item_root.get("result"), dict) else item_root
         if isinstance(item_result, dict) and isinstance(item_result.get("reviews"), list):
             reviews.extend(item_result["reviews"])
+        if reached_six_month_window(reviews):
+            break
 
     compact_reviews = []
     for review in reviews:
@@ -386,14 +413,9 @@ function extractPhraseHits(records: ReviewRecordDetailed[], mode: "positive" | "
   for (const record of filtered) {
     if (!record.text) continue;
     const tokens = tokenize(record.text);
-    for (let index = 0; index < tokens.length; index += 1) {
-      const unigram = tokens[index];
-      counts.set(unigram, (counts.get(unigram) ?? 0) + 1);
-      const next = tokens[index + 1];
-      if (next) {
-        const bigram = `${unigram} ${next}`;
-        counts.set(bigram, (counts.get(bigram) ?? 0) + 1);
-      }
+    for (let index = 0; index < tokens.length - 1; index += 1) {
+      const bigram = `${tokens[index]} ${tokens[index + 1]}`;
+      counts.set(bigram, (counts.get(bigram) ?? 0) + 1);
     }
   }
 

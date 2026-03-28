@@ -34,6 +34,10 @@ model User {
   id           String   @id @default(cuid())
   name         String?
   email        String   @unique
+  username     String?  @unique
+  phone        String?
+  companyName  String?
+  storeName    String?
   passwordHash String?
   role         UserRole @default(USER)
   plan         PlanCode @default(FREE)
@@ -41,6 +45,7 @@ model User {
   updatedAt    DateTime @updatedAt
 
   reports            Report[]
+  reportFavorites    ReportFavorite[]
   subscription       Subscription?
   userUsageRecords   UserUsageRecord[]
 }
@@ -104,11 +109,27 @@ model Report {
   updatedAt            DateTime @updatedAt
 
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  favorites ReportFavorite[]
   learningMemory LearningMemory?
 
   @@index([userId, createdAt])
   @@index([guestId, createdAt])
   @@map("reports")
+}
+
+model ReportFavorite {
+  id        String   @id @default(cuid())
+  userId    String
+  reportId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  report  Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, reportId])
+  @@index([userId, createdAt])
+  @@index([reportId])
 }
 
 model LearningMemory {
@@ -237,4 +258,28 @@ model GuestUsageRecord {
 
   @@unique([guestId, action, periodKey])
   @@index([guestId, periodKey])
+}
+
+model AnalyzeJob {
+  id        String   @id
+  requestId String
+  url       String
+  status    String
+  userId    String?
+  guestId   String?
+  workerId  String?
+  attempts  Int      @default(0)
+  startedAt DateTime?
+  finishedAt DateTime?
+  lockExpiresAt DateTime?
+  progress  Json?
+  result    Json?
+  error     Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, updatedAt])
+  @@index([status, lockExpiresAt])
+  @@index([userId, createdAt])
+  @@index([guestId, createdAt])
 }
