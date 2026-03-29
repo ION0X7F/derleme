@@ -28,6 +28,8 @@ type WorkspaceRouteState = {
   reportId?: string;
 };
 
+const DASHBOARD_SHELL_VERSION = "2026-03-29-11";
+
 function getQuery(
   view: View,
   reportId?: string,
@@ -76,6 +78,7 @@ export default function DashboardShellFrame({
   const searchParams = useSearchParams();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [isFrameReady, setIsFrameReady] = useState(false);
+  const [frameHash, setFrameHash] = useState("");
   const passthrough =
     initialView === "new-analysis"
       ? {
@@ -102,6 +105,13 @@ export default function DashboardShellFrame({
   useEffect(() => {
     setIsFrameReady(false);
   }, [initialView, reportId]);
+
+  useEffect(() => {
+    const syncHash = () => setFrameHash(window.location.hash || "");
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, []);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -212,7 +222,7 @@ export default function DashboardShellFrame({
       <iframe
         ref={iframeRef}
         title="SellBoost Dashboard"
-        src={`/dashboard-shell.html?${getQuery(initialView, reportId, passthrough)}`}
+        src={`/dashboard-shell.html?${getQuery(initialView, reportId, passthrough)}&shellv=${DASHBOARD_SHELL_VERSION}${frameHash}`}
         onLoad={() => setIsFrameReady(true)}
         style={{
           display: "block",
