@@ -69,14 +69,14 @@ function getPlanLimits(plan: "guest" | "free" | "pro" | "enterprise") {
 
   if (plan === "free") {
     return {
-      maxSuggestions: 5,
-      maxPriorityActions: 5,
+      maxSuggestions: 3,
+      maxPriorityActions: 3,
     };
   }
 
   return {
-    maxSuggestions: 24,
-    maxPriorityActions: 24,
+    maxSuggestions: 5,
+    maxPriorityActions: 5,
   };
 }
 

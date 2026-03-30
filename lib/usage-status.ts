@@ -30,6 +30,7 @@ export function getUsageStatus({
 }: UsageStatusParams): UsageStatus {
   const percent = limit > 0 ? Math.min(Math.round((used / limit) * 100), 100) : 0;
   const suggestedUpgrade = getSuggestedUpgradeCopy(planId);
+  const nearLimitRemainingThreshold = limit <= 3 ? 1 : 2;
 
   if (!allowed || remaining <= 0) {
     return {
@@ -45,7 +46,7 @@ export function getUsageStatus({
     };
   }
 
-  if (remaining <= 2 || percent >= 80) {
+  if (remaining <= nearLimitRemainingThreshold || percent >= 80) {
     return {
       percent,
       tone: "warn",

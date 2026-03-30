@@ -12,7 +12,7 @@ function read(path: string) {
 
 function run() {
   const reportDetailRoute = read("app/api/reports/[id]/route.ts");
-  const exportPage = read("app/reports/[id]/export/page.tsx");
+  const dashboardShell = read("public/dashboard-shell.html");
   const detailQuery = read("lib/report-detail-query.ts");
 
   const checks: Check[] = [
@@ -37,7 +37,13 @@ function run() {
     },
     {
       label: "report export page requests detail without timeline",
-      passed: exportPage.includes("`/api/reports/${id}?timeline=0`"),
+      passed:
+        dashboardShell.includes(
+          "fetch(`/api/reports/${encodeURIComponent(id)}?timeline=0`"
+        ) ||
+        dashboardShell.includes(
+          "fetch(`/api/reports/${id}?timeline=0`"
+        ),
     },
     {
       label: "report detail query defines dedicated timeline select/helper",

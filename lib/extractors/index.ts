@@ -38,6 +38,15 @@ function pickBoolean(...values: Array<boolean | null | undefined>): boolean {
   return false;
 }
 
+function pickNullableBoolean(
+  ...values: Array<boolean | null | undefined>
+): boolean | null {
+  for (const value of values) {
+    if (typeof value === "boolean") return value;
+  }
+  return null;
+}
+
 function pickStringArray(
   ...values: Array<string[] | null | undefined>
 ): string[] | null {
@@ -291,6 +300,7 @@ function pickOtherSellerOffers(
             typeof offer.original_price === "number" ? offer.original_price : null,
           discount_rate:
             typeof offer.discount_rate === "number" ? offer.discount_rate : null,
+          delivery_text: cleanText(offer.delivery_text),
           promotion_labels: pickStringArray(offer.promotion_labels),
           listing_url: cleanText(offer.listing_url),
         };
@@ -546,14 +556,17 @@ function mergeExtractedFields(params: {
 
     brand: pickString(platformFields.brand, basicFields.brand),
     product_name: pickString(platformFields.product_name, basicFields.product_name),
-    model_code: null,
+    model_code: chooseBestModelCode(
+      platformFields.model_code,
+      basicFields.model_code
+    ),
 
     sku: pickString(platformFields.sku, basicFields.sku),
     sku_source: pickString(platformFields.sku_source, basicFields.sku_source),
-    mpn: null,
-    mpn_source: null,
-    gtin: null,
-    gtin_source: null,
+    mpn: pickString(platformFields.mpn, basicFields.mpn),
+    mpn_source: pickString(platformFields.mpn_source, basicFields.mpn_source),
+    gtin: pickString(platformFields.gtin, basicFields.gtin),
+    gtin_source: pickString(platformFields.gtin_source, basicFields.gtin_source),
 
     price: mergedPrice,
     normalized_price: parseNormalizedPrice(mergedPrice),
@@ -571,7 +584,10 @@ function mergeExtractedFields(params: {
       platformFields.image_count,
       basicFields.image_count
     ),
-    has_video: pickBoolean(platformFields.has_video, basicFields.has_video),
+    has_video: pickNullableBoolean(
+      platformFields.has_video,
+      basicFields.has_video
+    ),
 
     rating_value: pickNumber(platformFields.rating_value, basicFields.rating_value),
     rating_breakdown: pickRatingBreakdown(
@@ -632,7 +648,7 @@ function mergeExtractedFields(params: {
       platformFields.has_return_info,
       basicFields.has_return_info
     ),
-    has_free_shipping: pickBoolean(
+    has_free_shipping: pickNullableBoolean(
       platformFields.has_free_shipping,
       basicFields.has_free_shipping
     ),
@@ -671,6 +687,10 @@ function mergeExtractedFields(params: {
       platformFields.favorite_count,
       basicFields.favorite_count
     ),
+    view_count_24h: pickNumber(
+      platformFields.view_count_24h,
+      basicFields.view_count_24h
+    ),
     other_sellers_count: pickNumber(
       platformFields.other_sellers_count,
       basicFields.other_sellers_count
@@ -683,15 +703,15 @@ function mergeExtractedFields(params: {
       platformFields.other_sellers_summary,
       basicFields.other_sellers_summary
     ),
-    has_brand_page: pickBoolean(
+    has_brand_page: pickNullableBoolean(
       platformFields.has_brand_page,
       basicFields.has_brand_page
     ),
-    official_seller: pickBoolean(
+    official_seller: pickNullableBoolean(
       platformFields.official_seller,
       basicFields.official_seller
     ),
-    has_campaign: pickBoolean(
+    has_campaign: pickNullableBoolean(
       platformFields.has_campaign,
       basicFields.has_campaign
     ),
@@ -707,7 +727,7 @@ function mergeExtractedFields(params: {
       platformFields.delivery_type,
       basicFields.delivery_type
     ),
-    is_best_seller: pickBoolean(
+    is_best_seller: pickNullableBoolean(
       platformFields.is_best_seller,
       basicFields.is_best_seller
     ),

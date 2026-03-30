@@ -124,11 +124,24 @@ function parseStringArray(
   const normalized: string[] = [];
 
   for (const item of rawValue) {
-    if (typeof item !== "string") {
+    const normalizedItem =
+      typeof item === "string"
+        ? item
+        : item && typeof item === "object"
+          ? typeof (item as Record<string, unknown>).title === "string"
+            ? String((item as Record<string, unknown>).title)
+            : typeof (item as Record<string, unknown>).label === "string"
+              ? String((item as Record<string, unknown>).label)
+              : typeof (item as Record<string, unknown>).text === "string"
+                ? String((item as Record<string, unknown>).text)
+                : null
+          : null;
+
+    if (normalizedItem === null) {
       return { ok: false, error: `Gecersiz alan: ${fieldName}` };
     }
 
-    const trimmed = item.trim();
+    const trimmed = normalizedItem.trim();
     if (!trimmed) continue;
 
     if (trimmed.length > 240) {

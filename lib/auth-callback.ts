@@ -23,12 +23,8 @@ function isAllowedInternalPath(pathname: string) {
 }
 
 function normalizeLegacyWorkspaceCallbackPath(path: string) {
-  if (!path.startsWith("/reports/")) return path;
-
-  const suffix = path.slice("/reports/".length);
-  if (!suffix) return WORKSPACE_ROUTES.reports;
-
-  return `/report/${suffix}`;
+  if (path === "/reports/") return WORKSPACE_ROUTES.reports;
+  return path;
 }
 
 export function sanitizeAuthCallbackPath(raw: string | null | undefined): string {

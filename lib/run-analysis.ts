@@ -21,7 +21,9 @@ import { createDebugTrace, emitDebugTrace, traceEvent } from "@/lib/debug-observ
 import { getLearningContext } from "@/lib/learning-engine";
 import { fetchTrendyolReviewAnalysis } from "@/lib/trendyol-review-analysis";
 import { isTrendyolFreeShippingEligible } from "@/lib/trendyol-shipping";
+import trendyolRenderedProductContent from "@/lib/trendyol-rendered-product-content";
 import { enrichTrendyolScorecardWithAi } from "@/lib/trendyol-scorecard";
+import trendyolRenderedOtherMerchants from "@/lib/trendyol-rendered-other-merchants";
 import {
   completeMissingFieldsWithMetadata,
   getLearningStatus,
@@ -422,7 +424,11 @@ export async function runAnalysisPipeline(
       }
 
       // Son olarak, birleştirilmiş veri API'den gelen bilgilerle zenginleştirilir ve eksik alanlar tamamlanır.
-      if (isTrendyol && isTrendyolFreeShippingEligible(mergedWithHtml.normalized_price)) {
+      if (
+        isTrendyol &&
+        mergedWithHtml.has_free_shipping == null &&
+        isTrendyolFreeShippingEligible(mergedWithHtml.normalized_price)
+      ) {
         mergedWithHtml.has_free_shipping = true;
         initialMetadata.has_free_shipping = {
           source: "derived",
@@ -460,6 +466,93 @@ export async function runAnalysisPipeline(
           level: "warn",
           code: "python_backfill_unavailable",
           message: "Python fallback denendi fakat veri alinamadi.",
+        });
+      }
+    }
+
+    if (
+      trendyolRenderedProductContent.shouldFetchRenderedProductContent({
+        platform: finalExtractionResult.extracted.platform,
+        description_text: finalExtractionResult.extracted.description_text ?? null,
+        description_length: finalExtractionResult.extracted.description_length,
+        view_count_24h: finalExtractionResult.extracted.view_count_24h ?? null,
+      })
+    ) {
+      const renderedProductContent =
+        await trendyolRenderedProductContent.fetchRenderedProductContent(params.url);
+      if (renderedProductContent) {
+        if (renderedProductContent.description_text) {
+          finalExtractionResult.extracted.description_text =
+            renderedProductContent.description_text;
+          finalExtractionResult.extracted.description_length =
+            renderedProductContent.description_length;
+          finalExtractionResult.fieldMetadata.description_text = {
+            source: "html",
+            confidence: "high",
+            timestamp: Date.now(),
+            reason: "trendyol rendered urun aciklamasi block",
+          };
+          finalExtractionResult.fieldMetadata.description_length = {
+            source: "html",
+            confidence: "high",
+            timestamp: Date.now(),
+            reason: "trendyol rendered urun aciklamasi block",
+          };
+        }
+        if (typeof renderedProductContent.view_count_24h === "number") {
+          finalExtractionResult.extracted.view_count_24h =
+            renderedProductContent.view_count_24h;
+          finalExtractionResult.fieldMetadata.view_count_24h = {
+            source: "html",
+            confidence: "high",
+            timestamp: Date.now(),
+            reason: "trendyol rendered son 24 saatte goruntulenme block",
+          };
+        }
+
+        traceEvent(debugTrace, {
+          stage: "merge",
+          code: "rendered_product_description_enriched",
+          message: "Render edilmis Trendyol urun bloklari ile aciklama ve goruntulenme sinyali zenginlestirildi.",
+          meta: {
+            descriptionLength: renderedProductContent.description_length,
+            viewCount24h: renderedProductContent.view_count_24h,
+          },
+        });
+      }
+    }
+
+    if (
+      isTrendyol &&
+      trendyolRenderedOtherMerchants.shouldFetchRenderedOtherMerchantData(
+        finalExtractionResult.extracted.other_seller_offers
+      )
+    ) {
+      const renderedOffers =
+        await trendyolRenderedOtherMerchants.fetchRenderedOtherMerchantData(params.url);
+      if (renderedOffers && renderedOffers.length > 0) {
+        finalExtractionResult.extracted.other_seller_offers =
+          trendyolRenderedOtherMerchants.mergeRenderedOtherMerchantData(
+            finalExtractionResult.extracted.other_seller_offers,
+            renderedOffers
+          );
+
+        traceEvent(debugTrace, {
+          stage: "merge",
+          code: "rendered_other_merchants_enriched",
+          message: "Render edilmis rakip kart verileri ile teslimat/promo alanlari zenginlestirildi.",
+          meta: {
+            renderedOfferCount: renderedOffers.length,
+            extractedOfferCount:
+              finalExtractionResult.extracted.other_seller_offers?.length ?? 0,
+          },
+        });
+      } else {
+        traceEvent(debugTrace, {
+          stage: "merge",
+          level: "warn",
+          code: "rendered_other_merchants_unavailable",
+          message: "Render edilmis rakip kart verisi alinamadi.",
         });
       }
     }
@@ -850,22 +943,6 @@ export async function runAnalysisPipeline(
       mode: "ai_enriched",
       summary: analysis.summary,
     };
-  }
-
-  if (analysis.trendyolScorecard) {
-    analysis.seoScore = analysis.trendyolScorecard.searchVisibility.score;
-    analysis.conversionScore = analysis.trendyolScorecard.conversionPotential.score;
-    analysis.overallScore = Math.max(
-      0,
-      Math.min(
-        100,
-        Math.round(
-          analysis.trendyolScorecard.overall.score * 0.65 +
-            analysis.dataCompletenessScore * 0.2 +
-            analysis.trendyolScorecard.conversionPotential.score * 0.15
-        )
-      )
-    );
   }
 
   analysis.analysisTrace = buildAnalysisTrace({

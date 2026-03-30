@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/dev-full.ts",
+    "dev:web": "next dev",
     "dev:full": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/dev-full.ts",
     "build": "next build",
     "start": "next start",
@@ -67,7 +68,8 @@
     "next-auth": "^5.0.0-beta.30",
     "prisma": "^7.5.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "stripe": "^21.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

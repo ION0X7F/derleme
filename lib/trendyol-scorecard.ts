@@ -249,6 +249,15 @@ function buildDimension(score: number, evidence: string[]): TrendyolScoreDimensi
   };
 }
 
+function hasSplitDescriptionProxy(extracted: ExtractedProductFields) {
+  return (
+    extracted.description_length == null &&
+    extracted.has_specs === true &&
+    typeof extracted.bullet_point_count === "number" &&
+    extracted.bullet_point_count >= 4
+  );
+}
+
 function buildIssuesAndRecommendations(params: {
   contentFit: TrendyolScoreDimension;
   listingQuality: TrendyolScoreDimension;
@@ -383,9 +392,12 @@ export function buildTrendyolScorecard(params: {
   const videoBonus = extracted.has_video ? 8 : 0;
   const faqBonus = extracted.has_faq ? 6 : 0;
   const specBonus = extracted.has_specs ? 12 : 0;
+  const splitDescriptionProxy = hasSplitDescriptionProxy(extracted);
   const descriptionScore = clamp(
     extracted.description_length == null
-      ? 40
+      ? splitDescriptionProxy
+        ? 58
+        : 40
       : extracted.description_length >= 800
         ? 88
         : extracted.description_length >= 300
@@ -407,6 +419,9 @@ export function buildTrendyolScorecard(params: {
   const listingQuality = buildDimension(
     average([contentFit.score, imageScore, descriptionScore, specBonus * 4 + faqBonus * 3 + videoBonus * 2, titleConfidence]),
     [
+      splitDescriptionProxy
+        ? "Urun Aciklamasi ve Ek Bilgiler ayri bloklarda olabilir; yapisal icerik bulundu."
+        : "Serbest aciklama blogu ayri olarak cozulmedi veya sinirli gorunuyor.",
       `Görsel skoru: ${imageScore}/100`,
       `Açıklama yeterliliği: ${descriptionScore}/100`,
       extracted.has_video ? "Video desteği mevcut." : "Video desteği görünmüyor.",

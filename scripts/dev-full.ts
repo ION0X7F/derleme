@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "child_process";
 
-const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+const npmCmd = "npm";
+const useShell = process.platform === "win32";
 const children = new Set<ChildProcess>();
 let shuttingDown = false;
 
@@ -8,7 +9,7 @@ function startProcess(label: string, args: string[]) {
   const child = spawn(npmCmd, args, {
     stdio: "inherit",
     env: process.env,
-    shell: false,
+    shell: useShell,
   });
 
   children.add(child);
@@ -60,5 +61,5 @@ process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 
 console.log("[dev-full] next dev + analyze worker baslatiliyor...");
-startProcess("web", ["run", "dev"]);
+startProcess("web", ["run", "dev:web"]);
 startProcess("worker", ["run", "worker:analyze"]);

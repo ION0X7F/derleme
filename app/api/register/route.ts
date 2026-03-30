@@ -5,16 +5,37 @@ import { prisma } from "@/lib/prisma";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_PATTERN = /^[a-z0-9._-]+$/i;
 
+function normalizeOptionalString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const name = body?.name?.trim();
-    const username = body?.username?.trim()?.toLowerCase();
-    const email = body?.email?.trim()?.toLowerCase();
-    const phone = body?.phone?.trim();
-    const companyName = body?.companyName?.trim() || null;
-    const storeName = body?.storeName?.trim() || null;
-    const password = body?.password;
+    let body: Record<string, unknown>;
+    try {
+      body = (await req.json()) as Record<string, unknown>;
+    } catch {
+      return NextResponse.json(
+        { error: "Gecersiz istek govdesi." },
+        { status: 400 }
+      );
+    }
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json(
+        { error: "Gecersiz istek govdesi." },
+        { status: 400 }
+      );
+    }
+
+    const name = normalizeOptionalString(body.name);
+    const username = normalizeOptionalString(body.username).toLowerCase();
+    const email = normalizeOptionalString(body.email).toLowerCase();
+    const phone = normalizeOptionalString(body.phone);
+    const companyName = normalizeOptionalString(body.companyName) || null;
+    const storeName = normalizeOptionalString(body.storeName) || null;
+    const password =
+      typeof body.password === "string" ? body.password : "";
 
     if (!name || !username || !email || !phone || !password) {
       return NextResponse.json(

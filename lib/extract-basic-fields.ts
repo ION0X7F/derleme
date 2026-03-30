@@ -63,6 +63,55 @@ function cleanText(value: string | undefined | null) {
   return normalized.length > 0 ? normalized : null;
 }
 
+function normalizeComparisonText(value: string | null | undefined) {
+  return (value || "")
+    .toLocaleLowerCase("tr-TR")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sliceBetweenHeadings(
+  text: string | null,
+  startLabels: string[],
+  endLabels: string[]
+) {
+  if (!text) return null;
+  const normalized = normalizeComparisonText(text);
+  let startIndex = -1;
+  let startLength = 0;
+
+  for (const label of startLabels) {
+    const normalizedLabel = normalizeComparisonText(label);
+    const index = normalized.indexOf(normalizedLabel);
+    if (index === -1) continue;
+    startIndex = index;
+    startLength = normalizedLabel.length;
+    break;
+  }
+
+  if (startIndex === -1) return null;
+
+  let endIndex = normalized.length;
+  for (const label of endLabels) {
+    const normalizedLabel = normalizeComparisonText(label);
+    const index = normalized.indexOf(normalizedLabel, startIndex + startLength);
+    if (index === -1) continue;
+    endIndex = Math.min(endIndex, index);
+  }
+
+  const sliced = cleanText(text.slice(startIndex + startLength, endIndex));
+  return sliced && sliced.length >= 40 ? sliced : null;
+}
+
+function countDescriptionBullets(text: string | null) {
+  if (!text) return null;
+  const parts = text
+    .split(/\s(?=[A-ZÇĞİÖŞÜ0-9])/)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 8);
+  return parts.length >= 3 ? Math.min(parts.length, 20) : null;
+}
+
 function toLowerSafe(value: string | null | undefined) {
   return (value || "").toLowerCase();
 }
@@ -884,7 +933,9 @@ function findDescription($: cheerio.CheerioAPI) {
   const trendyolProductInfo = $('[data-testid="product-info"]').first();
   if (trendyolProductInfo.length > 0) {
     const trendyolDescriptionSelectors = [
+      ".product-description-content",
       '[class*="content-descriptions-description-content"]',
+      '[class*="product-description-content"]',
       '[class*="content-description"] ul',
       '[class*="content-description"]',
     ];
@@ -892,6 +943,19 @@ function findDescription($: cheerio.CheerioAPI) {
       const text = cleanText(trendyolProductInfo.find(selector).first().text());
       if (text && text.length >= 20) return text;
     }
+
+    const splitDescription = sliceBetweenHeadings(
+      cleanText(trendyolProductInfo.text()),
+      ["Ürün Açıklaması", "Urun Aciklamasi", "Product Description"],
+      [
+        "Ek Bilgiler",
+        "Urun Bilgileri",
+        "Ürün Bilgileri",
+        "Ürün Özellikleri",
+        "Teknik Özellikler",
+      ]
+    );
+    if (splitDescription) return splitDescription;
   }
 
   const selectors = [
@@ -1122,6 +1186,7 @@ export function extractBasicFields(html: string): ExtractedProductFields {
 
   const image_count = getImageCount($);
   const description = findDescription($);
+  const descriptionBulletCount = countDescriptionBullets(description);
   const metaDescription = extractMetaDescription({
     $,
     jsonLdDescription: jsonLdSignals.description,
@@ -1220,7 +1285,7 @@ export function extractBasicFields(html: string): ExtractedProductFields {
     discount_rate: null,
     currency: currency || null,
     image_count,
-    has_video: false,
+    has_video: null,
     rating_value,
     rating_breakdown: null,
     review_count,
@@ -1233,10 +1298,10 @@ export function extractBasicFields(html: string): ExtractedProductFields {
     question_count: null,
     description_text: description,
     description_length: description ? description.length : null,
-    bullet_point_count: null,
+    bullet_point_count: descriptionBulletCount,
     has_add_to_cart,
     has_shipping_info,
-    has_free_shipping: false,
+    has_free_shipping: null,
     shipping_days: null,
     has_return_info,
     has_specs,
@@ -1251,16 +1316,17 @@ export function extractBasicFields(html: string): ExtractedProductFields {
     seller_score: null,
     follower_count: null,
     favorite_count: null,
+    view_count_24h: null,
     other_sellers_count: null,
     other_seller_offers: null,
     other_sellers_summary: null,
-    has_brand_page: false,
-    official_seller: false,
-    has_campaign: false,
+    has_brand_page: null,
+    official_seller: null,
+    has_campaign: null,
     campaign_label: null,
     promotion_labels: null,
     delivery_type: null,
-    is_best_seller: false,
+    is_best_seller: null,
     best_seller_rank: null,
     best_seller_badge: null,
     category: null,

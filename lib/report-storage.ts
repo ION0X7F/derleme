@@ -87,6 +87,7 @@ function compactOtherSellerOffers(value: unknown) {
       seller_score: typeof item.seller_score === "number" ? item.seller_score : null,
       shipping_days: typeof item.shipping_days === "number" ? item.shipping_days : null,
       delivery_type: typeof item.delivery_type === "string" ? item.delivery_type : null,
+      delivery_text: typeof item.delivery_text === "string" ? item.delivery_text : null,
       is_official: item.is_official === true,
       has_free_shipping: item.has_free_shipping === true,
       has_fast_delivery: item.has_fast_delivery === true,

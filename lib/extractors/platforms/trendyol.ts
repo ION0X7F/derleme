@@ -377,6 +377,83 @@ function parseFollowerCountText(raw: string | null | undefined) {
   return Math.round(numberPart * multiplier);
 }
 
+function parseCompactCountText(raw: string | null | undefined, noisePattern?: RegExp) {
+  const text = cleanText(raw);
+  if (!text) return null;
+
+  const normalized = text
+    .toLocaleLowerCase("tr-TR")
+    .replace(noisePattern ?? /kisi|kişi|goruntuledi|görüntüledi|son24saatte|son24saat|saatte|goruntulenme|görüntülenme/gi, "")
+    .replace(/\s+/g, "")
+    .trim();
+
+  const match = normalized.match(/(\d+(?:[.,]\d+)?)([a-zğıüşöç]*)/i);
+  if (!match) return null;
+
+  const numberPart = Number(match[1].replace(",", "."));
+  if (!Number.isFinite(numberPart) || numberPart < 0) return null;
+
+  const unit = (match[2] || "").toLocaleLowerCase("tr-TR");
+  const multiplier =
+    unit === "b" || unit === "bin"
+      ? 1_000
+      : unit === "m" || unit === "mn" || unit === "milyon"
+        ? 1_000_000
+        : 1;
+
+  return Math.round(numberPart * multiplier);
+}
+
+function extractViewCount24h(
+  $: CheerioAPI,
+  envoyProduct: Record<string, unknown> | null,
+  decodedHtml: string
+) {
+  const fromState =
+    toFiniteNumber(getNestedValue(envoyProduct, ["viewCount24h"])) ??
+    toFiniteNumber(getNestedValue(envoyProduct, ["viewCount24Hours"])) ??
+    toFiniteNumber(getNestedValue(envoyProduct, ["productViewCountLast24Hour"])) ??
+    toFiniteNumber(getNestedValue(envoyProduct, ["socialProof", "viewCount24h"])) ??
+    toFiniteNumber(getNestedValue(envoyProduct, ["socialProof", "last24HourViewCount"])) ??
+    null;
+
+  if (typeof fromState === "number" && Number.isFinite(fromState)) {
+    return Math.round(fromState);
+  }
+
+  const selectorCandidates = [
+    '[data-testid*="view"]',
+    '[data-testid*="popular"]',
+    '[class*="popular"]',
+    '[class*="view"]',
+    '[class*="social-proof"]',
+    '[class*="product-stats"]',
+  ];
+
+  for (const selector of selectorCandidates) {
+    const nodeText = $(selector)
+      .toArray()
+      .map((node) => cleanText($(node).text()))
+      .find((text) => text && /son\s*24\s*saatte|g[oö]r[uü]nt[uü]ledi/i.test(text));
+    const parsed = parseCompactCountText(nodeText);
+    if (typeof parsed === "number") return parsed;
+  }
+
+  const regexCandidates = [
+    /son\s*24\s*saatte\s*([\d.,]+\s*[bmk]?)\s*k(?:iÅŸ|iş)i\s*g(?:o|Ã¶)r(?:u|Ã¼)nt(?:u|Ã¼)ledi/iu,
+    /"viewCount24h"\s*:\s*("?[\d.,]+[bmk]?"?)/i,
+    /"last24HourViewCount"\s*:\s*("?[\d.,]+[bmk]?"?)/i,
+  ];
+
+  for (const pattern of regexCandidates) {
+    const match = decodedHtml.match(pattern);
+    const parsed = parseCompactCountText(match?.[1] ?? null);
+    if (typeof parsed === "number") return parsed;
+  }
+
+  return null;
+}
+
 function extractFollowerCount(
   $: CheerioAPI,
   envoyProduct: Record<string, unknown> | null,
@@ -750,30 +827,32 @@ function parseOtherSellerOffers(
       seller_badges: null,
       seller_score: null,
       follower_count: null,
-      official_seller: false,
-      has_video: false,
+      official_seller: null,
+      has_video: null,
       question_count: null as number | null,
       review_count: null as number | null,
       rating_value: null as number | null,
       rating_breakdown: null as ReviewRatingBreakdown | null,
-      has_campaign: false,
+      has_campaign: null,
       campaign_label: null as string | null,
       promotion_labels: null as string[] | null,
       review_snippets: null as ReviewSnippet[] | null,
       qa_snippets: null as QuestionAnswerSnippet[] | null,
       review_summary: null as ReviewSummary | null,
-      has_free_shipping: false,
+      has_free_shipping: null,
       has_return_info: false,
       has_specs: false,
       variant_count: null as number | null,
       image_count: null as number | null,
       stock_quantity: null as number | null,
       stock_status: null as string | null,
+      delivery_type: null as string | null,
       category: null as string | null,
       favorite_count: null as number | null,
+      view_count_24h: null as number | null,
       merchant_id: null as number | null,
       listing_id: null as string | null,
-      is_best_seller: false,
+      is_best_seller: null,
       best_seller_rank: null as number | null,
       best_seller_badge: null as string | null,
       other_seller_offers: null as OtherSellerOffer[] | null,
@@ -835,6 +914,7 @@ function parseOtherSellerOffers(
     null;
   const favoriteCount =
     toFiniteNumber(getNestedValue(envoyProduct, ["favoriteCount"])) ?? null;
+  const viewCount24h = extractViewCount24h($, envoyProduct, decodedHtml);
   const imageCount = Array.isArray(getNestedValue(envoyProduct, ["images"]))
     ? (getNestedValue(envoyProduct, ["images"]) as unknown[]).length
     : null;
@@ -937,6 +1017,7 @@ function parseOtherSellerOffers(
         price: priceData.price,
         original_price: priceData.original_price,
         discount_rate: priceData.discount_rate,
+        delivery_text: null,
         promotion_labels:
           parsePromotionLabels(record.promotions) ||
           parsePromotionLabels(getNestedValue(variantRecord, ["promotions"])),
@@ -1064,6 +1145,7 @@ function parseOtherSellerOffers(
     stock_status: stockStatus,
     category: categoryPath,
     favorite_count: favoriteCount,
+    view_count_24h: viewCount24h,
     merchant_id: merchantId,
     listing_id: listingId,
     is_best_seller: typeof bestSellerRank === "number",
@@ -1157,6 +1239,39 @@ function parsePriceNumber(raw: string | number | null | undefined) {
   return Number.isFinite(amount) && amount > 0 ? amount : null;
 }
 
+function normalizeOriginalPriceValue(
+  originalPrice: number | null,
+  currentPrice: number | null
+) {
+  if (
+    originalPrice == null ||
+    currentPrice == null ||
+    !Number.isFinite(originalPrice) ||
+    !Number.isFinite(currentPrice) ||
+    originalPrice <= currentPrice
+  ) {
+    return null;
+  }
+
+  return originalPrice;
+}
+
+function normalizeShippingDaysWithDeliveryType(
+  shippingDays: number | null,
+  deliveryType: string | null | undefined
+) {
+  const normalizedDeliveryType = cleanText(deliveryType)?.toLocaleLowerCase("tr-TR") ?? null;
+  if (normalizedDeliveryType === "same_day") return 0;
+  if (normalizedDeliveryType === "next_day") return 1;
+  if (normalizedDeliveryType === "fast_delivery") {
+    if (typeof shippingDays === "number" && Number.isFinite(shippingDays) && shippingDays <= 2) {
+      return shippingDays;
+    }
+    return 1;
+  }
+  return shippingDays;
+}
+
 function parseLooseNumber(raw: string | number | null | undefined) {
   if (raw === null || raw === undefined) return null;
   const text = String(raw).replace(/[^\d.,]/g, "").trim();
@@ -1204,19 +1319,16 @@ function extractPriceNumberFromStateObjects(
   stateObjects: unknown[],
   candidatePaths: Array<Array<string | number>>
 ) {
-  const amounts: number[] = [];
-
   for (const obj of stateObjects) {
     for (const path of candidatePaths) {
       const value = getNestedValue(obj, path);
       if (typeof value !== "string" && typeof value !== "number") continue;
       const amount = parsePriceNumber(value);
-      if (amount) amounts.push(amount);
+      if (amount) return amount;
     }
   }
 
-  if (amounts.length === 0) return null;
-  return Math.max(...amounts);
+  return null;
 }
 
 function extractCurrentPriceNumber(
@@ -1310,16 +1422,21 @@ function calculateDiscountRate(
   originalPrice: number | null,
   currentPrice: number | null
 ) {
+  const normalizedOriginalPrice = normalizeOriginalPriceValue(
+    originalPrice,
+    currentPrice
+  );
   if (
-    originalPrice == null ||
+    normalizedOriginalPrice == null ||
     currentPrice == null ||
-    originalPrice <= currentPrice ||
-    originalPrice <= 0
+    normalizedOriginalPrice <= 0
   ) {
     return null;
   }
 
-  return Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
+  return Math.round(
+    ((normalizedOriginalPrice - currentPrice) / normalizedOriginalPrice) * 100
+  );
 }
 
 function detectFreeShipping($: CheerioAPI, decodedHtml: string) {
@@ -1869,6 +1986,16 @@ function detectCampaignSignal($: CheerioAPI, decodedHtml: string) {
   );
 }
 
+function detectCollectableCouponSignal(decodedHtml: string) {
+  return (
+    /"(?:hasCollectable|hasCoupon|couponAvailable|campaignAvailable)"\s*:\s*true/i.test(
+      decodedHtml
+    ) ||
+    /KUPONLU(?:<[^>]+>|\s)*URUN/i.test(decodedHtml) ||
+    /Kupon F[ıi]rsat[ıi]/i.test(decodedHtml)
+  );
+}
+
 function extractCampaignLabel($: CheerioAPI, decodedHtml: string) {
   const selectorTexts = [
     cleanText($('[class*="campaign"]').first().text()),
@@ -1996,9 +2123,11 @@ function extractBulletPointCount(
   }
 
   const selectorCounts = [
+    $('.product-description-content li').length,
     $('[class*="attribute"] li').length,
     $('[class*="attributes"] li').length,
     $('[class*="feature"] li').length,
+    $('[class*="product-description-content"] li').length,
     $('[class*="description"] li').length,
     $('#product-description li').length,
   ].filter((count) => count > 0 && count <= 30);
@@ -2007,6 +2136,67 @@ function extractBulletPointCount(
 
   if (counts.length === 0) return null;
   return Math.max(...counts);
+}
+
+function extractAttributeDescriptionFromEnvoy(
+  envoyProduct: Record<string, unknown> | null
+) {
+  if (!envoyProduct) return null;
+
+  const attributeSources = [
+    getNestedValue(envoyProduct, ["starredAttributes"]),
+    getNestedValue(envoyProduct, ["attributes"]),
+  ];
+  const seen = new Set<string>();
+  const lines: string[] = [];
+
+  for (const source of attributeSources) {
+    if (!Array.isArray(source)) continue;
+
+    for (const item of source) {
+      if (!item || typeof item !== "object") continue;
+      const record = item as Record<string, unknown>;
+      const keyName = cleanText(
+        getNestedValue(record, ["key", "name"]) as string | null
+      );
+      const valueName = cleanText(
+        getNestedValue(record, ["value", "name"]) as string | null
+      );
+
+      if (!keyName || !valueName) continue;
+      if (keyName.length > 60 || valueName.length > 120) continue;
+
+      const normalizedKey = `${keyName.toLocaleLowerCase("tr-TR")}::${valueName.toLocaleLowerCase("tr-TR")}`;
+      if (seen.has(normalizedKey)) continue;
+      seen.add(normalizedKey);
+
+      lines.push(`${keyName}: ${valueName}`);
+      if (lines.length >= 10) break;
+    }
+
+    if (lines.length >= 10) break;
+  }
+
+  if (lines.length === 0) return null;
+
+  const brand = cleanText(getNestedValue(envoyProduct, ["brand", "name"]) as string | null);
+  const productName = cleanText(getNestedValue(envoyProduct, ["name"]) as string | null);
+  const intro = cleanText(
+    [brand, productName]
+      .filter(Boolean)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
+
+  const description = [
+    intro ? `${intro} icin one cikan ozellikler.` : null,
+    ...lines.map((line) => `${line}.`),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return cleanText(description);
 }
 
 function extractImagesFromJson(jsonBlocks: unknown[]) {
@@ -2300,6 +2490,10 @@ function extractCouponLabel($: CheerioAPI, decodedHtml: string) {
     if (/tl/i.test(rawValue)) return `${rawValue} Kupon`;
   }
 
+  if (detectCollectableCouponSignal(decodedHtml)) {
+    return "Kuponlu Urun";
+  }
+
   return null;
 }
 
@@ -2313,6 +2507,24 @@ export const extractTrendyolFields: PlatformExtractor = ({ $, html }) => {
 
   // 2. En güvenilir kaynak olan "envoy" verisinden öncelikli çıkarım yap
   const currentPriceNumber =
+    toFiniteNumber(
+      getNestedValue(envoyProduct, [
+        "merchantListing",
+        "winnerVariant",
+        "price",
+        "discountedPrice",
+        "value",
+      ])
+    ) ??
+    toFiniteNumber(
+      getNestedValue(envoyProduct, [
+        "merchantListing",
+        "winnerVariant",
+        "price",
+        "sellingPrice",
+        "value",
+      ])
+    ) ??
     toFiniteNumber(getNestedValue(envoyProduct, ["price", "discountedPrice", "value"])) ??
     toFiniteNumber(getNestedValue(envoyProduct, ["price", "sellingPrice", "value"])) ??
     extractCurrentPriceNumber(jsonBlocks, stateObjects, decodedHtml);
@@ -2338,9 +2550,20 @@ export const extractTrendyolFields: PlatformExtractor = ({ $, html }) => {
     normalizePriceValue(cleanText($('[data-testid="price-current-price"]').first().text())) ??
     normalizePriceValue(cleanText($('[class*="prc-dsc"]').first().text()));
 
-  const originalPrice =
-    toFiniteNumber(getNestedValue(envoyProduct, ["price", "originalPrice", "value"])) ??
-    extractOriginalPrice($, decodedHtml, jsonBlocks, stateObjects, currentPriceNumber);
+  const originalPrice = normalizeOriginalPriceValue(
+    toFiniteNumber(
+      getNestedValue(envoyProduct, [
+        "merchantListing",
+        "winnerVariant",
+        "price",
+        "originalPrice",
+        "value",
+      ])
+    ) ??
+      toFiniteNumber(getNestedValue(envoyProduct, ["price", "originalPrice", "value"])) ??
+      extractOriginalPrice($, decodedHtml, jsonBlocks, stateObjects, currentPriceNumber),
+    currentPriceNumber
+  );
 
   const imageCandidates = new Set<string>();
   (
@@ -2389,6 +2612,13 @@ export const extractTrendyolFields: PlatformExtractor = ({ $, html }) => {
   const questionCount = envoySignals.question_count; // Sadece envoy'dan gelen, daha güvenilir.
 
   const couponLabel = extractCouponLabel($, decodedHtml);
+  const syntheticDescription = extractAttributeDescriptionFromEnvoy(envoyProduct);
+  const deliveryType =
+    envoySignals.delivery_type ?? extractDeliveryType($, decodedHtml);
+  const shippingDays = normalizeShippingDaysWithDeliveryType(
+    extractShippingDaysFromJson(jsonBlocks),
+    deliveryType
+  );
   return {
     // En güvenilir kaynaktan (envoy) gelenler
     seller_name: envoySignals.seller_name ?? extractSellerFromHtml($, decodedHtml),
@@ -2399,6 +2629,7 @@ export const extractTrendyolFields: PlatformExtractor = ({ $, html }) => {
     rating_breakdown: envoySignals.rating_breakdown,
     stock_quantity: envoySignals.stock_quantity,
     favorite_count: envoySignals.favorite_count,
+    view_count_24h: envoySignals.view_count_24h,
     follower_count: envoySignals.follower_count,
     other_seller_offers: envoySignals.other_seller_offers,
     other_sellers_summary: envoySignals.other_sellers_summary,
@@ -2413,6 +2644,8 @@ export const extractTrendyolFields: PlatformExtractor = ({ $, html }) => {
 
     // Birden çok kaynaktan, öncelik sırasına göre doldurulanlar
     brand: brand,
+    description_text: syntheticDescription,
+    description_length: syntheticDescription ? syntheticDescription.length : null,
     price: price,
     original_price: originalPrice,
     discount_rate: calculateDiscountRate(originalPrice, currentPriceNumber),
@@ -2426,24 +2659,28 @@ export const extractTrendyolFields: PlatformExtractor = ({ $, html }) => {
     // Fallback'li diğer alanlar
     category: envoySignals.category ?? extractCategory(jsonBlocks, decodedHtml),
     has_free_shipping:
-      isTrendyolFreeShippingEligible(price) ||
-      envoySignals.has_free_shipping ||
-      detectFreeShipping($, decodedHtml),
-    shipping_days: extractShippingDaysFromJson(jsonBlocks), // Genellikle sadece JSON-LD'de var.
+      envoySignals.has_free_shipping ??
+      detectFreeShipping($, decodedHtml) ??
+      (isTrendyolFreeShippingEligible(price) ? true : null),
+    shipping_days: shippingDays,
     variant_count: envoySignals.variant_count ?? extractVariantCount($, decodedHtml, stateObjects),
-    has_video: envoySignals.has_video || detectVideo($, decodedHtml, stateObjects),
+    has_video: envoySignals.has_video ?? detectVideo($, decodedHtml, stateObjects),
     has_brand_page: detectBrandPage($, decodedHtml, brand),
     bullet_point_count: extractBulletPointCount($, decodedHtml, stateObjects),
     has_return_info: envoySignals.has_return_info || undefined,
     has_specs: envoySignals.has_specs || undefined,
     stock_status: envoySignals.stock_status ?? extractStockStatus($, decodedHtml, stateObjects),
-    official_seller: envoySignals.official_seller || detectOfficialSeller($, decodedHtml),
-    has_campaign: envoySignals.has_campaign || detectCampaignSignal($, decodedHtml) || !!couponLabel,
+    official_seller:
+      envoySignals.official_seller ?? detectOfficialSeller($, decodedHtml),
+    has_campaign:
+      envoySignals.has_campaign ??
+      detectCampaignSignal($, decodedHtml) ??
+      (!!couponLabel ? true : null),
     campaign_label: envoySignals.campaign_label ?? extractCampaignLabel($, decodedHtml) ?? couponLabel,
     promotion_labels: (() => {
       const labels = uniqueNonEmptyStrings([...(envoySignals.promotion_labels ?? []), couponLabel]);
       return labels.length > 0 ? labels : null;
     })(),
-    delivery_type: extractDeliveryType($, decodedHtml),
+    delivery_type: deliveryType,
   };
 };

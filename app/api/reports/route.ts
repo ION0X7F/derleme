@@ -75,7 +75,6 @@ export async function GET(req: Request) {
         requestId,
         error: "INTERNAL_SERVER_ERROR",
         message: "Raporlar alinamadi.",
-        detail: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );

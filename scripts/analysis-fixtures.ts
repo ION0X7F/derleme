@@ -55,6 +55,7 @@ export function createExtracted(
     seller_score: 9.2,
     follower_count: 5000,
     favorite_count: 120000,
+    view_count_24h: 2500,
     other_sellers_count: 5,
     other_seller_offers: null,
     other_sellers_summary: {

@@ -12,7 +12,8 @@ function read(path: string) {
 }
 
 function run() {
-  const content = read("app/api/analyze/route.ts");
+  const routeContent = read("app/api/analyze/route.ts");
+  const executionContent = read("lib/analyze-execution.ts");
   const reanalyzeContent = read("app/api/reports/[id]/reanalyze/route.ts");
   const checks: Check[] = [];
 
@@ -20,34 +21,34 @@ function run() {
     label: "analyze route builds a slim reportPreview payload",
     passed:
       /const reportPreview = savedReport[\s\S]*id:\s*savedReport\.id[\s\S]*overallScore:\s*savedReport\.overallScore/m.test(
-        content
+        executionContent
       ),
   });
 
   checks.push({
     label: "analyze route returns report preview instead of full db record",
-    passed: /report:\s*reportPreview/m.test(content),
+    passed: /report:\s*reportPreview/m.test(executionContent),
   });
 
   checks.push({
     label: "analyze route returns top-level reportId for lightweight consumers",
-    passed: /reportId:\s*reportPreview\?\.id\s*\?\?\s*null/m.test(content),
+    passed: /reportId:\s*reportPreview\?\.id\s*\?\?\s*null/m.test(executionContent),
   });
 
   checks.push({
     label: "analyze route uses shared create helper instead of direct prisma import",
     passed:
-      content.includes('from "@/lib/report-detail-query"') &&
-      content.includes("createAnalyzeReport") &&
-      content.includes("createAnalyzeReport({") &&
-      !content.includes('from "@/lib/prisma"'),
+      executionContent.includes('from "@/lib/report-detail-query"') &&
+      executionContent.includes("createAnalyzeReport") &&
+      executionContent.includes("createAnalyzeReport({") &&
+      !executionContent.includes('from "@/lib/prisma"'),
   });
   checks.push({
     label: "analyze route returns 400 INVALID_REQUEST_BODY for malformed body",
     passed:
-      content.includes("INVALID_REQUEST_BODY") &&
-      content.includes("Gecersiz istek govdesi.") &&
-      content.includes("Array.isArray(body)"),
+      routeContent.includes("INVALID_REQUEST_BODY") &&
+      routeContent.includes("Gecersiz istek govdesi.") &&
+      routeContent.includes("Array.isArray(body)"),
   });
 
   checks.push({

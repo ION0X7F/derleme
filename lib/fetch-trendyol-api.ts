@@ -15,6 +15,7 @@ type TrendyolSeller = {
   price: number | null;
   original_price: number | null;
   discount_rate: number | null;
+  delivery_text: string | null;
   promotion_labels: string[] | null;
   listing_url: string | null;
 };
@@ -114,12 +115,32 @@ function buildApiHeaders() {
   };
 }
 
+const TRENDYOL_API_TIMEOUT_MS = 10_000;
+
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs = TRENDYOL_API_TIMEOUT_MS
+) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function fetchTrendyolFollowerCountByMerchantId(
   merchantId: number
 ): Promise<number | null> {
   try {
     const followerUrl = `https://apigw.trendyol.com/discovery-storefront-trproductgw-service/api/sellerstore-follow/${merchantId}/follower-count?culture=tr-TR&channelId=1&checkCoupon=true`;
-    const response = await fetch(followerUrl, {
+    const response = await fetchWithTimeout(followerUrl, {
       method: "GET",
       headers: buildApiHeaders(),
       cache: "no-store",
@@ -187,10 +208,40 @@ function buildBadgeList(
   return Array.from(badges);
 }
 
+function resolveFreeShippingFlag(params: {
+  seller?: Pick<
+    TrendyolApiSellerRecord,
+    "freeCargo" | "freeShipping" | "hasFreeCargo"
+  > | null;
+  variant?: Pick<
+    NonNullable<TrendyolApiSellerRecord["variants"]>[number],
+    "freeCargo" | "hasFreeCargo"
+  > | null;
+  price: number | null;
+}) {
+  const explicitFlag = [
+    params.variant?.freeCargo,
+    params.variant?.hasFreeCargo,
+    params.seller?.freeCargo,
+    params.seller?.hasFreeCargo,
+    params.seller?.freeShipping,
+  ].find((value) => typeof value === "boolean");
+
+  if (typeof explicitFlag === "boolean") {
+    return explicitFlag;
+  }
+
+  return isTrendyolFreeShippingEligible(params.price);
+}
+
 function normalizeSellerOffer(raw: TrendyolApiSellerRecord): TrendyolSeller {
   const variant = Array.isArray(raw.variants) && raw.variants.length > 0 ? raw.variants[0] : null;
   const priceInfo = getPriceValue(variant?.price ?? raw.price ?? null);
-  const hasFreeShipping = isTrendyolFreeShippingEligible(priceInfo.price);
+  const hasFreeShipping = resolveFreeShippingFlag({
+    seller: raw,
+    variant,
+    price: priceInfo.price,
+  });
 
   return {
     merchant_id: toFiniteNumber(raw.id) ?? toFiniteNumber(raw.sellerId),
@@ -206,6 +257,7 @@ function normalizeSellerOffer(raw: TrendyolApiSellerRecord): TrendyolSeller {
     price: priceInfo.price,
     original_price: priceInfo.originalPrice,
     discount_rate: priceInfo.discountRate,
+    delivery_text: null,
     promotion_labels: null,
     listing_url: typeof raw.url === "string" && raw.url.trim() ? raw.url : null,
   };
@@ -315,7 +367,7 @@ export async function fetchTrendyolApi(url: string): Promise<TrendyolApiResult |
 
     const apiUrl = `https://apigw.trendyol.com/discovery-web-productgw-service/api/product-detail/v2/${contentId}?storefrontId=1&culture=tr-TR&channelId=1`;
 
-    const response = await fetch(apiUrl, {
+    const response = await fetchWithTimeout(apiUrl, {
       method: "GET",
       headers: buildApiHeaders(),
       cache: "no-store",
@@ -369,7 +421,10 @@ export async function fetchTrendyolApi(url: string): Promise<TrendyolApiResult |
     const other_sellers_summary = buildOtherSellersSummary(other_sellers, discounted_price);
 
     // Ücretsiz kargo
-    const has_free_shipping = isTrendyolFreeShippingEligible(discounted_price);
+    const has_free_shipping = resolveFreeShippingFlag({
+      seller: data?.result?.product ?? data,
+      price: discounted_price,
+    });
 
     // Varyant sayısı
     const variants =

@@ -70,7 +70,7 @@ async function ensureOAuthUser(params: {
   return dbUser;
 }
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
+export const { handlers, signIn, signOut, auth, unstable_update } = NextAuth({
   trustHost: true,
   session: {
     strategy: "jwt",
@@ -148,7 +148,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       : []),
   ],
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger, session }) {
+      if (trigger === "update" && session?.user) {
+        if (session.user.plan != null) {
+          token.plan = String(session.user.plan);
+        }
+        if (session.user.name != null) {
+          token.name = String(session.user.name);
+        }
+        if (session.user.email != null) {
+          token.email = String(session.user.email);
+        }
+        if ("username" in session.user && session.user.username != null) {
+          token.username = String(session.user.username);
+        }
+        return token;
+      }
+
       if (
         account?.provider &&
         account.provider !== "credentials"

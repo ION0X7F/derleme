@@ -28,7 +28,7 @@ type WorkspaceRouteState = {
   reportId?: string;
 };
 
-const DASHBOARD_SHELL_VERSION = "2026-03-29-11";
+const DASHBOARD_SHELL_VERSION = "2026-03-29-13";
 
 function getQuery(
   view: View,

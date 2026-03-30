@@ -8,6 +8,7 @@ export async function resolveReportHistoryLimit(userId: string) {
     select: {
       subscription: {
         select: {
+          status: true,
           plan: {
             select: {
               reportsHistoryLimit: true,
@@ -18,5 +19,13 @@ export async function resolveReportHistoryLimit(userId: string) {
     },
   });
 
-  return user?.subscription?.plan?.reportsHistoryLimit ?? DEFAULT_REPORT_HISTORY_LIMIT;
+  if (
+    user?.subscription &&
+    (user.subscription.status === "ACTIVE" ||
+      user.subscription.status === "TRIALING")
+  ) {
+    return user.subscription.plan?.reportsHistoryLimit ?? DEFAULT_REPORT_HISTORY_LIMIT;
+  }
+
+  return DEFAULT_REPORT_HISTORY_LIMIT;
 }

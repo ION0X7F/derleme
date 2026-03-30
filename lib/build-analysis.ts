@@ -257,6 +257,15 @@ function hasReliableQuestionSignal(extracted: ExtractedProductFields) {
   return qaSample > 0 || extracted.has_faq === true || count >= 5;
 }
 
+function hasSplitDescriptionProxy(extracted: ExtractedProductFields) {
+  return (
+    typeof extracted.description_length !== "number" &&
+    extracted.has_specs === true &&
+    typeof extracted.bullet_point_count === "number" &&
+    extracted.bullet_point_count >= 4
+  );
+}
+
 function getOtherSellerScoreGap(extracted: ExtractedProductFields) {
   if (
     typeof extracted.seller_score !== "number" ||
@@ -1349,6 +1358,7 @@ function buildDecisionSupportPacket(params: {
       seller_score: extracted.seller_score,
       follower_count: extracted.follower_count,
       favorite_count: extracted.favorite_count,
+      view_count_24h: extracted.view_count_24h,
       other_sellers_count: extracted.other_sellers_count,
       other_seller_offers: extracted.other_seller_offers,
       other_sellers_summary: extracted.other_sellers_summary,
@@ -1713,7 +1723,13 @@ function getSuggestions(
   const lowRatedRatio = getLowRatedSampleRatio(extracted);
 
   // --- Product Quality Suggestions ---
-  if (metrics.productQuality.label === "weak" || (extracted.description_length || 0) < 120) {
+  if (
+    metrics.productQuality.label === "weak" ||
+    (
+      (extracted.description_length || 0) < 120 &&
+      !hasSplitDescriptionProxy(extracted)
+    )
+  ) {
     suggestions.push({
       key: "expand-description",
       severity: "high",

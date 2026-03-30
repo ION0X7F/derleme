@@ -1,14 +1,24 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CSSProperties, FormEvent, useMemo, useState } from "react";
 import { signIn } from "next-auth/react";
+import {
+  getPlanDisplayName,
+  isAppPlanId,
+  isPaidPlanId,
+  type AppPlanId,
+} from "@/lib/plans";
+import { extractSafeCallbackPathFromUrl } from "@/lib/auth-callback";
 
 type AuthMode = "login" | "register";
 
 type Props = {
   mode: AuthMode;
+  callbackUrlOverride?: string;
+  context?: "default" | "admin";
 };
 
 const shellStyle: CSSProperties = {
@@ -104,18 +114,32 @@ const emptyRegisterForm: RegisterForm = {
   password: "",
 };
 
-export default function AuthPanel({ mode }: Props) {
+export default function AuthPanel({
+  mode,
+  callbackUrlOverride,
+  context = "default",
+}: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const selectedPlanId = useMemo<AppPlanId | null>(() => {
+    const rawPlan = searchParams.get("plan");
+    return isAppPlanId(rawPlan) ? rawPlan : null;
+  }, [searchParams]);
   const callbackUrl = useMemo(
-    () => searchParams.get("callbackUrl") || "/dashboard",
-    [searchParams]
+    () =>
+      extractSafeCallbackPathFromUrl(
+        callbackUrlOverride || searchParams.get("callbackUrl") || "/dashboard"
+      ),
+    [callbackUrlOverride, searchParams]
   );
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [registerForm, setRegisterForm] = useState<RegisterForm>(emptyRegisterForm);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const isLogin = mode === "login";
+  const isAdminContext = context === "admin";
 
   function setRegisterField<K extends keyof RegisterForm>(
     key: K,
@@ -132,7 +156,7 @@ export default function AuthPanel({ mode }: Props) {
     const password = loginPassword;
 
     if (!email || !password) {
-      setError("E-posta ve şifre zorunlu.");
+      setError("E-posta ve sifre zorunlu.");
       return;
     }
 
@@ -149,7 +173,13 @@ export default function AuthPanel({ mode }: Props) {
     setLoading(false);
 
     if (!result || result.error) {
-      setError("Giriş başarısız. Bilgilerini kontrol edip tekrar dene.");
+      setError("Giris basarisiz. Bilgilerini kontrol edip tekrar dene.");
+      return;
+    }
+
+    if (selectedPlanId && isPaidPlanId(selectedPlanId)) {
+      router.push(`/checkout?plan=${encodeURIComponent(selectedPlanId)}`);
+      router.refresh();
       return;
     }
 
@@ -181,12 +211,12 @@ export default function AuthPanel({ mode }: Props) {
       !phone ||
       !password
     ) {
-      setError("Tüm zorunlu alanları doldur.");
+      setError("Tum zorunlu alanlari doldur.");
       return;
     }
 
     if (email !== confirmEmail) {
-      setError("E-posta alanları birbiriyle eşleşmiyor.");
+      setError("E-posta alanlari birbiriyle eslesmiyor.");
       return;
     }
 
@@ -211,7 +241,7 @@ export default function AuthPanel({ mode }: Props) {
 
     if (!registerRes.ok) {
       setLoading(false);
-      setError(registerPayload?.error || "Kayıt sırasında bir hata oluştu.");
+      setError(registerPayload?.error || "Kayit sirasinda bir hata olustu.");
       return;
     }
 
@@ -225,10 +255,18 @@ export default function AuthPanel({ mode }: Props) {
     setLoading(false);
 
     if (!signInResult || signInResult.error) {
-      setError(
-        "Kayıt tamamlandı ama otomatik giriş başarısız oldu. Giriş yapmayı dene."
+      setError("Kayit tamamlandi ama otomatik giris basarisiz oldu.");
+      router.push(
+        `/login?callbackUrl=${encodeURIComponent(callbackUrl)}${
+          selectedPlanId ? `&plan=${encodeURIComponent(selectedPlanId)}` : ""
+        }`
       );
-      router.push(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+      return;
+    }
+
+    if (selectedPlanId && isPaidPlanId(selectedPlanId)) {
+      router.push(`/checkout?plan=${encodeURIComponent(selectedPlanId)}`);
+      router.refresh();
       return;
     }
 
@@ -236,7 +274,34 @@ export default function AuthPanel({ mode }: Props) {
     router.refresh();
   }
 
-  const isLogin = mode === "login";
+  const eyebrowCopy = isAdminContext
+    ? "Admin Girisi"
+    : isLogin
+      ? "Giris Yap"
+      : "Kayit Ol";
+  const titleCopy = isAdminContext
+    ? "Yonetim alanina giris yap"
+    : isLogin
+      ? "Tekrar hos geldin"
+      : "Hesabini olustur";
+  const introCopy = isAdminContext
+    ? "Bu alan sadece yetkili admin hesaplarina aciktir."
+    : isLogin
+      ? "Raporlarina kaldigin yerden devam etmek icin giris yap."
+      : "Ucretsiz basla, ilk analizini gercek hesabinla kaydet.";
+  const asideBadgeCopy = isAdminContext
+    ? "Guvenli Admin Erisimi"
+    : "Canli Hesap Akisi";
+  const asideTitleCopy = isAdminContext
+    ? "Dashboard, kullanici yonetimi ve sistem kayitlari tek panelde."
+    : isLogin
+      ? "Kayitli raporlarin ve favorilerin seni bekliyor."
+      : "Sadece hesap degil, calisma baglamini da ilk adimda kur.";
+  const asideBodyCopy = isAdminContext
+    ? "Giris yaptiktan sonra sadece ADMIN yetkili hesaplar paneli gorebilir. Diger hesaplar ana sayfaya yonlendirilir."
+    : isLogin
+      ? "Giris yaptiginda kendi raporlarina, favorilerine ve kisisel calisma alanina dusersin."
+      : "Kullanici adi, telefon ve magaza bilgisiyle baslayan kayit akisi; sonradan profil, favoriler ve rapor ekranlarinda daha tutarli bir deneyim saglar.";
 
   return (
     <div className="auth-shell" style={shellStyle}>
@@ -247,7 +312,7 @@ export default function AuthPanel({ mode }: Props) {
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: 10,
+              gap: 12,
               marginBottom: 20,
               color: "#fff",
               textDecoration: "none",
@@ -255,20 +320,13 @@ export default function AuthPanel({ mode }: Props) {
               letterSpacing: ".04em",
             }}
           >
-            <span
-              style={{
-                width: 34,
-                height: 34,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: 12,
-                background: "linear-gradient(135deg, #4f7fff, #7c5cfc)",
-              }}
-            >
-              S
-            </span>
-            SellBoost AI
+            <Image
+              src="/brand/sellboost-logo.png"
+              alt="SellBoost"
+              width={210}
+              height={59}
+              style={{ width: 210, height: "auto", display: "block" }}
+            />
           </Link>
 
           <div
@@ -277,20 +335,35 @@ export default function AuthPanel({ mode }: Props) {
               fontWeight: 700,
               letterSpacing: ".14em",
               textTransform: "uppercase",
-              color: "#00d4a8",
+              color: isAdminContext ? "#ff8b8b" : "#00d4a8",
               marginBottom: 10,
             }}
           >
-            {isLogin ? "Giriş Yap" : "Kayıt Ol"}
+            {eyebrowCopy}
           </div>
           <h1 style={{ fontSize: 34, lineHeight: 1.05, margin: "0 0 10px" }}>
-            {isLogin ? "Tekrar hoş geldin" : "Hesabını oluştur"}
+            {titleCopy}
           </h1>
           <p style={{ margin: "0 0 24px", color: "#9aa3ba", fontSize: 15 }}>
-            {isLogin
-              ? "Raporlarına kaldığın yerden devam etmek için giriş yap."
-              : "Ücretsiz başla, ilk analizini gerçek hesabınla kaydet."}
+            {introCopy}
           </p>
+
+          {selectedPlanId && isPaidPlanId(selectedPlanId) ? (
+            <div
+              style={{
+                marginBottom: 18,
+                padding: "12px 14px",
+                borderRadius: 14,
+                border: "1px solid rgba(79,127,255,.24)",
+                background: "rgba(79,127,255,.1)",
+                color: "#dbe6ff",
+                fontSize: 14,
+              }}
+            >
+              Secilen plan: <strong>{getPlanDisplayName(selectedPlanId)}</strong>.{" "}
+              Kayit veya giris tamamlaninca odeme adimina yonlendirileceksin.
+            </div>
+          ) : null}
 
           <form onSubmit={isLogin ? handleLoginSubmit : handleRegisterSubmit}>
             {!isLogin ? (
@@ -304,7 +377,7 @@ export default function AuthPanel({ mode }: Props) {
               >
                 <div>
                   <label htmlFor="firstName" style={labelStyle}>
-                    İsim
+                    Isim
                   </label>
                   <input
                     id="firstName"
@@ -336,7 +409,7 @@ export default function AuthPanel({ mode }: Props) {
             {!isLogin ? (
               <div style={{ marginBottom: 14 }}>
                 <label htmlFor="username" style={labelStyle}>
-                  Kullanıcı Adı
+                  Kullanici Adi
                 </label>
                 <input
                   id="username"
@@ -417,7 +490,7 @@ export default function AuthPanel({ mode }: Props) {
               >
                 <div>
                   <label htmlFor="storeName" style={labelStyle}>
-                    Mağaza Adı
+                    Magaza Adi
                   </label>
                   <input
                     id="storeName"
@@ -431,7 +504,7 @@ export default function AuthPanel({ mode }: Props) {
                 </div>
                 <div>
                   <label htmlFor="companyName" style={labelStyle}>
-                    Şirket Adı
+                    Sirket Adi
                   </label>
                   <input
                     id="companyName"
@@ -448,7 +521,7 @@ export default function AuthPanel({ mode }: Props) {
 
             <div style={{ marginBottom: 18 }}>
               <label htmlFor="password" style={labelStyle}>
-                Şifre
+                Sifre
               </label>
               <input
                 id="password"
@@ -483,27 +556,33 @@ export default function AuthPanel({ mode }: Props) {
             <button type="submit" disabled={loading} style={buttonStyle}>
               {loading
                 ? isLogin
-                  ? "Giriş yapılıyor..."
-                  : "Hesap oluşturuluyor..."
+                  ? "Giris yapiliyor..."
+                  : "Hesap olusturuluyor..."
                 : isLogin
-                  ? "Giriş Yap"
-                  : "Hesap Oluştur"}
+                  ? "Giris Yap"
+                  : "Hesap Olustur"}
             </button>
           </form>
 
-          <p style={{ margin: "18px 0 0", color: "#9aa3ba", fontSize: 14 }}>
-            {isLogin ? "Hesabın yok mu?" : "Zaten hesabın var mı?"}{" "}
-            <Link
-              href={
-                isLogin
-                  ? `/register?callbackUrl=${encodeURIComponent(callbackUrl)}`
-                  : `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`
-              }
-              style={{ color: "#7ea0ff", fontWeight: 700, textDecoration: "none" }}
-            >
-              {isLogin ? "Ücretsiz kayıt ol" : "Giriş yap"}
-            </Link>
-          </p>
+          {!isAdminContext ? (
+            <p style={{ margin: "18px 0 0", color: "#9aa3ba", fontSize: 14 }}>
+              {isLogin ? "Hesabin yok mu?" : "Zaten hesabin var mi?"}{" "}
+              <Link
+                href={
+                  isLogin
+                    ? `/register?callbackUrl=${encodeURIComponent(callbackUrl)}${
+                        selectedPlanId ? `&plan=${encodeURIComponent(selectedPlanId)}` : ""
+                      }`
+                    : `/login?callbackUrl=${encodeURIComponent(callbackUrl)}${
+                        selectedPlanId ? `&plan=${encodeURIComponent(selectedPlanId)}` : ""
+                      }`
+                }
+                style={{ color: "#7ea0ff", fontWeight: 700, textDecoration: "none" }}
+              >
+                {isLogin ? "Ucretsiz kayit ol" : "Giris yap"}
+              </Link>
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -514,8 +593,10 @@ export default function AuthPanel({ mode }: Props) {
               display: "inline-flex",
               padding: "6px 12px",
               borderRadius: 999,
-              background: "rgba(79,127,255,.12)",
-              color: "#b8c8ff",
+              background: isAdminContext
+                ? "rgba(232,77,77,.12)"
+                : "rgba(79,127,255,.12)",
+              color: isAdminContext ? "#ffb4b4" : "#b8c8ff",
               fontSize: 12,
               fontWeight: 700,
               letterSpacing: ".08em",
@@ -523,20 +604,17 @@ export default function AuthPanel({ mode }: Props) {
               marginBottom: 18,
             }}
           >
-            Canlı Hesap Akışı
+            {asideBadgeCopy}
           </div>
           <h2 style={{ fontSize: 40, lineHeight: 1.05, margin: "0 0 14px" }}>
-            {isLogin
-              ? "Kayıtlı raporların ve favorilerin seni bekliyor."
-              : "Sadece hesap değil, çalışma bağlamını da ilk adımda kur."}
+            {asideTitleCopy}
           </h2>
           <p style={{ fontSize: 16, color: "#c0c8da", lineHeight: 1.7, margin: 0 }}>
-            {isLogin
-              ? "Giriş yaptığında kendi raporlarına, favorilerine ve kişisel çalışma alanına düşersin."
-              : "Kullanıcı adı, telefon ve mağaza bilgisiyle başlayan kayıt akışı; sonradan profil, favoriler ve rapor ekranlarında daha tutarlı bir deneyim sağlar."}
+            {asideBodyCopy}
           </p>
         </div>
       </aside>
+
       <style jsx>{`
         @media (max-width: 960px) {
           .auth-shell {

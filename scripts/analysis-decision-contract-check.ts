@@ -18,7 +18,7 @@ function run() {
   checks.push({
     label: "analyze route includes decisionSummary in result payload",
     passed: hasPattern(
-      "app/api/analyze/route.ts",
+      "lib/analyze-execution.ts",
       /result:\s*\{[\s\S]*decisionSummary/m
     ),
   });

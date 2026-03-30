@@ -36,10 +36,8 @@ canvas{display:block;width:100%!important;}
 
 /* ── SIDEBAR ── */
 .sidebar{grid-row:1/-1;grid-column:1;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;z-index:10;}
-.sb-brand{display:flex;align-items:center;gap:9px;padding:0 18px;height:var(--topbar);border-bottom:1px solid var(--border);flex-shrink:0;cursor:pointer;}
-.sb-mark{width:30px;height:30px;background:linear-gradient(135deg,var(--brand),var(--brand2));border-radius:8px;display:grid;place-items:center;font-size:14px;flex-shrink:0;}
-.sb-name{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:17px;letter-spacing:-.03em;}
-.sb-name span{color:var(--brand);}
+.sb-brand{display:flex;align-items:center;gap:10px;padding:0 18px;height:var(--topbar);border-bottom:1px solid var(--border);flex-shrink:0;cursor:pointer;}
+.sb-brand img{display:block;max-width:152px;height:auto;}
 .sb-sec{padding:18px 12px 4px;}
 .sb-sec-lbl{font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);padding:0 8px;margin-bottom:4px;}
 .sb-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;font-size:13px;font-weight:500;color:var(--muted);background:transparent;border:none;text-align:left;width:100%;transition:color .18s,background .18s;position:relative;}
@@ -225,6 +223,14 @@ canvas{display:block;width:100%!important;}
 .seller-row:hover{background:rgba(255,255,255,.025);}
 .seller-row.this-product{background:rgba(79,127,255,.06);border-left:2px solid var(--brand);}
 .seller-head{background:rgba(255,255,255,.02);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);}
+.comp-adv-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.comp-adv-item{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px 14px;}
+.comp-adv-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.comp-adv-seller{font-weight:700;font-size:13px;}
+.comp-adv-price{font-size:12px;color:var(--muted);}
+.comp-adv-signals{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+.comp-adv-meta{font-size:11.5px;color:var(--muted);line-height:1.45;}
+.comp-adv-empty{padding:14px;border:1px dashed var(--border2);border-radius:12px;color:var(--muted);font-size:12.5px;background:rgba(255,255,255,.02);}
 
 /* rd tabs */
 .rd-tabs{display:flex;gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:20px;width:fit-content;flex-wrap:wrap;}
@@ -295,6 +301,7 @@ canvas{display:block;width:100%!important;}
   .g4,.sc-strip{grid-template-columns:repeat(2,1fr);}
   .sig-grid{grid-template-columns:repeat(2,1fr);}
   .g2,.g3,.g-wide{grid-template-columns:1fr;}
+  .comp-adv-list{grid-template-columns:1fr;}
   .rt-head{display:none;}
   .rt-row{grid-template-columns:1fr auto;}
 }
@@ -304,8 +311,7 @@ canvas{display:block;width:100%!important;}
 <div class="app">
 <aside class="sidebar">
   <div class="sb-brand" onclick="gv('overview')">
-    <div class="sb-mark">⚡</div>
-    <div class="sb-name">Sell<span>Boost</span></div>
+    <img src="/brand/sellboost-logo.png" alt="SellBoost">
   </div>
 
   <div class="sb-sec">
@@ -339,6 +345,7 @@ canvas{display:block;width:100%!important;}
     <button class="sb-item" onclick="gv('account')">
       <svg class="sb-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
       Hesabım
+      <span id="sbAccountNotifBadge" class="sb-badge" style="display:none;">0</span>
     </button>
     <button class="sb-item" onclick="gv('settings')">
       <svg class="sb-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.1 3.1l1.4 1.4M11.5 11.5l1.4 1.4M3.1 12.9l1.4-1.4M11.5 4.5l1.4-1.4"/></svg>
@@ -373,9 +380,9 @@ canvas{display:block;width:100%!important;}
       <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
       Yeni Analiz
     </button>
-    <div class="tb-notif">
+    <div class="tb-notif" onclick="gv('account')" title="Bildirimler">
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5 5 0 0 1 5 5v3l1.5 2H1.5L3 9V6a5 5 0 0 1 5-5z"/><path d="M6 13a2 2 0 0 0 4 0"/></svg>
-      <div class="ndot"></div>
+      <div class="ndot" id="topbarNotifDot" style="display:none;"></div>
     </div>
   </div>
 </header>
@@ -651,15 +658,23 @@ canvas{display:block;width:100%!important;}
       </div>
     </div>
 
-    <div class="g2" style="margin-top:14px;">
-      <div class="cc"><div class="cc-head"><div><div class="cc-title">Rakip Fiyat Dağılımı</div><div class="cc-sub">other_sellers_summary: min/avg/max</div></div><span class="cc-type derived" id="priceRangeType">Türetilmiş</span></div><div class="h180"><canvas id="priceRangeChart"></canvas></div></div>
-      <div class="cc"><div class="cc-head"><div><div class="cc-title">Rakip Avantajları</div><div class="cc-sub">Kampanya + indirim + teslimat sinyalleri</div></div><span class="cc-type derived" id="compAdvType">Türetilmiş</span></div><div class="h180"><canvas id="compAdvChart"></canvas></div><div id="compAdvNote" style="margin-top:10px;font-size:12px;color:var(--muted);">Rakip kampanya sinyalleri hazırlanıyor.</div></div>
+    <div style="margin-top:14px;">
+      <div class="cc"><div class="cc-head"><div><div class="cc-title">Rakip Avantajları</div><div class="cc-sub">En fazla 10 rakipte kupon, kampanya ve birlikte al sinyalleri</div></div><span class="cc-type derived" id="compAdvType">Türetilmiş</span></div><div id="compAdvList" class="comp-adv-list"></div><div id="compAdvNote" style="margin-top:10px;font-size:12px;color:var(--muted);">Rakip kampanya sinyalleri hazırlanıyor.</div></div>
     </div>
   </div>
 
   <div id="rdt-content" class="rd-sec">
     <div class="sig-grid" style="grid-template-columns:repeat(4,1fr);">
-      <div class="sig"><div class="sig-lbl">Birincil Anahtar Kelimeler</div><div class="sig-val c-b" id="contentPrimaryKeywordsValue" style="font-size:14px;line-height:1.35;">bromelain şurubu · detox şurubu · ananas şurubu</div><div class="sig-note ne" id="contentPrimaryKeywordsNote">Algoritma tarafından çıkarıldı</div></div>
+      <div class="sig">
+        <div class="sig-lbl">Birincil Anahtar Kelimeler</div>
+        <div class="sig-val c-b" id="contentPrimaryKeywordsValue" style="font-size:14px;line-height:1.35;">bromelain şurubu · detox şurubu · ananas şurubu</div>
+        <div class="sig-note dn" id="contentPrimaryKeywordsNote">Anahtar kelime girilmedi</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;">
+          <input id="contentPrimaryKeywordsInput" type="text" placeholder="Anahtar kelime gir, virgulle ayir" style="flex:1;min-width:0;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 12px;font-size:12px;outline:none;">
+          <button id="contentPrimaryKeywordsApplyBtn" type="button" class="btn btn-o btn-sm" onclick="applyCustomPrimaryKeywords()">Uygula</button>
+        </div>
+        <div class="sig-note ne" id="contentPrimaryKeywordsHelp" style="margin-top:8px;">En fazla 3 ifade gir. Bu alan anahtar kelime sıralaması ve açıklama puanında kullanılır.</div>
+      </div>
       <div class="sig"><div class="sig-lbl">Anahtar Kelime Sıralaması</div><div class="sig-val c-b" id="contentKeywordRankValue" style="font-size:13px;line-height:1.45;">Kontrol ediliyor…</div><div class="sig-note ne" id="contentKeywordRankNote">Trendyol arama sırası</div></div>
       <div class="sig"><div class="sig-lbl">Ürün / Kategori Uyumu</div><div class="sig-val c-g" id="contentCategoryFitValue">Yüksek</div><div class="sig-note up" id="contentCategoryFitNote">Kategori ile güçlü eşleşme görülüyor</div></div>
       <div class="sig"><div class="sig-lbl">Açıklama Yeterliliği</div><div class="sig-val c-r" id="contentDescriptionValue">Zayıf</div><div class="sig-note dn" id="contentDescriptionNote">Ürün bilgisini taşımakta yetersiz</div></div>
@@ -857,7 +872,10 @@ canvas{display:block;width:100%!important;}
           <div style="font-size:12px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:5px;"><span>Rapor Depolama</span><span style="font-weight:700;color:var(--text);">12 / 500</span></div>
           <div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;"><div style="width:2.4%;height:100%;background:var(--accent);border-radius:3px;"></div></div>
         </div>
-        <div style="display:flex;gap:8px;"><button class="btn btn-p btn-sm">Planı Yükselt</button><button class="btn btn-g btn-sm">Faturalama</button></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-p btn-sm" onclick="startPlanUpgradeFlow()">Planı Yükselt</button>
+          <button class="btn btn-g btn-sm" onclick="window.location.href='/pricing'">Faturalama</button>
+        </div>
       </div>
       <div class="cc" style="margin-bottom:14px;">
         <div style="font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);">Bildirimler</div>
@@ -866,6 +884,14 @@ canvas{display:block;width:100%!important;}
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--muted);"><input type="checkbox" checked style="accent-color:var(--brand);"> Haftalık özet e-postası</label>
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--muted);"><input type="checkbox" style="accent-color:var(--brand);"> Kampanya ve duyurular</label>
         </div>
+      </div>
+      <div class="cc" style="margin-bottom:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);">
+          <div style="font-size:14px;font-weight:700;">Admin Bildirimleri</div>
+          <button class="btn btn-g btn-sm" onclick="markAllUserNotificationsAsRead()">Tümünü Okundu Yap</button>
+        </div>
+        <div id="accountNotifSummary" style="font-size:12px;color:var(--muted);margin-bottom:10px;">Henüz bildirim yok.</div>
+        <div id="accountNotifList" style="display:grid;gap:8px;"></div>
       </div>
       <div class="cc">
         <div style="font-size:14px;font-weight:700;color:var(--danger);margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border);">Tehlikeli Bölge</div>
@@ -927,9 +953,11 @@ const BR='#4f7fff',BR2='#7c5cfc',AC='#00d4a8',WN='#f59e0b',DG='#ef4444',GC='rgba
 const CI={};
 const FAVORITE_REPORTS_STORAGE_KEY='sellboost:favorite-report-keys:v1';
 const REPORTS_FILTER_MODE_STORAGE_KEY='sellboost:reports-filter-mode:v1';
+const CONTENT_PRIMARY_KEYWORDS_STORAGE_KEY='sellboost:content-primary-keywords:v1';
 let currentReportData=null;
 let currentCampaignState={discountRate:null,campaignDays:null};
 let keywordRankRequestToken=0;
+let primaryKeywordInputDebounceTimer=null;
 let currentActionFeedbackType='veri_yorumlama';
 let liveReportsCache=[];
 let reportsFetchPromise=null;
@@ -944,6 +972,7 @@ let resolvedRulebookCache=null;
 let rulebookFetchPromise=null;
 let overviewDataSourceMode='unknown';
 let currentUserProfile={
+  id:'',
   name:'Kullanıcı',
   firstName:'Kullanıcı',
   lastName:'',
@@ -951,6 +980,8 @@ let currentUserProfile={
   username:'kullanici',
   plan:'FREE',
 };
+let currentUserNotifications=[];
+let currentUserNotificationUnreadCount=0;
 function getResolvedRuleSection(section){
   return resolvedRulebookCache?.[section]?.rules ? resolvedRulebookCache[section] : null;
 }
@@ -979,6 +1010,48 @@ function getKeywordRankCacheKey(reportId,url,keywords){
   const reportPart=reportId?`report:${String(reportId)}`:`url:${String(url||'').trim()}`;
   const keywordPart=(Array.isArray(keywords)?keywords:[]).map((item)=>String(item||'').trim().toLocaleLowerCase('tr-TR')).filter(Boolean).join('|');
   return `sellboost:keyword-rank:${reportPart}:${keywordPart}`;
+}
+function normalizePrimaryKeywordList(rawValue,maxCount=3){
+  const values=Array.isArray(rawValue)
+    ? rawValue
+    : String(rawValue || '')
+        .split(/[\n,;|]+|·/g);
+  const seen=new Set();
+  return values
+    .map((item)=>String(item || '').replace(/\s+/g,' ').trim())
+    .filter(Boolean)
+    .filter((item)=>{
+      const key=item.toLocaleLowerCase('tr-TR');
+      if(seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0,maxCount);
+}
+function getContentPrimaryKeywordsStorageKey(reportId,url){
+  const reportPart=reportId?`report:${String(reportId)}`:`url:${String(url||'').trim()}`;
+  return `${CONTENT_PRIMARY_KEYWORDS_STORAGE_KEY}:${reportPart}`;
+}
+function loadCustomPrimaryKeywords(reportId,url){
+  try{
+    const raw=localStorage.getItem(getContentPrimaryKeywordsStorageKey(reportId,url));
+    if(!raw) return [];
+    return normalizePrimaryKeywordList(JSON.parse(raw));
+  }catch{
+    return [];
+  }
+}
+function saveCustomPrimaryKeywords(reportId,url,keywords){
+  const normalized=normalizePrimaryKeywordList(keywords);
+  const storageKey=getContentPrimaryKeywordsStorageKey(reportId,url);
+  try{
+    if(normalized.length){
+      localStorage.setItem(storageKey,JSON.stringify(normalized));
+    }else{
+      localStorage.removeItem(storageKey);
+    }
+  }catch{}
+  return normalized;
 }
 function loadKeywordRankCache(reportId,url,keywords){
   try{
@@ -1189,6 +1262,10 @@ const TRENDYOL_FREE_SHIPPING_THRESHOLD=350;
 function isTrendyolFreeShippingEligible(price){
   return typeof price==='number'&&Number.isFinite(price)&&price>=TRENDYOL_FREE_SHIPPING_THRESHOLD;
 }
+function resolveFreeShippingState(rawFlag,price){
+  if(typeof rawFlag==='boolean') return rawFlag;
+  return isTrendyolFreeShippingEligible(price);
+}
 function extractPrimaryKeywordsFromTitle(title,brandHint=''){
   const stopwords=new Set([
     've','ile','icin','için','uygun','tüm','tum','ml','gr','adet','paket','set','tekli','orijinal','orjinal',
@@ -1259,15 +1336,24 @@ function extractPrimaryKeywordsFromTitle(title,brandHint=''){
   return [...new Set(phrases.map((item)=>item.replace(/\s+/g,' ').trim()).filter((item)=>item.length>=4))].slice(0,3);
 }
 function inferCategoryFitFromText(title, category, primaryKeywords){
-  const stopwords=new Set(['ve','ile','icin','için','uygun','tüm','tum','ml','gr','adet','paket','set','tekli','orijinal','orjinal','asit']);
-  const tokenize=(value)=>String(value||'')
+  const stopwords=new Set([
+    've','ile','icin','için','uygun','tüm','tum','ml','gr','adet','paket','set','tekli','orijinal','orjinal','asit',
+    'fiyatı','fiyati','yorumları','yorumlari','yorum','trendyol'
+  ]);
+  const normalizeText=(value)=>String(value||'')
     .toLocaleLowerCase('tr-TR')
-    .replace(/[^\p{L}\p{N}\s>/]/gu,' ')
+    .replace(/[&+]/g,' ')
+    .replace(/[–—-]\s*(fiyatı|fiyati|yorumları|yorumlari).*/giu,' ')
+    .replace(/[/>|]/g,' ')
+    .replace(/[^\p{L}\p{N}\s]/gu,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+  const tokenize=(value)=>normalizeText(value)
     .split(/\s+/)
     .map((item)=>item.trim())
     .filter((item)=>item.length>=2 && !stopwords.has(item) && !/^\d+$/.test(item));
   const titleTokens=[...new Set(tokenize(title))];
-  const categoryText=String(category||'').toLocaleLowerCase('tr-TR');
+  const categoryText=normalizeText(category);
   if(!categoryText.trim()){
     return {score:45,label:'Zayıf',note:'Kategori bilgisi olmadığı için eşleşme ölçülemedi.'};
   }
@@ -1353,9 +1439,9 @@ function scoreDescriptionRules(params){
     keyword1Coverage>=0.9
       ? 100
       : keyword1Coverage>=0.66
-        ? 82
+        ? 84
         : keyword1Coverage>=0.4
-          ? 58
+          ? 62
           : keyword1Coverage>0
             ? 34
             : 0,
@@ -1366,40 +1452,78 @@ function scoreDescriptionRules(params){
     keyword2Coverage>=0.9
       ? 92
       : keyword2Coverage>=0.66
-        ? 74
+        ? 76
         : keyword2Coverage>=0.4
-          ? 48
+          ? 54
           : keyword2Coverage>0
-            ? 26
+            ? 28
             : 0,
     0,
     100
   );
-  const introText=normalizedDescription.split(/[.!?]/).slice(0,2).join(' ').trim();
+  const firstTwoSentences=normalizedDescription.split(/[.!?]/).slice(0,2).join(' ').trim();
+  const firstSentence=normalizedDescription.split(/[.!?]/).slice(0,1).join(' ').trim();
   const productIntroScore=clamp(
-    keyword1Coverage>0 && phraseCoverageScore(keyword1, introText)>=0.66
+    keyword1Coverage>0 && phraseCoverageScore(keyword1, firstTwoSentences)>=0.66
       ? 100
-      : keyword1Coverage>0 && phraseCoverageScore(keyword1, introText)>=0.4
-        ? 72
+      : keyword1Coverage>0 && phraseCoverageScore(keyword1, firstTwoSentences)>=0.4
+        ? 76
         : effectiveDescriptionLength>=120
-          ? 42
+          ? 46
           : 18,
     0,
     100
   );
-  const featureHints=['ışık','isik','teker','tekerlek','taban','malzeme','mekanizma','sistem','tasarım','tasarim','özellik','ozellik','kumaş','kumas','destek'];
-  const usageHints=['günlük','gunluk','kullanım','kullanim','çocuk','cocuk','okul','spor','hediye','oyun','dış','dis','aktif'];
-  const decisionHints=['numara','beden','kalıp','kalip','ölçü','olcu','uyarı','uyari','bakım','bakim','temizlik','kontrol','iade','garanti'];
+  const benefitHints=['kolay','rahat','konfor','hijyen','guven','güven','dayanikli','dayanıklı','tasarruf','destek','saglar','sağlar','uygun','pratik','mumkun','mümkün'];
+  const detailHints=['ölçü','olcu','cm','mm','malzeme','materyal','renk','cam','metal','emaye','dogalgaz','doğalgaz','lpg','gaz','göz','goz','ızgara','izgara','kurulum','genişlik','genislik','ateşleme','atesleme','garanti'];
+  const usageHints=['kullanım','kullanim','mutfak','gunluk','günlük','pisirme','pişirme','temizlik','yerlestirilebilir','yerleştirilebilir','uygunluk'];
+  const trustHints=['teslimat','kargo','garanti','iade','kurulum','montaj','ucretsiz iade','ücretsiz iade'];
+  const headingHints=['ürün açıklaması','urun aciklamasi','ek bilgiler','öne çıkan','one cikan'];
+  const ctaHints=['tercih','ideal','uygun','destekler','saglar','sağlar','mumkun','mümkün'];
   const descriptionTokens=new Set(tokenizeSeoText(normalizedDescription));
-  const featureCount=featureHints.filter((token)=>descriptionTokens.has(token)).length;
+  const benefitCount=benefitHints.filter((token)=>normalizedDescription.includes(token)).length;
+  const detailCount=detailHints.filter((token)=>normalizedDescription.includes(token)).length;
   const usageCount=usageHints.filter((token)=>descriptionTokens.has(token)).length;
-  const decisionCount=decisionHints.filter((token)=>descriptionTokens.has(token)).length;
-  const featureDepthScore=clamp(featureCount>=5?100:featureCount>=3?78:featureCount>=2?58:featureCount>=1?36:12,0,100);
-  const usageScenarioScore=clamp(usageCount>=4?100:usageCount>=2?74:usageCount>=1?48:18,0,100);
-  const decisionSupportScore=clamp(decisionCount>=3?100:decisionCount>=2?76:decisionCount>=1?52:(hasSpecs?34:14),0,100);
+  const trustCount=trustHints.filter((token)=>normalizedDescription.includes(token)).length;
+  const ctaCount=ctaHints.filter((token)=>normalizedDescription.includes(token)).length;
+  const featureDepthScore=clamp(detailCount>=8?100:detailCount>=6?86:detailCount>=4?72:detailCount>=2?54:24,0,100);
+  const usageScenarioScore=clamp((benefitCount>=4?96:benefitCount>=2?76:benefitCount>=1?56:28)*0.55 + (usageCount>=3?96:usageCount>=2?76:usageCount>=1?54:26)*0.45,0,100);
+  const decisionSupportScore=clamp((trustCount>=3?96:trustCount>=2?78:trustCount>=1?58:(hasSpecs?44:18))*0.7 + (ctaCount>=3?88:ctaCount>=2?74:ctaCount>=1?58:36)*0.3,0,100);
   const repeatedPrimaryCount=keyword1
     ? (normalizedDescription.match(new RegExp(keyword1.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g')) || []).length
     : 0;
+  const sentences=descriptionBody.split(/[.!?]+/).map((item)=>item.trim()).filter(Boolean);
+  const paragraphs=descriptionBody.split(/\n{2,}/).map((item)=>item.trim()).filter(Boolean);
+  const avgSentenceWords=sentences.length
+    ? sentences.reduce((sum,item)=>sum+item.split(/\s+/).filter(Boolean).length,0)/sentences.length
+    : 0;
+  const headingCount=headingHints.filter((token)=>normalizedDescription.includes(token)).length;
+  const structureScore=clamp(
+    (paragraphs.length>=3?92:paragraphs.length>=2?74:48)*0.35 +
+    (headingCount>=2?96:headingCount>=1?72:38)*0.25 +
+    (bulletPointCount>=6?94:bulletPointCount>=4?76:bulletPointCount>=2?58:28)*0.25 +
+    (avgSentenceWords>0 && avgSentenceWords<=18?88:avgSentenceWords<=24?72:avgSentenceWords<=30?56:34)*0.15,
+    0,
+    100
+  );
+  const originalityScore=clamp(
+    descriptionBody.length>=220 && descriptionBody!==String(metaDescription||'').trim()
+      ? 88
+      : descriptionBody.length>=140
+        ? 68
+        : 42,
+    0,
+    100
+  );
+  const writingQualityScore=clamp(
+    /[!]{2,}|%100|mukemmel|kusursuz|efsane|en iyi/i.test(descriptionBody)
+      ? 34
+      : /[^\p{L}\p{N}\s.,:;!?()'"-]/gu.test(descriptionBody)
+        ? 58
+        : 86,
+    0,
+    100
+  );
   const spamRiskScore=clamp(
     repeatedPrimaryCount>=4
       ? 18
@@ -1455,12 +1579,15 @@ function scoreDescriptionRules(params){
     };
   }
   const rules=[
-    {key:'product_intro',label:'Ürün tanımı',score:productIntroScore,weight:0.2},
-    {key:'keyword_alignment',label:'Keyword uyumu',score:clamp((keywordAlignmentScore*0.75)+(secondaryKeywordSupport*0.25),0,100),weight:0.2},
-    {key:'feature_depth',label:'Özellik derinliği',score:featureDepthScore,weight:0.2},
-    {key:'usage_scenario',label:'Kullanım senaryosu',score:usageScenarioScore,weight:0.15},
-    {key:'decision_support',label:'Karar bilgisi',score:decisionSupportScore,weight:0.15},
-    {key:'spam_risk',label:'Doğal dil',score:spamRiskScore,weight:0.1},
+    {key:'product_intro',label:'Ürün tanımı',score:productIntroScore,weight:0.14},
+    {key:'keyword_alignment',label:'Keyword uyumu',score:clamp((keywordAlignmentScore*0.7)+(secondaryKeywordSupport*0.3),0,100),weight:0.14},
+    {key:'originality',label:'Özgünlük',score:originalityScore,weight:0.08},
+    {key:'feature_depth',label:'Detay derinliği',score:featureDepthScore,weight:0.16},
+    {key:'usage_scenario',label:'Fayda ve kullanım',score:usageScenarioScore,weight:0.14},
+    {key:'structure',label:'Okunabilir yapı',score:structureScore,weight:0.12},
+    {key:'decision_support',label:'Güven ve karar',score:decisionSupportScore,weight:0.1},
+    {key:'writing_quality',label:'Yazım ve üslup',score:writingQualityScore,weight:0.06},
+    {key:'spam_risk',label:'Keyword dengesi',score:spamRiskScore,weight:0.06},
   ];
   const totalWeight=rules.reduce((sum,item)=>sum+item.weight,0);
   const score=clamp(
@@ -1476,13 +1603,19 @@ function scoreDescriptionRules(params){
         ? 'Açıklama ürünün ne olduğunu girişte net anlatmıyor'
         : weakestRule.key==='keyword_alignment'
           ? 'Ana ürün anahtar kelimesi açıklamada doğal ve güçlü şekilde taşınmıyor'
+          : weakestRule.key==='originality'
+            ? 'Açıklama yeterince özgün görünmüyor veya meta metne fazla yakın'
           : weakestRule.key==='feature_depth'
-            ? 'Özellik ve ayırt edici detay derinliği sınırlı'
+            ? 'Ölçü, malzeme, renk ve teknik detay derinliği sınırlı'
             : weakestRule.key==='usage_scenario'
-              ? 'Kullanım senaryosu ve hedef kullanıcı bağlamı zayıf'
+              ? 'Kullanıcı faydası ve kullanım senaryosu yeterince güçlü değil'
+              : weakestRule.key==='structure'
+                ? 'Paragraf, alt başlık veya madde yapısı daha okunur olabilir'
               : weakestRule.key==='decision_support'
-                ? 'Karar verdirici bilgi eksik; beden, bakım veya teknik yönler zayıf'
-                : 'Metin doğal ama keyword yoğunluğu veya tekrar dengesi geliştirilmeli';
+                ? 'Garanti, iade, teslimat veya karar verdirici güven bilgisi zayıf'
+                : weakestRule.key==='writing_quality'
+                  ? 'Yazım, ton veya abartılı ifade dengesi geliştirilmeli'
+                  : 'Anahtar kelime tekrar dengesi geliştirilmeli';
   return {
     score,
     label:getLegacyContentBand(score)==='strong'?'Güçlü':getLegacyContentBand(score)==='medium'?'Orta':'Zayıf',
@@ -1675,10 +1808,16 @@ function normalizeActionTitle(value){
     .replace(/\s+/g,' ')
     .trim();
 }
+function truncateThemeLabelWords(value,maxWords=3){
+  const words=String(value||'').replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
+  if(!words.length) return '';
+  if(words.length<=maxWords) return words.join(' ');
+  return `${words.slice(0,maxWords).join(' ')}...`;
+}
 function themeItemHtml(label,count,positive){
   const klass=positive?'theme-item ti-pos':'theme-item ti-neg';
   const countHtml=typeof count==='number'?` <span class="ti-count">×${count}</span>`:'';
-  return `<div class="${klass}">${label}${countHtml}</div>`;
+  return `<div class="${klass}">${escapeHtml(truncateThemeLabelWords(label,3))}${countHtml}</div>`;
 }
 function renderThemeList(containerId,hits,fallbackItems,positive){
   const el=document.getElementById(containerId); if(!el) return;
@@ -1909,7 +2048,7 @@ function getDemandData(){
   const couponSignal=(/kupon/i.test(String(r.src||'')) || r.hasCoupon===true || directSignals.hasCoupon===true)?1:0;
   const lowStockSignal=r.lowStock===true || /tükeniyor/i.test(String(r.stockBadge||'')) ? 1 : 0;
   const fastDeliverySignal=/1-2 gün|yarın kargoda|hızlı/i.test(String(r.deliveryText||'')) ? 1 : 0;
-  const freeShippingSignal=isTrendyolFreeShippingEligible(safeNumber(r.normalizedPrice))?1:0;
+  const freeShippingSignal=resolveFreeShippingState(r.freeShipping,safeNumber(r.normalizedPrice))?1:0;
   const officialSignal=r.officialSeller===true || safeNumber(summary.official_count)>0 ? 1 : 0;
   const campaignSignal=r.hasCampaign===true || (safeNumber(r.discountRate) ?? 0) > 0 ? 1 : 0;
   const commercialMomentumScore=clamp(
@@ -2097,7 +2236,11 @@ function updateDemandKpis(demand){
   const demandRules=getResolvedRuleSection('demand_signals');
   const estimatedLanguageRule=Boolean(sharedRules?.rules?.some((item)=>item.id==='shared-estimated-language'));
   const relativeMarketPositionRule=Boolean(demandRules?.rules?.some((item)=>item.id==='demand-market-position-is-relative'));
-  setText('demandSignalValue',`${Math.round(demand.finalScore)}`);
+  const demandSignalValueEl=document.getElementById('demandSignalValue');
+  if(demandSignalValueEl){
+    demandSignalValueEl.innerHTML=`<span style="color:var(--text);">100/</span><span class="${getDemandSignalColor(demand.finalScore)}">${Math.round(demand.finalScore)}</span>`;
+    demandSignalValueEl.className='kpi-val';
+  }
   const demandBand=getDerivedBand(demand.finalScore);
   setText('demandSignalNote',demand.demandConfidence>=0.75?`${demandBand==='strong'?'↑':demandBand==='medium'?'→':'↓'} ${demand.demandLabel} talep sinyali`:(estimatedLanguageRule?`ne ${demand.demandNote}`:'ne Veri güveni sınırlı'));
   setClass(document.getElementById('demandSignalNote'),'kpi-note',getDemandTone(demand.finalScore));
@@ -2237,6 +2380,20 @@ function enrichActionItem(item,index){
   const detail=String(item?.detail||'').trim();
   const weight=safeNumber(item?.weight) ?? Math.max(55,90-(index*7));
   const kind=detectActionKind(`${title} ${detail}`);
+  if(item?.source==='ai'){
+    return {
+      ...item,
+      title,
+      detail,
+      kind,
+      weight,
+      severity:item?.severity || inferActionSeverity(weight),
+      aiDetail:detail,
+      change:item?.change || getActionChangeByKind(kind) || detail || title,
+      evidence:item?.evidence || getActionEvidenceByKind(kind),
+      outcome:item?.outcome || getActionOutcomeByKind(kind,weight),
+    };
+  }
   const weakAiSource=item?.source==='ai' && isWeakAiAction(item);
   return {
     ...item,
@@ -2284,6 +2441,21 @@ function buildFallbackActions(){
 }
 function getActionData(){
   const r=currentReportData||{};
+  const aiSummary=String(r.aiCommentary?.summary || '').trim();
+  if(aiSummary){
+    return {
+      actions:[{
+        priority:1,
+        title:'AI Yorumu',
+        detail:aiSummary,
+        severity:'high',
+        weight:100,
+        source:'ai_raw',
+      }],
+      aiMode:r.aiCommentary?.mode||'ai_raw',
+      hasAiActions:true,
+    };
+  }
   const priorityActions=Array.isArray(r.priorityActions)?r.priorityActions:[];
   const suggestions=Array.isArray(r.suggestions)?r.suggestions:[];
   const fallbackActions=buildFallbackActions();
@@ -2318,10 +2490,12 @@ function getActionData(){
       source:'ai',
     });
   });
+  const hasAiActions=merged.length>0;
   const enrichedMerged=merged.map((item,index)=>enrichActionItem(item,index));
   const usedKinds=new Set(enrichedMerged.map((item)=>item.kind));
   const weakAiOnly=enrichedMerged.length>0 && enrichedMerged.length<4;
   const supplementalFallback=fallbackActions.filter((item)=>{
+    if(hasAiActions) return false;
     if(!item) return false;
     if(!weakAiOnly && usedKinds.has(item.kind)) return false;
     const incomingTitle=shouldDedupeRephrased?normalizeActionTitle(item.title):item.title;
@@ -2334,21 +2508,29 @@ function getActionData(){
     .sort((a,b)=>(a.priority??99)-(b.priority??99) || (b.weight??0)-(a.weight??0))
     .slice(0,10)
     .map((item,index)=>enrichActionItem({...item,priority:index+1},index));
-  return { actions, aiMode };
+  return { actions, aiMode, hasAiActions };
 }
 function renderActionList(){
   const container=document.getElementById('actionList');
   if(!container) return;
-  const {actions,aiMode}=getActionData();
+  const {actions,aiMode,hasAiActions}=getActionData();
   const actionRules=getResolvedRuleSection('actions');
   const evidenceRequired=Boolean(actionRules?.rules?.some((rule)=>rule.id==='actions-evidence-required'));
   container.innerHTML=actions.map((item,index)=>{
     const apClass=index<2?'ap1':index<4?'ap2':'ap3';
+    if(item.source==='ai_raw'){
+      return `<div class="action-item"><div class="ap ${apClass}">AI</div><div class="action-body"><div class="at">Musteri gibi yorum</div><div class="action-row" style="line-height:1.8;color:var(--text);white-space:pre-wrap;">${escapeHtml(item.detail || '')}</div></div></div>`;
+    }
+    if(item.source==='ai'){
+      return `<div class="action-item"><div class="ap ${apClass}">Öncelik ${index+1}</div><div class="action-body"><div class="at">${escapeHtml(item.title)}</div><div class="action-rows"><div class="action-row"><b>Müşteri gözüyle:</b> ${escapeHtml(item.aiDetail || item.detail || item.title)}</div><div class="action-row"><b>Veri dayanağı:</b> ${escapeHtml(item.evidence || item.detail || item.title)}</div><div class="action-row"><b>Ne yap:</b> ${escapeHtml(item.change || item.detail || item.title)}</div><div class="action-row"><b>Beklenen etki:</b> ${escapeHtml(item.outcome || item.detail || item.title)}</div></div></div></div>`;
+    }
     return `<div class="action-item"><div class="ap ${apClass}">Öncelik ${index+1}</div><div class="action-body"><div class="at">${escapeHtml(item.title)}</div><div class="action-rows"><div class="action-row"><b>Ne değiştir:</b> ${escapeHtml(item.change || item.detail)}</div><div class="action-row"><b>Neye dayanıyor:</b> ${escapeHtml(item.evidence || item.detail)}</div><div class="action-row"><b>Beklenen sonuç:</b> ${escapeHtml(item.outcome || item.detail)}</div></div></div></div>`;
   }).join('');
   const helper=document.querySelector('#rdt-actions > div:first-child p');
   if(helper){
-    helper.textContent=evidenceRequired
+    helper.textContent=hasAiActions
+      ? 'AI bu urunu sadece linke bakarak yorumlar; metin bu ekranda yeniden yazilmaz.'
+      : evidenceRequired
       ? 'Somut veri dayanağı, kullanıcı itirazı ve beklenen etkiye göre sıralandı'
       : (aiMode==='ai_enriched'
         ? 'AI analist + kural motoru ile üretildi; her aksiyon neyi değiştireceğini ve neden önemli olduğunu açıklar'
@@ -2559,9 +2741,82 @@ function getCompetitiveAdvantageData(){
     source:'offers',
   };
 }
+function getCompetitorPromotionListData(){
+  const r=currentReportData||{};
+  const offers=(Array.isArray(r.otherSellerOffers)?r.otherSellerOffers:[])
+    .map((offer)=>({
+      sellerName:String(offer?.seller_name || offer?.sellerName || 'Bilinmeyen Satıcı'),
+      price:safeNumber(offer?.price),
+      sellerScore:safeNumber(offer?.seller_score),
+      hasFreeShipping:offer?.has_free_shipping===true,
+      hasFastDelivery:offer?.has_fast_delivery===true || /1-2 gün|yarın|hızlı/i.test(String(offer?.delivery_text || offer?.deliveryText || '')),
+      labels:Array.isArray(offer?.promotion_labels)?offer.promotion_labels.map((item)=>String(item||'').trim()).filter(Boolean):[],
+    }))
+    .filter((offer)=>offer.price!=null)
+    .slice(0,10);
+  return offers.map((offer)=>{
+    const couponLabels=offer.labels.filter((label)=>/kupon/i.test(label));
+    const bundleLabels=offer.labels.filter((label)=>/birlikte al|sepette|2 al|3 al|cok al|çok al|hediye/i.test(label));
+    const campaignLabels=offer.labels.filter((label)=>!couponLabels.includes(label) && !bundleLabels.includes(label));
+    return {
+      ...offer,
+      couponLabels,
+      bundleLabels,
+      campaignLabels,
+      hasCoupon:couponLabels.length>0,
+      hasBundle:bundleLabels.length>0,
+      hasCampaign:campaignLabels.length>0,
+    };
+  });
+}
+function renderCompetitorAdvantageList(){
+  const container=document.getElementById('compAdvList');
+  if(!container) return;
+  const items=getCompetitorPromotionListData();
+  if(!items.length){
+    container.innerHTML='<div class="comp-adv-empty">Rakip teklifleri bulundu ama promosyon etiketi yakalanmadi. Kupon, kampanya ve birlikte al sinyalleri geldikce burada en fazla 10 rakip listelenecek.</div>';
+    return;
+  }
+  container.innerHTML=items.map((item,index)=>{
+    const signalTags=[
+      `<span class="tag ${item.hasCoupon?'t-g':'t-n'}">Kupon ${item.hasCoupon?'Var':'Yok'}</span>`,
+      `<span class="tag ${item.hasCampaign?'t-w':'t-n'}">Kampanya ${item.hasCampaign?'Var':'Yok'}</span>`,
+      `<span class="tag ${item.hasBundle?'t-b':'t-n'}">Birlikte Al ${item.hasBundle?'Var':'Yok'}</span>`
+    ].join('');
+    const detailParts=[
+      item.hasCoupon?`Kupon: ${escapeHtml(item.couponLabels.join(', '))}`:'Kupon etiketi yok',
+      item.hasCampaign?`Kampanya: ${escapeHtml(item.campaignLabels.join(', '))}`:'Kampanya etiketi yok',
+      item.hasBundle?`Birlikte al: ${escapeHtml(item.bundleLabels.join(', '))}`:'Birlikte al etiketi yok',
+      item.hasFreeShipping?'Ucretsiz kargo var':'Ucretsiz kargo yok',
+      item.hasFastDelivery?'Hizli teslimat var':'Hizli teslimat yok'
+    ];
+    return `<div class="comp-adv-item"><div class="comp-adv-head"><div><div class="comp-adv-seller">${index+1}. ${escapeHtml(item.sellerName)}</div><div class="comp-adv-price">${formatCurrencyTRY(item.price)}${item.sellerScore!=null?` · ${item.sellerScore.toFixed(1)} ⭐`:''}</div></div></div><div class="comp-adv-signals">${signalTags}</div><div class="comp-adv-meta">${detailParts.join(' · ')}</div></div>`;
+  }).join('');
+}
 function formatCurrencyTRY(value){
   if(value==null||Number.isNaN(Number(value))) return '—';
   return `₺${Number(value).toLocaleString('tr-TR')}`;
+}
+function humanizeDeliveryText(rawDeliveryType, shippingDays){
+  const rawText=String(rawDeliveryType || '').trim();
+  const deliveryType=rawText.toLocaleLowerCase('tr-TR');
+  if(rawText && !/^(same_day|next_day|fast_delivery|standard|mp)$/i.test(rawText)){
+    return rawText
+      .replace(/\bayni gun\b/gi,'Ayni gun')
+      .replace(/\byarin\b/gi,'Yarin')
+      .replace(/\bgun icinde kargoda\b/gi,'gun icinde kargoda')
+      .replace(/\bgun\b/gi,'gun');
+  }
+  if(deliveryType==='same_day') return 'Ayni gun kargo';
+  if(deliveryType==='next_day') return 'Yarin kargoda';
+  if(deliveryType==='fast_delivery') return 'Hizli teslimat';
+  if(deliveryType==='mp' && typeof shippingDays==='number' && Number.isFinite(shippingDays)){
+    return shippingDays<=1 ? '1 gun icinde kargoda' : `${shippingDays} gun icinde kargoda`;
+  }
+  if(typeof shippingDays==='number' && Number.isFinite(shippingDays)){
+    return shippingDays<=1 ? '1 gun' : `${shippingDays} gun`;
+  }
+  return 'Teslimat bilgisi sinirli';
 }
 function getSellerScoreTone(score){
   if(score==null) return 'var(--muted)';
@@ -2577,10 +2832,14 @@ function getOtherSellerOffersData(){
     sellerName:item?.seller_name||item?.sellerName||'Bilinmeyen Satıcı',
     price:normalizeComparablePrice(safeNumber(item?.price), ownPrice),
     sellerScore:safeNumber(item?.seller_score ?? item?.sellerScore),
-    freeShipping:isTrendyolFreeShippingEligible(
+    freeShipping:resolveFreeShippingState(
+      typeof item?.has_free_shipping==='boolean'?item.has_free_shipping:(typeof item?.freeShipping==='boolean'?item.freeShipping:null),
       normalizeComparablePrice(safeNumber(item?.price), ownPrice)
     ),
-    deliveryText:item?.delivery_text || item?.delivery || item?.delivery_range || '—',
+    deliveryText:humanizeDeliveryText(
+      item?.delivery_text || item?.deliveryText || item?.delivery_type || item?.delivery || item?.delivery_range || '',
+      safeNumber(item?.shipping_days)
+    ),
   })).filter(item=>item.price!=null).sort((a,b)=>a.price-b.price).slice(0,10);
 }
 function getPriceComparisonPalette(count){
@@ -2663,7 +2922,7 @@ function renderOtherSellerOffers(){
     return;
   }
   block.style.display='';
-  const ownShippingTag=isTrendyolFreeShippingEligible(safeNumber(r.normalizedPrice))?'<span class="tag t-g">Ücretsiz</span>':'<span class="tag t-n">Ücretli</span>';
+  const ownShippingTag=resolveFreeShippingState(r.freeShipping,safeNumber(r.normalizedPrice))?'<span class="tag t-g">Ücretsiz</span>':'<span class="tag t-n">Ücretli</span>';
   const ownScore=safeNumber(r.sellerScore);
   const ownRowHtml=`<div class="seller-row this-product"><div style="font-weight:600;">${r.sellerName||'Bu Ürün'} <span class="tag t-b" style="margin-left:6px;font-size:9px;">Bu Ürün</span></div><div style="font-weight:700;color:var(--accent);">${formatCurrencyTRY(r.normalizedPrice)}</div><div style="color:${getSellerScoreTone(ownScore)};">${ownScore!=null?`${ownScore.toFixed(1)} ⭐`:'—'}</div><div>${ownShippingTag}</div><div style="color:var(--muted);">${r.deliveryText||'—'}</div></div>`;
   const offerRowsHtml=offers.map(item=>{
@@ -2781,19 +3040,18 @@ function getContentSeoData(){
   const categoryAverages=r.categoryAverages||{};
   const questionAnalysis=r.questionAnalysis||{};
   const keywordInsight=r.trendyolScorecard?.keywordInsight||{};
-  const fallbackKeywords=(Array.isArray(r.primaryKeywords)?r.primaryKeywords:[]).map(item=>String(item||'').trim()).filter(Boolean);
-  const titleFallbackKeywords=extractPrimaryKeywordsFromTitle(r.title);
-  const primaryKeywords=[...new Set((fallbackKeywords.length?fallbackKeywords:titleFallbackKeywords))].slice(0,3);
-  const keywordSource=fallbackKeywords.length?'algorithm':titleFallbackKeywords.length?'title_fallback':'none';
+  const customKeywords=normalizePrimaryKeywordList(r.customPrimaryKeywords);
+  const primaryKeywords=[...new Set(customKeywords)].slice(0,3);
+  const keywordSource=customKeywords.length?'custom':'none';
   const descriptionText=String(r.descriptionText || r.description || '').trim();
   const descriptionLength=safeNumber(r.descriptionLength);
   const metaDescription=String(r.metaDescription || '').trim();
-  const imageCount=safeNumber(r.imageCount) ?? 4;
-  const bulletPointCount=safeNumber(r.bulletPointCount) ?? 3;
+  const imageCount=safeNumber(r.imageCount);
+  const bulletPointCount=safeNumber(r.bulletPointCount);
   const generalQuestionCount=safeNumber(questionAnalysis.general?.count);
   const sellerQuestionCount=safeNumber(questionAnalysis.seller?.count);
   const isSingleSellerQuestionPool=questionAnalysis.is_single_seller===true;
-  const questionCount=safeNumber(r.questionCount) ?? generalQuestionCount ?? 28;
+  const questionCount=safeNumber(r.questionCount) ?? generalQuestionCount ?? null;
   const qaSnippetCount=safeNumber(r.qaSnippetCount) ?? 0;
   const answeredQuestionCount=
     safeNumber(r.answeredQuestionCount) ??
@@ -2810,7 +3068,8 @@ function getContentSeoData(){
   const couponSignalLabels=couponCandidates.filter((item)=>/kupon/i.test(item));
   const hasCoupon=couponSignalLabels.length>0;
   const hasCampaignSignal=r.hasCampaign===true || couponCandidates.length>0;
-  const searchVisibilityScore=clamp(safeNumber(r.seoScore) ?? 61,0,100);
+  const hasSearchVisibilityScore=safeNumber(r.seoScore)!=null;
+  const searchVisibilityScore=clamp(safeNumber(r.seoScore) ?? 0,0,100);
   const categoryFit=r.categoryFit||{};
   const descriptionBenchmark=safeNumber(categoryAverages.descriptionLength) ?? safeNumber(benchmark.descriptionLength) ?? 1240;
   const imageBenchmark=safeNumber(categoryAverages.imageCount) ?? safeNumber(benchmark.imageCount) ?? 8.3;
@@ -2818,13 +3077,16 @@ function getContentSeoData(){
   const imageBenchmarkSource=safeNumber(categoryAverages.imageCount)!=null?'category':'reference';
   const bulletBenchmark=safeNumber(benchmark.bulletPointCount) ?? 6;
   const targetScore=safeNumber(benchmark.targetSeoScore) ?? 75;
+  const effectiveImageCount=imageCount ?? 0;
+  const effectiveBulletPointCount=bulletPointCount ?? 0;
+  const effectiveQuestionCount=questionCount ?? 0;
   const hasDescriptionContent=descriptionLength!=null && descriptionLength>=40;
   const effectiveDescriptionLength=descriptionLength ?? 0;
   const descriptionLengthScore=hasDescriptionContent?clamp((effectiveDescriptionLength/descriptionBenchmark)*100,0,100):0;
-  const imageScore=clamp((imageCount/imageBenchmark)*100,0,100);
-  const bulletScore=clamp((bulletPointCount/bulletBenchmark)*100,0,100);
+  const imageScore=clamp((effectiveImageCount/imageBenchmark)*100,0,100);
+  const bulletScore=clamp((effectiveBulletPointCount/bulletBenchmark)*100,0,100);
   const specScore=hasSpecs?85:35;
-  const questionSignalScore=clamp(questionCount>=30?86:questionCount>=15?72:questionCount>=5?58:35,0,100);
+  const questionSignalScore=questionCount==null?0:clamp(effectiveQuestionCount>=30?86:effectiveQuestionCount>=15?72:effectiveQuestionCount>=5?58:35,0,100);
   const qaCoverageScore=clamp(qaSnippetCount>=10?92:qaSnippetCount>=5?76:qaSnippetCount>0?58:28,0,100);
   const hasExplicitQaStatus=unansweredQuestionCount!=null || answeredQuestionCount!=null;
   const unresolvedQuestionCount=unansweredQuestionCount!=null?Math.max(0,Math.round(unansweredQuestionCount)):0;
@@ -2833,9 +3095,9 @@ function getContentSeoData(){
       ? 'risk'
       : answeredQuestionCount!=null || qaSnippetCount>0
         ? 'good'
-        : questionCount>0
-          ? 'neutral'
-          : 'neutral';
+          : questionCount>0
+            ? 'neutral'
+            : 'neutral';
   const keywordCoverageScore=clamp(primaryKeywords.length>=3?88:primaryKeywords.length===2?72:primaryKeywords.length===1?55:30,0,100);
   const descriptionRules=scoreDescriptionRules({
     hasDescriptionContent,
@@ -2843,31 +3105,19 @@ function getContentSeoData(){
     descriptionBenchmark,
     descriptionText,
     metaDescription,
-    bulletPointCount,
+    bulletPointCount:effectiveBulletPointCount,
     hasSpecs,
     primaryKeywords,
-    imageCount,
+    imageCount:effectiveImageCount,
     qaSnippetCount,
-    questionCount,
+    questionCount:effectiveQuestionCount,
   });
   const descriptionScore=descriptionRules.score;
   const titleScore=clamp(searchVisibilityScore+8,0,100);
   const inferredCategoryFit=inferCategoryFitFromText(r.title,r.cat,primaryKeywords);
-  const categoryFitScore=clamp(
-    Math.max(safeNumber(categoryFit.score) ?? 0,inferredCategoryFit.score),
-    0,
-    100
-  );
-  const categoryFitLabel=categoryFitScore===inferredCategoryFit.score
-    ? inferredCategoryFit.label
-    : typeof categoryFit.label==='string'&&categoryFit.label.trim().length>0
-      ? categoryFit.label.trim()
-      : (getLegacyContentBand(categoryFitScore)==='strong'?'Yüksek':getLegacyContentBand(categoryFitScore)==='medium'?'Orta':'Zayıf');
-  const categoryFitNote=categoryFitScore===inferredCategoryFit.score
-    ? inferredCategoryFit.note
-    : typeof categoryFit.note==='string'&&categoryFit.note.trim().length>0
-      ? categoryFit.note.trim()
-      : (getLegacyContentBand(categoryFitScore)==='strong'?'Kategori ile güçlü eşleşme görülüyor':getLegacyContentBand(categoryFitScore)==='medium'?'Kategori ilişkisi kabul edilebilir':'Kategori uyumu zayıf');
+  const categoryFitScore=clamp(inferredCategoryFit.score,0,100);
+  const categoryFitLabel=inferredCategoryFit.label;
+  const categoryFitNote=inferredCategoryFit.note;
   const categoryVisibilityScore=
     safeNumber(categoryAverages.searchVisibility) ??
     (
@@ -2891,17 +3141,23 @@ function getContentSeoData(){
       : null;
   const descriptionLabel=descriptionRules.label;
   const descriptionNote=descriptionRules.note;
-  const questionCardValue=String(questionCount);
+  const questionCardValue=questionCount==null?'—':String(questionCount);
   const questionCardNote=
-    isSingleSellerQuestionPool || sellerQuestionCount==null
-      ? (questionCount>=15?'Aktif ilgi sinyali':questionCount>0?'Sınırlı ilgi sinyali':'Soru görünmüyor')
-      : `Bu satıcıya ${sellerQuestionCount} soru geldi`;
+    questionCount==null && sellerQuestionCount==null
+      ? 'Soru verisi sınırlı'
+      : isSingleSellerQuestionPool || sellerQuestionCount==null
+        ? (effectiveQuestionCount>=15?'Aktif ilgi sinyali':effectiveQuestionCount>0?'Sınırlı ilgi sinyali':'Soru görünmüyor')
+        : `Bu satıcıya ${sellerQuestionCount} soru geldi`;
   const questionCardTone=
-    questionSignalScore>=80?'c-g':questionSignalScore>=55?'c-b':'c-w';
+    questionCount==null && sellerQuestionCount==null
+      ? 'c-b'
+      : questionSignalScore>=80?'c-g':questionSignalScore>=55?'c-b':'c-w';
   const questionNoteTone=
-    isSingleSellerQuestionPool || sellerQuestionCount==null
-      ? (questionSignalScore>=80?'up':'ne')
-      : (sellerQuestionCount>=5?'up':'ne');
+    questionCount==null && sellerQuestionCount==null
+      ? 'ne'
+      : isSingleSellerQuestionPool || sellerQuestionCount==null
+        ? (questionSignalScore>=80?'up':'ne')
+        : (sellerQuestionCount>=5?'up':'ne');
   const qaStatusValue=
     unansweredQuestionCount!=null && unresolvedQuestionCount>0
       ? `${unresolvedQuestionCount} yanıtsız`
@@ -2952,10 +3208,13 @@ function getContentSeoData(){
   const couponNoteTone=hasCoupon?'up':hasCampaignSignal?'ne':'dn';
   return {
     primaryKeywords,keywordSource,categoryFitScore,categoryFitLabel,categoryFitNote,
-    descriptionLength,imageCount,bulletPointCount,questionCount,qaSnippetCount,unresolvedQuestionCount,qaStatusTone,hasSpecs,searchVisibilityScore,
+    descriptionLength,imageCount,bulletPointCount,questionCount,qaSnippetCount,unresolvedQuestionCount,qaStatusTone,hasSpecs,searchVisibilityScore,hasSearchVisibilityScore,
     descriptionBenchmark,imageBenchmark,bulletBenchmark,targetScore,descriptionBenchmarkSource,imageBenchmarkSource,
     descriptionScore,descriptionLabel,descriptionNote,imageScore,bulletScore,specScore,questionSignalScore,titleScore,
     descriptionRules,
+    keyword1:String(primaryKeywords?.[0] || '').trim(),
+    keyword2:String(primaryKeywords?.[1] || '').trim(),
+    descriptionExists:hasDescriptionContent,
     questionCardValue,questionCardNote,questionCardTone,questionNoteTone,qaStatusValue,qaStatusNote,qaValueTone,qaNoteTone,
     couponValue,couponNote,couponValueTone,couponNoteTone,
     keywordCoverageScore,
@@ -3006,10 +3265,10 @@ const CARD_INFO_TEXT={
   'Kampanya Dönüşüm Senaryosu':'Bu grafik gerçek satış verisi değildir. Model; indirim oranı, kampanya süresi, conversionScore, talep skoru, momentum, fiyat avantajı, güven, içerik hazırlığı ve düşük yıldız cezasını birlikte okuyarak olası dönüşüm eğrisini üretir.',
   'Rakip Fiyat Dağılımı':'Rakip fiyat dağılımı, rakip özetindeki minimum, ortalama ve maksimum fiyatlardan kurulur. Ürünün pazardaki fiyat bandını görmek için kullanılır.',
   'Rakip Avantajları':'Rakip avantajları, kampanya, indirim, teslimat ve satıcı sinyallerinden türetilir. Gerçek performans değil, rakiplerin hangi alanlarda daha güçlü göründüğünü özetler.',
-  'Birincil Anahtar Kelimeler':'Bu liste başlık, marka ve ürün tipi sinyallerinden algoritmik olarak çıkarılır. Amaç başlıktaki gerçek arama niyetini yakalamak; rastgele kelime parçalamak değildir.',
+  'Birincil Anahtar Kelimeler':'Bu alan yalnızca kullanıcının girdiği anahtar kelimelerle çalışır. Sistem artık otomatik anahtar kelime türetmez; girilen ifade hem sıralama kartında hem açıklama puanında kullanılır.',
   'Anahtar Kelime Sıralaması':'Bu kart, mümkünse Trendyol arama sonucundan bulunan sıralama bilgisini cache ile birlikte gösterir. Canlı sonuç yoksa son bulunan veri veya uyarı gösterilir.',
   'Ürün / Kategori Uyumu':'Bu skor, başlık tokenları ile kategori tokenlarının çakışmasını ölçer ve anahtar kelimelerin kategori ağacına oturup oturmadığını kontrol eder. Başlıkta ürün tipi net değilse veya kategoriyle çatışıyorsa puan düşer.',
-  'Açıklama Yeterliliği':'Açıklama skoru 6 parçadan oluşur: ürün tanımı %20, anahtar kelime uyumu %20, özellik derinliği %20, kullanım senaryosu %15, karar verdirici bilgi %15 ve doğal dil/spam riski %10.',
+  'Açıklama Yeterliliği':'Açıklama skoru; ilk cümlede ürünün net anlatılması, ana anahtar kelimenin doğal kullanımı, özgünlük, fayda anlatımı, okunabilir yapı, teknik detay, güven sinyalleri, yazım kalitesi ve keyword tekrar dengesi üzerinden hesaplanır.',
   'Görsel Sayısı':'Bu kart, ürünün mevcut görsel sayısını kategori benchmarkı ile karşılaştırır. Tek başına kalite garantisi vermez ama içerik hazırlığının önemli bir sinyalidir.',
   'Maddeleme':'Maddeleme, açıklamadaki bullet veya kısa özellik maddelerinin yeterliliğini gösterir. Kullanıcıya hızlı taranabilir bilgi sunma kapasitesini temsil eder.',
   'Soru Yoğunluğu':'Soru yoğunluğu, toplam soru hacminden türetilen ilgi sinyalidir. Yüksek soru sayısı çoğu durumda aktif talep ve karar aşamasındaki kullanıcıyı işaret eder.',
@@ -3136,7 +3395,6 @@ function updateContentSeoCards(){
   const content=getContentSeoData();
   const contentRules=getResolvedRuleSection('content_seo');
   const metaIsSecondary=Boolean(contentRules?.rules?.some((rule)=>rule.id==='content-meta-is-secondary'));
-  const algorithmFirstKeywords=Boolean(contentRules?.rules?.some((rule)=>rule.id==='content-primary-keywords-algorithm-first'));
   const categoryBand=getLegacyContentBand(content.categoryFitScore);
   const descriptionBand=getLegacyContentBand(content.descriptionScore);
   const descriptionTone=content.descriptionLabel==='Sınırlı'
@@ -3155,10 +3413,20 @@ function updateContentSeoCards(){
         : 'dn';
   const imageBand=getLegacyContentBand(content.imageScore);
   const bulletBand=getLegacyContentBand(content.bulletScore);
+  const primaryKeywordsInput=document.getElementById('contentPrimaryKeywordsInput');
+  if(primaryKeywordsInput && document.activeElement!==primaryKeywordsInput){
+    primaryKeywordsInput.value=content.keywordSource==='custom'?content.primaryKeywords.join(', '):'';
+  }
   setText('contentPrimaryKeywordsValue',content.primaryKeywords.length?content.primaryKeywords.join(' · '):'—');
-  setText('contentPrimaryKeywordsNote',content.primaryKeywords.length?(content.keywordSource==='title_fallback'?'Ürün başlığından türetildi':(algorithmFirstKeywords?'Algoritma öncelikli çıkarım':'Algoritma tarafından çıkarıldı')):'Algoritma anahtar kelime çıkaramadı');
+  setText('contentPrimaryKeywordsNote',content.primaryKeywords.length?'Kullanıcı girişi aktif':'Anahtar kelime girilmedi');
   setClass(document.getElementById('contentPrimaryKeywordsValue'),'sig-val',content.primaryKeywords.length?'c-b':'c-r');
-  setClass(document.getElementById('contentPrimaryKeywordsNote'),'sig-note',content.primaryKeywords.length?'ne':'dn');
+  setClass(document.getElementById('contentPrimaryKeywordsNote'),'sig-note',content.primaryKeywords.length?'up':'dn');
+  setText(
+    'contentPrimaryKeywordsHelp',
+    content.keywordSource==='custom'
+      ? 'Kullanici girdigi ifade aktif. Temizlemek icin alani bos birakip uygula.'
+      : 'Sistem artik anahtar kelime turetmiyor. Bu alana kullanici olarak sen girmelisin.'
+  );
   setText('contentCategoryFitValue',content.categoryFitLabel);
   setText('contentCategoryFitNote',content.categoryFitNote);
   setClass(document.getElementById('contentCategoryFitValue'),'sig-val',categoryBand==='strong'?'c-g':categoryBand==='medium'?'c-w':'c-r');
@@ -3168,15 +3436,15 @@ function updateContentSeoCards(){
   setClass(document.getElementById('contentDescriptionValue'),'sig-val',descriptionTone);
   setClass(document.getElementById('contentDescriptionNote'),'sig-note',descriptionNoteTone);
 
-  setText('contentImageValue',String(content.imageCount));
-  setText('contentImageNote',`${content.imageBenchmarkSource==='category'?'Kategori Ort.':'Referans'}: ${String(content.imageBenchmark).replace('.',',')}`);
-  setClass(document.getElementById('contentImageValue'),'sig-val',imageBand==='strong'?'c-g':imageBand==='medium'?'c-w':'c-r');
-  setClass(document.getElementById('contentImageNote'),'sig-note',imageBand==='strong'?'up':imageBand==='medium'?'ne':'dn');
+  setText('contentImageValue',content.imageCount!=null?String(content.imageCount):'—');
+  setText('contentImageNote',content.imageCount!=null?`${content.imageBenchmarkSource==='category'?'Kategori Ort.':'Referans'}: ${String(content.imageBenchmark).replace('.',',')}`:'Görsel verisi sınırlı');
+  setClass(document.getElementById('contentImageValue'),'sig-val',content.imageCount!=null?(imageBand==='strong'?'c-g':imageBand==='medium'?'c-w':'c-r'):'c-b');
+  setClass(document.getElementById('contentImageNote'),'sig-note',content.imageCount!=null?(imageBand==='strong'?'up':imageBand==='medium'?'ne':'dn'):'ne');
 
-  setText('contentBulletValue',String(content.bulletPointCount));
-  setText('contentBulletNote',`Önerilen: ${content.bulletBenchmark}+`);
-  setClass(document.getElementById('contentBulletValue'),'sig-val',bulletBand==='strong'?'c-g':bulletBand==='medium'?'c-w':'c-r');
-  setClass(document.getElementById('contentBulletNote'),'sig-note',bulletBand==='strong'?'up':bulletBand==='medium'?'ne':'dn');
+  setText('contentBulletValue',content.bulletPointCount!=null?String(content.bulletPointCount):'—');
+  setText('contentBulletNote',content.bulletPointCount!=null?`Önerilen: ${content.bulletBenchmark}+`:'Maddeleme verisi sınırlı');
+  setClass(document.getElementById('contentBulletValue'),'sig-val',content.bulletPointCount!=null?(bulletBand==='strong'?'c-g':bulletBand==='medium'?'c-w':'c-r'):'c-b');
+  setClass(document.getElementById('contentBulletNote'),'sig-note',content.bulletPointCount!=null?(bulletBand==='strong'?'up':bulletBand==='medium'?'ne':'dn'):'ne');
 
   setText('contentQuestionValue',content.questionCardValue);
   setText('contentQuestionNote',content.questionCardNote);
@@ -3198,24 +3466,82 @@ function updateContentSeoCards(){
   setClass(document.getElementById('contentQaValue'),'sig-val',content.qaValueTone);
   setClass(document.getElementById('contentQaNote'),'sig-note',content.qaNoteTone);
 
-  setText('contentSeoValue',String(Math.round(content.searchVisibilityScore)));
-  setText('contentSeoNote',content.categoryVisibilityScore!=null?`Kategori Ort.: ${content.categoryVisibilityScore}`:`Hedef: ${content.targetScore}+`);
-  setClass(document.getElementById('contentSeoValue'),'sig-val',content.searchVisibilityScore>=content.targetScore?'c-g':content.searchVisibilityScore>=60?'c-w':'c-r');
-  setClass(document.getElementById('contentSeoNote'),'sig-note',content.categoryVisibilityScore!=null?(content.searchVisibilityScore>=content.categoryVisibilityScore?'up':'dn'):(content.searchVisibilityScore>=content.targetScore?'up':'dn'));
+  setText('contentSeoValue',content.hasSearchVisibilityScore?String(Math.round(content.searchVisibilityScore)):'—');
+  setText('contentSeoNote',content.hasSearchVisibilityScore?(content.categoryVisibilityScore!=null?`Kategori Ort.: ${content.categoryVisibilityScore}`:`Hedef: ${content.targetScore}+`):'SEO skoru verisi sınırlı');
+  setClass(document.getElementById('contentSeoValue'),'sig-val',content.hasSearchVisibilityScore?(content.searchVisibilityScore>=content.targetScore?'c-g':content.searchVisibilityScore>=60?'c-w':'c-r'):'c-b');
+  setClass(document.getElementById('contentSeoNote'),'sig-note',content.hasSearchVisibilityScore?(content.categoryVisibilityScore!=null?(content.searchVisibilityScore>=content.categoryVisibilityScore?'up':'dn'):(content.searchVisibilityScore>=content.targetScore?'up':'dn')):'ne');
   updateKeywordRankCard();
+}
+function getActiveReportDetailSection(){
+  return document.querySelector('.rd-tab.act')?.getAttribute('data-section') || getReportTabSectionFromHash();
+}
+function refreshKeywordDrivenViews(){
+  updateSummaryDiagnosis();
+  const activeSection=getActiveReportDetailSection();
+  if(activeSection==='rdt-content'){
+    initRdContent();
+    return;
+  }
+  if(activeSection==='rdt-demand'){
+    initRdDemand();
+    return;
+  }
+  if(activeSection==='rdt-actions'){
+    initRdActions();
+    return;
+  }
+  if(activeSection==='rdt-summary'){
+    initRdSummary();
+  }
+}
+function applyCustomPrimaryKeywords(){
+  if(!currentReportData) return;
+  const input=document.getElementById('contentPrimaryKeywordsInput');
+  const nextKeywords=saveCustomPrimaryKeywords(
+    currentReportData.reportId,
+    currentReportData.url,
+    input && 'value' in input ? input.value : ''
+  );
+  currentReportData.customPrimaryKeywords=nextKeywords;
+  refreshKeywordDrivenViews();
+}
+function initContentPrimaryKeywordInput(){
+  const input=document.getElementById('contentPrimaryKeywordsInput');
+  if(!input || input.dataset.bound==='1') return;
+  input.dataset.bound='1';
+  input.addEventListener('keydown',(event)=>{
+    if(event.key==='Enter'){
+      event.preventDefault();
+      applyCustomPrimaryKeywords();
+    }
+  });
+  input.addEventListener('input',()=>{
+    if(primaryKeywordInputDebounceTimer){
+      clearTimeout(primaryKeywordInputDebounceTimer);
+    }
+    primaryKeywordInputDebounceTimer=setTimeout(()=>{
+      if(document.activeElement===input){
+        applyCustomPrimaryKeywords();
+      }
+    },500);
+  });
+  input.addEventListener('blur',()=>applyCustomPrimaryKeywords());
 }
 function updateSummaryDiagnosis(){
   const r=currentReportData||{};
   const content=getContentSeoData();
+  const hasLimitedEvidence=content.imageCount==null || content.bulletPointCount==null || !content.hasSearchVisibilityScore;
   const hasOfferAdvantage=safeNumber(r.normalizedPrice)!=null && getPriceData().avgPrice!=null && safeNumber(r.normalizedPrice)<getPriceData().avgPrice;
-  const tag=content.searchVisibilityScore<60?'İçerik Açığı':content.imageScore<80?'Görsel Gelişimi':'Güçlü Listeleme';
-  const theme=content.searchVisibilityScore<60?'İçerik Kalitesi':content.categoryFitScore<70?'Kategori Uyumu':'Arama Görünürlüğü';
-  const focus=content.searchVisibilityScore<60?'Başlık → Görsel → Açıklama':content.categoryFitScore<70?'Anahtar Kelime → Kategori → Başlık':'Başlık → Teknik Alan → Görsel';
-  const diagnosisText=content.searchVisibilityScore<60
-    ? `Ürünün başlık uyumu ve içerik kapsamı kategori seviyesinin altında kalıyor. ${hasOfferAdvantage?'Fiyat avantajı olmasına rağmen ':''}listeleme kalitesi görünürlüğü ve dönüşümü baskılıyor.`
-    : content.imageScore<80
-      ? `Ürünün içerik yapısı kabul edilebilir seviyede ancak görsel ve bilgi derinliği benchmark'ın gerisinde. Bu alanlar iyileşirse görünürlük daha hızlı güçlenebilir.`
-      : `Ürün içerik tarafında dengeli görünüyor. Küçük başlık, teknik alan ve görsel dokunuşlarıyla arama görünürlüğü daha da güçlenebilir.`;
+  const tag=hasLimitedEvidence?'Veri Sınırlı':content.searchVisibilityScore<60?'İçerik Açığı':content.imageScore<80?'Görsel Gelişimi':'Güçlü Listeleme';
+  const theme=hasLimitedEvidence?'Ek doğrulama gerekiyor':content.searchVisibilityScore<60?'İçerik Kalitesi':content.categoryFitScore<70?'Kategori Uyumu':'Arama Görünürlüğü';
+  const focus=hasLimitedEvidence?'Başlık → Görsel → Soru/SEO verisi':content.searchVisibilityScore<60?'Başlık → Görsel → Açıklama':content.categoryFitScore<70?'Anahtar Kelime → Kategori → Başlık':'Başlık → Teknik Alan → Görsel';
+  const diagnosisText=hasLimitedEvidence
+    ? 'Bu raporda içerik veya SEO sinyallerinin bir kısmı eksik geldiği için kesin teşhis üretilemiyor. Karar vermeden önce ürün sayfası verisini yeniden doğrulamak daha güvenli olur.'
+    : content.searchVisibilityScore<60
+      ? `Ürünün başlık uyumu ve içerik kapsamı kategori seviyesinin altında kalıyor. ${hasOfferAdvantage?'Fiyat avantajı olmasına rağmen ':''}listeleme kalitesi görünürlüğü ve dönüşümü baskılıyor.`
+      : content.imageScore<80
+        ? `Ürünün içerik yapısı kabul edilebilir seviyede ancak görsel ve bilgi derinliği benchmark'ın gerisinde. Bu alanlar iyileşirse görünürlük daha hızlı güçlenebilir.`
+        : `Ürün içerik tarafında dengeli görünüyor. Küçük başlık, teknik alan ve görsel dokunuşlarıyla arama görünürlüğü daha da güçlenebilir.`;
   setText('summaryDiagnosisTag',tag);
   setText('summaryDiagnosisText',diagnosisText);
   setText('summaryPrimaryTheme',theme);
@@ -3258,7 +3584,7 @@ function getCampaignScenarioData(){
   ,0,1);
   const operationScore=clamp(
     (0.35*clamp((safeNumber(r.sellerScore) ?? 8.5)/10,0,1))+
-    (0.25*(isTrendyolFreeShippingEligible(safeNumber(r.normalizedPrice))?0.9:0.65))+
+    (0.25*(resolveFreeShippingState(r.freeShipping,safeNumber(r.normalizedPrice))?0.9:0.65))+
     (0.20*(r.hasReturnInfo?0.85:0.55))+
     (0.20*(String(r.deliveryText||'').includes('1-2')?0.9:String(r.deliveryText||'').includes('1-3')?0.82:0.68))
   ,0,1);
@@ -3387,6 +3713,9 @@ function gv(id,options={}){
   const map={'overview':0,'new-analysis':1,'account':4,'settings':5};
   if(map[id]!==undefined) document.querySelectorAll('.sb-item')[map[id]]?.classList.add('act');
   if(id==='reports') applyReportsNavActiveState();
+  if(id==='account'){
+    loadCurrentUserNotifications().catch(()=>undefined);
+  }
   if(id==='overview') setTimeout(initOverview,80);
   setTimeout(()=>enhanceCardInfoButtons(document.getElementById('view-'+id) || document),60);
 }
@@ -3529,7 +3858,9 @@ function toReportDataFromStored(item){
 }
 
 function getAllReports(){
-  return liveReportsCache.length?liveReportsCache:getDemoReports();
+  if(liveReportsCache.length) return liveReportsCache;
+  if(hasAuthenticatedSessionCache===false) return getDemoReports();
+  return [];
 }
 function getOverviewDataSourceState(){
   const hasLiveReports=liveReportsCache.length>0;
@@ -3538,6 +3869,13 @@ function getOverviewDataSourceState(){
       label:'Canlı kullanıcı verisi',
       type:'live',
       note:`${liveReportsCache.length} kullanıcı raporu`,
+    };
+  }
+  if(hasAuthenticatedSessionCache===null){
+    return {
+      label:'Veri kontrol ediliyor',
+      type:'empty',
+      note:'Oturum ve rapor durumu kontrol ediliyor',
     };
   }
   if(hasAuthenticatedSessionCache===true){
@@ -3609,9 +3947,21 @@ async function getAuthSessionPayload(){
 
 function formatPlanLabel(plan){
   const normalized=String(plan||'FREE').trim().toUpperCase();
+  if(normalized==='PRO_MONTHLY') return 'Pro Aylık Plan';
+  if(normalized==='PRO_YEARLY') return 'Pro Yıllık Plan';
+  if(normalized==='TEAM') return 'Team Plan';
   if(normalized==='PREMIUM') return 'Premium Plan';
   if(normalized==='PRO') return 'Pro Plan';
   return 'Free Plan';
+}
+
+function startPlanUpgradeFlow(){
+  const normalized=String(currentUserProfile.plan||'FREE').trim().toUpperCase();
+  if(normalized==='FREE'){
+    window.location.href='/checkout?plan=PRO_MONTHLY';
+    return;
+  }
+  window.location.href='/pricing';
 }
 
 function getInitials(name){
@@ -3653,9 +4003,137 @@ function syncCurrentUserUi(){
   if(accountPlanName) accountPlanName.textContent=planLabel;
 }
 
+function formatNotificationTypeLabel(type){
+  const normalized=String(type||'INFO').trim().toUpperCase();
+  if(normalized==='SUCCESS') return 'Başarılı';
+  if(normalized==='WARNING') return 'Uyarı';
+  if(normalized==='ALERT') return 'Acil';
+  return 'Bilgi';
+}
+
+function getNotificationTagClass(type){
+  const normalized=String(type||'INFO').trim().toUpperCase();
+  if(normalized==='SUCCESS') return 't-g';
+  if(normalized==='WARNING') return 't-w';
+  if(normalized==='ALERT') return 't-r';
+  return 't-b';
+}
+
+function formatNotificationDate(value){
+  if(!value) return '-';
+  try{
+    return new Date(value).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  }catch{
+    return String(value);
+  }
+}
+
+function syncNotificationUi(){
+  const unread=Math.max(0,Number(currentUserNotificationUnreadCount||0));
+  const topbarDot=document.getElementById('topbarNotifDot');
+  if(topbarDot){
+    topbarDot.style.display=unread>0?'block':'none';
+  }
+  const accountBadge=document.getElementById('sbAccountNotifBadge');
+  if(accountBadge){
+    accountBadge.textContent=String(unread);
+    accountBadge.style.display=unread>0?'inline-flex':'none';
+  }
+}
+
+function renderUserNotifications(){
+  const listEl=document.getElementById('accountNotifList');
+  const summaryEl=document.getElementById('accountNotifSummary');
+  if(!listEl || !summaryEl) return;
+
+  const unread=Math.max(0,Number(currentUserNotificationUnreadCount||0));
+  summaryEl.textContent=unread>0
+    ? `${unread} okunmamış bildirim var.`
+    : 'Tüm bildirimler okundu.';
+
+  if(!currentUserNotifications.length){
+    listEl.innerHTML='<div style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg3);font-size:12px;color:var(--muted);">Henüz admin bildirimi bulunmuyor.</div>';
+    return;
+  }
+
+  listEl.innerHTML=currentUserNotifications.map((item)=>{
+    const isUnread=!item.readAt;
+    const tagClass=getNotificationTagClass(item.type);
+    const notificationId=String(item.notificationId||'');
+    return `<div style="padding:10px 12px;border:1px solid ${isUnread?'rgba(79,127,255,.35)':'var(--border)'};border-radius:10px;background:${isUnread?'rgba(79,127,255,.07)':'var(--bg3)'};">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+        <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+          <span class="tag ${tagClass}">${formatNotificationTypeLabel(item.type)}</span>
+          ${isUnread?'<span style="font-size:10.5px;color:var(--accent);font-weight:700;">Yeni</span>':''}
+        </div>
+        ${isUnread?`<button class="btn btn-g btn-sm" onclick="markUserNotificationAsRead('${escapeHtml(notificationId)}')">Okundu</button>`:''}
+      </div>
+      <div style="font-size:13px;font-weight:600;line-height:1.4;margin-bottom:4px;">${escapeHtml(String(item.title||''))}</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:6px;">${escapeHtml(String(item.message||''))}</div>
+      <div style="font-size:11px;color:var(--dim);">${formatNotificationDate(item.createdAt)}</div>
+    </div>`;
+  }).join('');
+}
+
+async function loadCurrentUserNotifications(){
+  const hasSession=await ensureHasAuthenticatedSession();
+  if(!hasSession){
+    currentUserNotifications=[];
+    currentUserNotificationUnreadCount=0;
+    syncNotificationUi();
+    renderUserNotifications();
+    return;
+  }
+
+  try{
+    const res=await fetch('/api/notifications',{cache:'no-store'});
+    const payload=await res.json().catch(()=>null);
+    if(!res.ok){
+      return;
+    }
+    currentUserNotifications=Array.isArray(payload?.notifications)?payload.notifications:[];
+    currentUserNotificationUnreadCount=Number(payload?.unreadCount||0);
+    syncNotificationUi();
+    renderUserNotifications();
+  }catch{}
+}
+
+async function markUserNotificationAsRead(notificationId){
+  const id=String(notificationId||'').trim();
+  if(!id) return;
+  try{
+    await fetch('/api/notifications/read',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({notificationId:id}),
+    });
+  }catch{}
+  await loadCurrentUserNotifications();
+}
+
+async function markAllUserNotificationsAsRead(){
+  try{
+    await fetch('/api/notifications/read',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:'{}',
+    });
+  }catch{}
+  await loadCurrentUserNotifications();
+}
+
 async function loadCurrentUserProfile(){
   const sessionPayload=await getAuthSessionPayload();
   if(!sessionPayload?.user){
+    currentUserProfile={
+      id:'',
+      name:'Kullanıcı',
+      firstName:'Kullanıcı',
+      lastName:'',
+      email:'',
+      username:'kullanici',
+      plan:'FREE',
+    };
     syncOverviewDataSourceBadge();
     syncCurrentUserUi();
     return;
@@ -3667,6 +4145,7 @@ async function loadCurrentUserProfile(){
     const firstName=nameParts[0] || 'Kullanıcı';
     const lastName=nameParts.slice(1).join(' ');
     currentUserProfile={
+      id:String(sessionPayload?.user?.id || '').trim(),
       name:rawName || firstName,
       firstName,
       lastName,
@@ -3782,6 +4261,7 @@ function updateSidebarBadges(){
   if(allBadge) allBadge.textContent=String(getAllReports().length);
   const favoritesBadge=document.getElementById('sbReportsFavoritesBadge');
   if(favoritesBadge) favoritesBadge.textContent=String(getFavoriteReportsCount());
+  syncNotificationUi();
 }
 
 function applyReportsNavActiveState(){
@@ -3842,11 +4322,20 @@ function getLegacyOverallStatus(score){
   return {label:'Kritik',tag:'t-r',scoreClass:'sco-r',color:'var(--danger)'};
 }
 
+function getDisplayScoreState(score){
+  const numeric=safeNumber(score);
+  if(numeric==null){
+    return {display:'—',status:{label:'Bekleniyor',tag:'t-n',scoreClass:'sco-b',color:'var(--muted)'}};
+  }
+  const rounded=Math.round(numeric);
+  return {display:String(rounded),status:getLegacyOverallStatus(rounded)};
+}
+
 function buildReportRowHtml(report,index){
-  const score=Math.round(safeNumber(report?.overallScore) ?? 0);
-  const seoScore=Math.round(safeNumber(report?.seoScore) ?? 0);
-  const conversionScore=Math.round(safeNumber(report?.conversionScore) ?? 0);
-  const status=getLegacyOverallStatus(score);
+  const overall=getDisplayScoreState(report?.overallScore);
+  const seoScore=safeNumber(report?.seoScore);
+  const conversionScore=safeNumber(report?.conversionScore);
+  const status=overall.status;
   const favoriteActive=isReportFavorite(report);
   const favoriteTitle=favoriteActive?'Favoriden çıkar':'Favoriye ekle';
   const favoriteIcon=favoriteActive?'★':'☆';
@@ -3855,9 +4344,9 @@ function buildReportRowHtml(report,index){
       <div class="rt-thumb">${getReportThumbHtml(report)}</div>
       <div><div class="rt-pname">${escapeHtml(String(report?.title||'Ürün'))}</div><div class="rt-pcat">${escapeHtml(String(report?.cat||'Kategori'))}</div></div>
     </div>
-    <div><div class="sco ${status.scoreClass}">${score}</div></div>
-    <div style="font-size:12.5px;color:${status.color};">${seoScore}</div>
-    <div style="font-size:12.5px;color:${status.color};">${conversionScore}</div>
+    <div><div class="sco ${status.scoreClass}">${overall.display}</div></div>
+    <div style="font-size:12.5px;color:${seoScore!=null?status.color:'var(--muted)'};">${seoScore!=null?Math.round(seoScore):'—'}</div>
+    <div style="font-size:12.5px;color:${conversionScore!=null?status.color:'var(--muted)'};">${conversionScore!=null?Math.round(conversionScore):'—'}</div>
     <div><span class="tag ${status.tag}">${status.label}</span></div>
     <div style="font-size:12px;color:var(--muted);">${escapeHtml(String(report?.date||''))}</div>
     <div class="rt-acts">
@@ -4109,7 +4598,7 @@ function adaptApiResultToReportData(payload){
   const brand=extracted.brand?`Brand: ${extracted.brand}`:null;
   const sku=extracted.model_code?`Model: ${extracted.model_code}`:null;
   const meta=[brand,sku].filter(Boolean).join(' · ');
-  const questionCount=safeNumber(extracted.question_count) ?? 0;
+  const questionCount=safeNumber(extracted.question_count) ?? null;
   const thumbnail=resolveReportThumbnail(payload,extracted);
   const descriptionText=String(extracted.description_text || '').trim();
   const descriptionLength=safeNumber(extracted.description_length) ?? (descriptionText.length?descriptionText.length:null);
@@ -4124,10 +4613,10 @@ function adaptApiResultToReportData(payload){
     cat:String(payload?.category || extracted.category || 'Kategori bilgisi yok'),
     src:normalizeReportSourceLabel(payload?.dataSource || 'Gerçek Veri'),
     url:payload?.url || null,
-    overallScore:overallScore ?? 0,
+    overallScore:overallScore ?? null,
     dataCompletenessScore:safeNumber(payload?.dataCompletenessScore) ?? null,
-    seoScore:seoScore ?? 0,
-    conversionScore:safeNumber(payload?.conversionScore) ?? 0,
+    seoScore:seoScore ?? null,
+    conversionScore:safeNumber(payload?.conversionScore) ?? null,
     discountRate:safeNumber(extracted.discount_rate) ?? 0,
     campaignDays:7,
     sellerName,
@@ -4136,34 +4625,23 @@ function adaptApiResultToReportData(payload){
     ratingValue:safeNumber(extracted.rating_value),
     reviewCount:safeNumber(extracted.review_count),
     favoriteCount:safeNumber(extracted.favorite_count),
+    viewCount24h:safeNumber(extracted.view_count_24h),
     normalizedPrice:safeNumber(extracted.normalized_price),
     originalPrice:safeNumber(extracted.original_price),
-    freeShipping:isTrendyolFreeShippingEligible(safeNumber(extracted.normalized_price)),
+    freeShipping:resolveFreeShippingState(
+      typeof extracted.has_free_shipping==='boolean'?extracted.has_free_shipping:null,
+      safeNumber(extracted.normalized_price)
+    ),
     shippingDays:safeNumber(extracted.shipping_days),
     officialSeller:extracted.official_seller===true,
     hasCampaign:extracted.has_campaign===true,
     campaignLabel:String(extracted.campaign_label || ''),
     promotionLabels:Array.isArray(extracted.promotion_labels)?extracted.promotion_labels.map(item=>String(item||'').trim()).filter(Boolean):[],
     otherSellersCount:safeNumber(extracted.other_sellers_count),
-    deliveryText:String(extracted.delivery_type || (safeNumber(extracted.shipping_days)!=null?`${extracted.shipping_days} gün`:'Teslimat bilgisi sınırlı')),
+    deliveryText:humanizeDeliveryText(extracted.delivery_type, safeNumber(extracted.shipping_days)),
     metaDescription:String(extracted.meta_description || ''),
     primaryKeywords:extractPrimaryKeywordsFromTitle(title, extracted.brand),
-    categoryFit:(()=>{
-      const contentFit=payload?.trendyolScorecard?.contentFit || null;
-      const score=safeNumber(contentFit?.score);
-      const bandForScore=(score!=null?getLegacyContentBand(score):'medium');
-      const label=typeof contentFit?.label==='string' && contentFit.label.trim().length>0
-        ? contentFit.label.trim()
-        : score!=null
-          ? (bandForScore==='strong'?'Yüksek':bandForScore==='medium'?'Orta':'Zayıf')
-          : 'Orta';
-      const note=Array.isArray(contentFit?.evidence) && contentFit.evidence.length
-        ? String(contentFit.evidence[0] || '').trim()
-        : score!=null
-          ? (bandForScore==='strong'?'Kategori ile güçlü eşleşme görülüyor':bandForScore==='medium'?'Kategori ilişkisi kabul edilebilir':'Kategori uyumu zayıf')
-          : 'Kategori sinyali sınırlı';
-      return {score:score ?? 70,label,note};
-    })(),
+    categoryFit:null,
     questionAnalysis:{
       is_single_seller: payload?.reviewAnalysis?.is_single_seller===true,
       general:{count:questionCount,answeredCount:null,unansweredCount:null},
@@ -4174,7 +4652,7 @@ function adaptApiResultToReportData(payload){
     descriptionLength,
     imageCount:safeNumber(extracted.image_count),
     bulletPointCount:safeNumber(extracted.bullet_point_count),
-    questionCount,
+    questionCount:safeNumber(extracted.question_count) ?? null,
     qaSnippetCount:Array.isArray(extracted.qa_snippets)?extracted.qa_snippets.length:0,
     hasSpecs:typeof extracted.has_specs==='boolean'?extracted.has_specs:false,
     hasFaq:typeof extracted.has_faq==='boolean'?extracted.has_faq:false,
@@ -4206,7 +4684,7 @@ function saveRecentAnalysis(report){
         thumbnail:report.thumbnail || null,
         title:report.title,
         url:report.url || '',
-        overallScore:Math.round(safeNumber(report.overallScore) ?? 0),
+        overallScore:safeNumber(report.overallScore),
         date:formatShortDate(new Date().toISOString()),
       },
       ...current.filter((item)=>item.url!==report.url).slice(0,5)
@@ -4233,23 +4711,28 @@ function renderRecentAnalyses(){
     const score=safeNumber(item.overallScore);
     const scoreBand=getLegacyOverallBand(score ?? 0);
     const scoreColor=scoreBand==='strong'?'var(--accent)':scoreBand==='medium'?'var(--brand)':'var(--warn)';
+    const label=String(item.title||item.url||'').trim() || 'Analiz';
     const thumbnail=normalizeImageUrl(item.thumbnail);
     const thumbHtml=thumbnail
       ? `<span class="rt-thumb" style="width:30px;height:30px;font-size:13px;"><img src="${escapeHtml(thumbnail)}" alt="Ürün görseli" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.parentElement.textContent='${escapeHtml(String(item.emoji||'📦'))}'"></span>`
       : `<span style="font-size:16px;">${escapeHtml(String(item.emoji||'📦'))}</span>`;
     return `<div class="ru-item" onclick="document.getElementById('analyzeInput').value='${escapeHtml(String(item.url||''))}'">
       ${thumbHtml}
-      <span class="ru-url">${escapeHtml(String(item.url||''))}</span>
-      <span style="font-size:12px;font-weight:700;color:${scoreColor};">${score!=null?score:'—'}</span>
+      <span class="ru-url">${escapeHtml(label)}</span>
+      <span style="font-size:12px;font-weight:700;color:${score!=null?scoreColor:'var(--muted)'};">${score!=null?Math.round(score):'—'}</span>
       <span style="font-size:11px;color:var(--dim);">${escapeHtml(String(item.date||''))}</span>
     </div>`;
   }).join('');
 }
 
 function openReportData(r){
-  currentReportData=r;
+  currentReportData={
+    ...r,
+    customPrimaryKeywords:loadCustomPrimaryKeywords(r?.reportId,r?.url),
+  };
   currentCampaignState.discountRate=safeNumber(r.discountRate) ?? 15;
   currentCampaignState.campaignDays=Math.round(clamp(safeNumber(r.campaignDays) ?? 7,1,30));
+  initContentPrimaryKeywordInput();
   updateReportDetailImage(r);
   document.getElementById('rdTitle').textContent=r.title;
   document.getElementById('rdMeta').textContent=r.meta;
@@ -4330,12 +4813,18 @@ async function startAnalysisJob(normalizedUrl){
 }
 
 async function waitForAnalysisJob(jobId,onProgress){
-  for(;;){
+  const maxAttempts=80;
+  const requestTimeoutMs=10000;
+  for(let attempt=0;attempt<maxAttempts;attempt++){
+    const controller=new AbortController();
+    const timeoutId=setTimeout(()=>controller.abort(),requestTimeoutMs);
     const res=await fetch(`/api/analyze/jobs/${encodeURIComponent(String(jobId))}`,{
       method:'GET',
       headers:{'Content-Type':'application/json'},
       cache:'no-store',
+      signal:controller.signal,
     });
+    clearTimeout(timeoutId);
     const data=await res.json();
     if(!res.ok || !data){
       throw new Error(data?.message || 'Analiz durumu alınamadı');
@@ -4351,6 +4840,7 @@ async function waitForAnalysisJob(jobId,onProgress){
     }
     await new Promise(resolve=>setTimeout(resolve,1500));
   }
+  throw new Error('Analiz zaman aşımına uğradı. Lütfen tekrar deneyin.');
 }
 
 async function startAnalysis(){
@@ -4418,10 +4908,76 @@ function applyAnalyzeQueryPrefill(options={}){
   }
 }
 
+function renderOverviewEmptyState(){
+  setCardTypeBadge('overviewActivityType','Bekleniyor','fallback');
+  setCardTypeBadge('overviewScoreDistType','Bekleniyor','fallback');
+  setCardTypeBadge('overviewPageStrengthType','Bekleniyor','fallback');
+  setCardTypeBadge('overviewTrustType','Bekleniyor','fallback');
+  setCardTypeBadge('overviewMarketType','Bekleniyor','fallback');
+  setCardTypeBadge('overviewChallengesType','Bekleniyor','fallback');
+
+  setText('ovAvgScoreVal','0');
+  setText('ovAvgScoreNote',overviewDataSourceMode==='demo'
+    ? 'Demo rapor seti yüklenemedi'
+    : 'Henüz hesaplanacak rapor yok');
+  const avgScoreNote=document.getElementById('ovAvgScoreNote');
+  if(avgScoreNote) avgScoreNote.className='kpi-note ne';
+  const avgFill=document.getElementById('ovAvgScoreFill');
+  if(avgFill) avgFill.style.width='0%';
+
+  setText('ovTotalReportsVal','0');
+  setText('ovTotalReportsNote',overviewDataSourceMode==='demo'
+    ? 'Demo veri bekleniyor'
+    : 'Henüz canlı kullanıcı raporu yok');
+  const totalReportsNote=document.getElementById('ovTotalReportsNote');
+  if(totalReportsNote) totalReportsNote.className='kpi-note ne';
+  const totalFill=document.getElementById('ovTotalReportsFill');
+  if(totalFill) totalFill.style.width='0%';
+
+  setText('ovDataCompletenessVal','%0');
+  setText('ovDataCompletenessNote','Yeterli veri gelmeden ortalama hesaplanmıyor');
+  const completenessNote=document.getElementById('ovDataCompletenessNote');
+  if(completenessNote) completenessNote.className='kpi-note ne';
+  const compFill=document.getElementById('ovDataCompletenessFill');
+  if(compFill) compFill.style.width='0%';
+
+  setText('ovPendingActionsVal','0');
+  setText('ovPendingActionsNote','Öneri üretmek için rapor gerekli');
+  const pendingNote=document.getElementById('ovPendingActionsNote');
+  if(pendingNote) pendingNote.className='kpi-note ne';
+  const pendingFill=document.getElementById('ovPendingActionsFill');
+  if(pendingFill) pendingFill.style.width='0%';
+
+  renderChartEmptyState('actChart','Rapor bulunmadığı için aylık aktivite grafiği gösterilmiyor.');
+  renderChartEmptyState('scoreDistChart','Rapor bulunmadığı için skor dağılımı gösterilmiyor.');
+  renderChartEmptyState('pageStrChart','Rapor bulunmadığı için sayfa gücü ortalaması hesaplanmıyor.');
+  renderChartEmptyState('custTrustChart','Rapor bulunmadığı için güven sinyalleri gösterilmiyor.');
+  renderChartEmptyState('mktPosChart','Rapor bulunmadığı için pazar konumu hesaplanmıyor.');
+  renderChartEmptyState('challengesChart','Rapor bulunmadığı için ana zorluklar gösterilmiyor.');
+
+  const activitySub=document.querySelector('#actChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(activitySub) activitySub.textContent='Rapor bulunamadı';
+  const scoreDistSub=document.querySelector('#scoreDistChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(scoreDistSub) scoreDistSub.textContent='overallScore bantları için rapor gerekli';
+  const pageStrengthSub=document.querySelector('#pageStrChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(pageStrengthSub) pageStrengthSub.textContent='İçerik ortalaması için rapor gerekli';
+  const trustSub=document.querySelector('#custTrustChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(trustSub) trustSub.textContent='Güven sinyalleri için rapor gerekli';
+  const marketSub=document.querySelector('#mktPosChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(marketSub) marketSub.textContent='Rakip özeti için rapor gerekli';
+  const challengesSub=document.querySelector('#challengesChart')?.closest('.cc')?.querySelector('.cc-sub');
+  if(challengesSub) challengesSub.textContent='Zorluk frekansı için rapor gerekli';
+
+  renderReportTables();
+}
+
 function initOverview(){
   syncOverviewDataSourceBadge();
   const reports=getCurrentReports();
-  if(!reports.length) return;
+  if(!reports.length){
+    renderOverviewEmptyState();
+    return;
+  }
   const sharedRules=getResolvedRuleSection('shared');
   const trustRules=getResolvedRuleSection('trust_reviews');
   const demandRules=getResolvedRuleSection('demand_signals');
@@ -4435,18 +4991,23 @@ function initOverview(){
   setCardTypeBadge('overviewTrustType','Türetilmiş','derived');
   setCardTypeBadge('overviewChallengesType','Türetilmiş','derived');
 
-  const avgOverall=Math.round(
-    reports.reduce((sum,item)=>sum+(safeNumber(item.overallScore) ?? 0),0) / reports.length
-  );
-  const avgCompleteness=Math.round(
-    reports.reduce((sum,item)=>sum+(safeNumber(item.dataCompletenessScore) ?? 70),0) / reports.length
-  );
-  const criticalCount=reports.filter((item)=>getLegacyOverallBand(safeNumber(item.overallScore) ?? 0)==='weak').length;
-  const pendingActions=reports.reduce((sum,item)=>sum+(Array.isArray(item.priorityActions)?Math.min(3,item.priorityActions.length):1),0);
+  const scoredReports=reports.map((item)=>safeNumber(item.overallScore)).filter((item)=>item!=null);
+  const completenessValues=reports.map((item)=>safeNumber(item.dataCompletenessScore)).filter((item)=>item!=null);
+  const avgOverall=scoredReports.length
+    ? Math.round(scoredReports.reduce((sum,item)=>sum+item,0) / scoredReports.length)
+    : 0;
+  const avgCompleteness=completenessValues.length
+    ? Math.round(completenessValues.reduce((sum,item)=>sum+item,0) / completenessValues.length)
+    : 0;
+  const criticalCount=reports.filter((item)=>{
+    const score=safeNumber(item.overallScore);
+    return score!=null && getLegacyOverallBand(score)==='weak';
+  }).length;
+  const pendingActions=reports.reduce((sum,item)=>sum+(Array.isArray(item.priorityActions)?Math.min(3,item.priorityActions.length):0),0);
   const avgOverallBand=getLegacyOverallBand(avgOverall);
 
-  setText('ovAvgScoreVal',String(avgOverall));
-  setText('ovAvgScoreNote',`${overviewDataSourceMode==='live'?'Canlı rapor ortalaması · ':overviewDataSourceMode==='demo'?'Demo veri ortalaması · ':''}${avgOverallBand==='strong'?'↑ Güçlü ortalama skor':avgOverallBand==='medium'?'→ İyileştirme alanı var':'↓ Kritik seviye'}`);
+  setText('ovAvgScoreVal',scoredReports.length?String(avgOverall):'—');
+  setText('ovAvgScoreNote',scoredReports.length?`${overviewDataSourceMode==='live'?'Canlı rapor ortalaması · ':overviewDataSourceMode==='demo'?'Demo veri ortalaması · ':''}${avgOverallBand==='strong'?'↑ Güçlü ortalama skor':avgOverallBand==='medium'?'→ İyileştirme alanı var':'↓ Kritik seviye'}`:'Skor verisi oluştuğunda ortalama burada görünecek');
   const avgFill=document.getElementById('ovAvgScoreFill');
   if(avgFill) avgFill.style.width=`${clamp(avgOverall,0,100)}%`;
 
@@ -4459,8 +5020,8 @@ function initOverview(){
   const totalFill=document.getElementById('ovTotalReportsFill');
   if(totalFill) totalFill.style.width=`${clamp(Math.round((reports.length/100)*100),8,100)}%`;
 
-  setText('ovDataCompletenessVal',`%${avgCompleteness}`);
-  setText('ovDataCompletenessNote',avgCompleteness>=80?'Ortalama veri kalitesi yüksek':avgCompleteness>=60?'Ortalama veri kalitesi orta':'Veri kalitesi gelişmeli');
+  setText('ovDataCompletenessVal',completenessValues.length?`%${avgCompleteness}`:'—');
+  setText('ovDataCompletenessNote',completenessValues.length?(avgCompleteness>=80?'Ortalama veri kalitesi yüksek':avgCompleteness>=60?'Ortalama veri kalitesi orta':'Veri kalitesi gelişmeli'):'Tamamlanma verisi geldiğinde burada hesaplanacak');
   const compFill=document.getElementById('ovDataCompletenessFill');
   if(compFill) compFill.style.width=`${clamp(avgCompleteness,0,100)}%`;
 
@@ -4707,7 +5268,7 @@ function initRdSummary(){
     content.descriptionScore*0.10 +
     content.imageScore*0.10 +
     offerScore*0.15 +
-    (isTrendyolFreeShippingEligible(safeNumber(r.normalizedPrice))?85:45)*0.10 +
+    (resolveFreeShippingState(r.freeShipping,safeNumber(r.normalizedPrice))?85:45)*0.10 +
     deliveryScore*0.10 +
     content.questionSignalScore*0.05 +
     clamp((safeNumber(r.sellerScore) ?? 0)/10*100,0,100)*0.15
@@ -4854,15 +5415,14 @@ function initRdPrice(){
   );
   setCardTypeBadge('pricePositionType',hasDirectCompetitorSummary?'Türetilmiş':'Kısmi fallback',hasDirectCompetitorSummary?'derived':'fallback');
   setCardTypeBadge('priceScenarioType','Tahmini','estimated');
-  setCardTypeBadge('priceRangeType',hasDirectCompetitorSummary?'Türetilmiş':'Kısmi fallback',hasDirectCompetitorSummary?'derived':'fallback');
   setCardTypeBadge(
     'compAdvType',
-    compAdvData?.source==='offers' || compAdvData?.source==='summary'
+    (Array.isArray(currentReportData?.otherSellerOffers) && currentReportData.otherSellerOffers.length) || compAdvData?.source==='summary'
       ? 'Türetilmiş'
       : compAdvData?.source==='self'
         ? 'Tahmini'
         : 'Kısmi fallback',
-    compAdvData?.source==='offers' || compAdvData?.source==='summary'
+    (Array.isArray(currentReportData?.otherSellerOffers) && currentReportData.otherSellerOffers.length) || compAdvData?.source==='summary'
       ? 'derived'
       : compAdvData?.source==='self'
         ? 'estimated'
@@ -4910,46 +5470,30 @@ function initRdPrice(){
   }
   const campaignScenario=getCampaignScenarioData();
   mk('discountChart','line',{labels:campaignScenario.labels,datasets:[{label:'Tahmini Dönüşüm Potansiyeli',data:campaignScenario.data,borderColor:WN,backgroundColor:'rgba(245,158,11,.1)',fill:true,tension:.4,pointRadius:4,pointBackgroundColor:WN}]},{plugins:{legend:{display:false}},scales:{y:{min:0,max:100,grid:{color:GC}},x:{grid:{display:false}}}});
-  if(hasPriceRangeData){
-    mk('priceRangeChart','bar',{labels:priceRangeChart.labels,datasets:[{data:priceRangeChart.values,backgroundColor:priceRangeChart.colors,borderRadius:5,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:GC}},x:{grid:{display:false}}}});
-  }else{
-    renderChartEmptyState('priceRangeChart','Rakip fiyat özeti bulunamadı; min/ortalama/maks dağılımı çizilmiyor.');
-  }
-  const priceRangeSubEl=document.querySelector('#priceRangeChart')?.closest('.cc')?.querySelector('.cc-sub');
-  if(priceRangeSubEl){
-    priceRangeSubEl.textContent=hasPriceRangeData
-      ? (dedupeOwnBar?'Bu ürün + rakipler, min/ort/max tekilleştirilmiş':'other_sellers_summary: min/avg/max')
-      : 'Rakip fiyat özeti bulunamadı';
-  }
-  if(hasCompetitorAdvantageData){
-    mk('compAdvChart','bar',{labels:compAdvData?compAdvData.labels:[],datasets:[{data:compAdvData?compAdvData.values:[],backgroundColor:compAdvData?compAdvData.colors:[],borderRadius:6,borderSkipped:false}]},{plugins:{legend:{display:false}},scales:{y:{grid:{color:GC},ticks:{precision:0},suggestedMax:compAdvData?Math.max(...compAdvData.values,2):4},x:{grid:{display:false}}}});
-  }else{
-    renderChartEmptyState('compAdvChart','Rakip teklif sinyali bulunamadı; avantaj dağılımı gösterilmiyor.');
-  }
-  const compAdvSubEl=document.querySelector('#compAdvChart')?.closest('.cc')?.querySelector('.cc-sub');
+  renderCompetitorAdvantageList();
+  const compAdvSubEl=document.getElementById('compAdvList')?.closest('.cc')?.querySelector('.cc-sub');
   if(compAdvSubEl) compAdvSubEl.textContent=hasCompetitorAdvantageData
     ? (
       compAdvData?.source==='offers'
-        ? (offerSignalRule?'Teklif bazli kampanya, indirim ve teslimat sinyalleri':'Kampanya + indirim + teslimat sinyalleri')
+        ? 'En fazla 10 rakipte kupon, kampanya ve birlikte al sinyalleri'
         : compAdvData?.source==='summary'
-          ? 'Rakip özetinden gelen teslimat ve satıcı sinyalleri'
-          : 'Rakip yok; ürün teklif sinyalleri gösteriliyor'
+          ? 'Rakip ozetinden gelen sinyaller sinirli'
+          : 'Rakip yok; urun teklif sinyalleri gosteriliyor'
     )
     : 'Rakip teklif sinyali bulunamadı';
   const compAdvNoteEl=document.getElementById('compAdvNote');
   if(compAdvNoteEl){
     if(!compAdvData){
-      compAdvNoteEl.textContent=offerSignalRule?'Rakip teklif sinyali bulunamadı.':'Rakip kampanya sinyali bulunamadı.';
+      compAdvNoteEl.textContent='Rakip teklif sinyali bulunamadi.';
     }else if(compAdvData.anomalyCount>0){
       compAdvNoteEl.textContent=`Uyarı: ${compAdvData.anomalyCount} rakip teklifte 1 TL / anomali fiyat görünüyor${compAdvData.anomalyNames.length?` (${compAdvData.anomalyNames.join(', ')})`:''}.`;
     }else if(compAdvData.source==='summary'){
-      compAdvNoteEl.textContent=`Rakip teklif listesi yok; özet veriden ${compAdvData.totalOffers} satıcıya ait teslimat ve satıcı sinyalleri okunuyor.`;
+      compAdvNoteEl.textContent=`Rakip teklif listesi yok; ozet veriden ${compAdvData.totalOffers} saticiya ait sinyal okunuyor.`;
     }else if(compAdvData.source==='self'){
-      compAdvNoteEl.textContent='Rakip teklif listesi yakalanamadığı için yalnızca mevcut ürünün kampanya, kargo ve teslimat sinyalleri gösteriliyor.';
+      compAdvNoteEl.textContent='Rakip teklif listesi yakalanamadigi icin yalnizca mevcut urunun sinyalleri gorunuyor.';
     }else{
-      compAdvNoteEl.textContent=offerSignalRule
-        ? `Toplam ${compAdvData.totalOffers} rakip teklifte kampanya, indirim ve teslimat sinyalleri ozetleniyor.`
-        : `Toplam ${compAdvData.totalOffers} rakip teklifte kampanya, indirim ve teslimat sinyalleri özetleniyor.`;
+      const listedCount=Math.min(Array.isArray(currentReportData?.otherSellerOffers)?currentReportData.otherSellerOffers.length:0,10);
+      compAdvNoteEl.textContent=`Toplam ${compAdvData.totalOffers} rakip tekliften en fazla ${listedCount} tanesi listeleniyor. Kupon, kampanya ve birlikte al etiketleri promotion_labels alanindan okunuyor.`;
     }
   }
 }
@@ -5187,6 +5731,7 @@ function initRdActions(){
 
 async function bootstrapDashboard(){
   await loadCurrentUserProfile();
+  await loadCurrentUserNotifications();
   await loadFavoriteReportKeys();
   try{
     const storedMode=localStorage.getItem(REPORTS_FILTER_MODE_STORAGE_KEY);

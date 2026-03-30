@@ -160,7 +160,7 @@ export const pricingPlans: MarketingPlan[] = [
     badge: "En populer",
     featured: true,
     accent: "brand",
-    ctaHref: "/register",
+    ctaHref: "/register?plan=PRO_MONTHLY",
     ctaLabel: "Pro'ya Gec",
   },
   {
@@ -179,7 +179,7 @@ export const pricingPlans: MarketingPlan[] = [
     ],
     badge: "En avantajli",
     accent: "success",
-    ctaHref: "/register",
+    ctaHref: "/register?plan=PRO_YEARLY",
     ctaLabel: "Yillik Degeri Sec",
   },
   {
@@ -197,7 +197,7 @@ export const pricingPlans: MarketingPlan[] = [
       "Ajans ve coklu urun akislari icin uygun yapi",
     ],
     accent: "accent",
-    ctaHref: "/register",
+    ctaHref: "/register?plan=TEAM",
     ctaLabel: "Ekip Paketi Sor",
   },
 ];

@@ -75,7 +75,6 @@ export async function POST(req: Request) {
           requestId,
           error: error.code,
           message: error.message,
-          detail: error.detail,
         },
         { status: 400 }
       );
@@ -107,7 +106,6 @@ export async function POST(req: Request) {
         requestId,
         error: "INTERNAL_SERVER_ERROR",
         message: "Analiz sirasinda bir hata olustu.",
-        detail: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );

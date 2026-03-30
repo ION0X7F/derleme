@@ -1,10 +1,29 @@
-import RoutePlaceholder from "../_ui/route-placeholder";
+import { auth } from "@/auth";
+import AuthPanel from "../_ui/auth-panel";
 
-export default function AdminPage() {
+export default async function AdminPage() {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return (
+      <AuthPanel
+        mode="login"
+        callbackUrlOverride="/admin"
+        context="admin"
+      />
+    );
+  }
+
   return (
-    <RoutePlaceholder
-      title="Admin panel"
-      description="Admin arayuzu yeniden tasarlanacak. Bu alan su an sade bir placeholder."
+    <iframe
+      src="/admin-panel.html"
+      style={{
+        width: "100vw",
+        height: "100vh",
+        border: "none",
+        display: "block",
+      }}
+      title="SellBoost Admin Panel"
     />
   );
 }

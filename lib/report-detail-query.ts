@@ -1,6 +1,33 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
+function assertReportOwnershipBinding(
+  data:
+    | Prisma.ReportUncheckedCreateInput
+    | Prisma.ReportCreateInput
+) {
+  const uncheckedData = data as Prisma.ReportUncheckedCreateInput;
+  const hasUserId =
+    typeof uncheckedData.userId === "string" && uncheckedData.userId.trim().length > 0;
+  const hasGuestId =
+    typeof uncheckedData.guestId === "string" && uncheckedData.guestId.trim().length > 0;
+  const checkedData = data as Prisma.ReportCreateInput;
+  const hasConnectedUser =
+    !!checkedData.user &&
+    "connect" in checkedData.user &&
+    !!checkedData.user.connect &&
+    typeof checkedData.user.connect.id === "string" &&
+    checkedData.user.connect.id.trim().length > 0;
+
+  const ownerBindings = [hasUserId || hasConnectedUser, hasGuestId].filter(Boolean).length;
+
+  if (ownerBindings !== 1) {
+    throw new Error(
+      "REPORT_OWNER_BINDING_REQUIRED"
+    );
+  }
+}
+
 export const REPORT_DETAIL_SELECT = {
   id: true,
   url: true,
@@ -117,6 +144,7 @@ export async function fetchReportTimelineForUser(params: {
 export async function createReanalyzeReport(params: {
   data: Prisma.ReportUncheckedCreateInput;
 }) {
+  assertReportOwnershipBinding(params.data);
   return prisma.report.create({
     data: params.data,
   });
@@ -125,14 +153,49 @@ export async function createReanalyzeReport(params: {
 export async function createAnalyzeReport(params: {
   data: Prisma.ReportUncheckedCreateInput;
 }) {
+  assertReportOwnershipBinding(params.data);
   return prisma.report.create({
     data: params.data,
+  });
+}
+
+export async function createAnalyzeReportInTransaction(params: {
+  tx: Pick<Prisma.TransactionClient, "report">;
+  data: Prisma.ReportUncheckedCreateInput;
+}) {
+  assertReportOwnershipBinding(params.data);
+  return params.tx.report.create({
+    data: params.data,
+  });
+}
+
+export async function createAnalyzeReportWithUsageTransaction<T>(params: {
+  consume: (
+    tx: Pick<
+      Prisma.TransactionClient,
+      "report" | "guestUsageRecord" | "userUsageRecord"
+    >
+  ) => Promise<T>;
+  data: Prisma.ReportUncheckedCreateInput;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const usage = await params.consume(tx);
+    const report = await createAnalyzeReportInTransaction({
+      tx,
+      data: params.data,
+    });
+
+    return {
+      usage,
+      report,
+    };
   });
 }
 
 export async function createSavedReport(params: {
   data: Prisma.ReportCreateInput;
 }) {
+  assertReportOwnershipBinding(params.data);
   return prisma.report.create({
     data: params.data,
   });

@@ -30,6 +30,18 @@ enum SubscriptionPlanVariant {
   TEAM
 }
 
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ALERT
+}
+
+enum NotificationTargetScope {
+  ALL_USERS
+  SINGLE_USER
+}
+
 model User {
   id           String   @id @default(cuid())
   name         String?
@@ -48,6 +60,41 @@ model User {
   reportFavorites    ReportFavorite[]
   subscription       Subscription?
   userUsageRecords   UserUsageRecord[]
+  sentNotifications  Notification[]      @relation("NotificationSender")
+  notifications      UserNotification[]
+}
+
+model Notification {
+  id            String                  @id @default(cuid())
+  title         String
+  message       String
+  type          NotificationType        @default(INFO)
+  targetScope   NotificationTargetScope @default(ALL_USERS)
+  targetUserId  String?
+  senderUserId  String?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  sender    User?              @relation("NotificationSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+  receipts  UserNotification[]
+
+  @@index([createdAt])
+  @@index([targetUserId])
+}
+
+model UserNotification {
+  id             String   @id @default(cuid())
+  userId         String
+  notificationId String
+  readAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, notificationId])
+  @@index([userId, readAt, createdAt])
 }
 
 model Plan {

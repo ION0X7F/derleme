@@ -65,7 +65,7 @@ export async function getAnalyzeUsageResponse() {
       {
         requestId,
         error: "INTERNAL_SERVER_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: "Kullanim bilgisi alinamadi.",
       },
       { status: 500 }
     );

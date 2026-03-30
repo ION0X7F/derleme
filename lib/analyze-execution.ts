@@ -12,7 +12,7 @@ import {
   resolveUserAnalyzeUsageContext,
 } from "@/lib/analyze-usage-context";
 import type { AnalyzeLimitResult } from "@/lib/check-analyze-limit";
-import { incrementAnalyzeUsage } from "@/lib/increment-analyze-usage";
+import { consumeAnalyzeUsageIfAllowed } from "@/lib/increment-analyze-usage";
 import { projectUsageAfterIncrement } from "@/lib/analyze-usage-snapshot";
 import { buildAnalysisDecisionSummary } from "@/lib/analysis-decision-summary";
 import { recordLearningArtifacts } from "@/lib/learning-engine";
@@ -21,7 +21,10 @@ import {
   AnalysisPipelineError,
   runAnalysisPipeline,
 } from "@/lib/run-analysis";
-import { createAnalyzeReport } from "@/lib/report-detail-query";
+import {
+  createAnalyzeReport,
+  createAnalyzeReportWithUsageTransaction,
+} from "@/lib/report-detail-query";
 import { resolveUserAnalysisContext } from "@/lib/analysis-user-context";
 import type {
   AnalysisAccessState,
@@ -390,51 +393,100 @@ export async function executeAnalyzeUrl(
       dataSource: shapedResult.dataSource,
     });
 
+    const buildLimitReachedError = (payload: AnalyzeLimitResult) => {
+      const limitError = new Error("ANALYZE_LIMIT_REACHED");
+      limitError.name = "AnalyzeLimitReachedError";
+      (limitError as Error & { payload?: AnalyzeLimitResult }).payload = payload;
+      return limitError;
+    };
+
     let savedReport: Awaited<ReturnType<typeof createAnalyzeReport>> | null = null;
     const storedPayload = buildStoredAnalysisPayload(analysis);
+    const reportCreateData =
+      usageTarget.type === "user"
+        ? ({
+            guestId: null,
+            userId: usageTarget.userId,
+            url,
+            platform,
+            category,
+            seoScore: shapedResult.seoScore,
+            dataCompletenessScore: shapedResult.dataCompletenessScore,
+            conversionScore: shapedResult.conversionScore,
+            overallScore: shapedResult.overallScore,
+            priceCompetitiveness: shapedResult.priceCompetitiveness,
+            summary: shapedResult.summary,
+            dataSource: shapedResult.dataSource,
+            extractedData: toDbJson(storedPayload.extractedData),
+            derivedMetrics:
+              storedPayload.derivedMetrics === null
+                ? null
+                : toDbJson(storedPayload.derivedMetrics),
+            coverage:
+              shapedResult.coverage === null
+                ? null
+                : toDbJson(shapedResult.coverage),
+            accessState: toDbJson(
+              attachReportVersionMeta({
+                accessState: access as unknown as Record<string, unknown>,
+                previousReportId: null,
+                rootReportId: null,
+                generation: 0,
+                trigger: "analyze",
+              })
+            ),
+            suggestions: toDbJson(shapedResult.suggestions),
+            priorityActions: toDbJson(shapedResult.priorityActions),
+            analysisTrace:
+              shapedResult.analysisTrace === null
+                ? null
+                : toDbJson(shapedResult.analysisTrace),
+          } as const)
+        : null;
 
-    if (usageTarget.type === "user") {
+    let updatedUsage = limitInfo;
+    if (!unlimited && usageTarget.type === "user" && reportCreateData) {
+      const persisted = await createAnalyzeReportWithUsageTransaction({
+        data: reportCreateData as never,
+        consume: async (tx) => {
+        const usage = await consumeAnalyzeUsageIfAllowed({
+          type: "user",
+          userId: usageTarget.userId,
+          limit: limitInfo.limit,
+          client: tx,
+        });
+
+        if (!usage.allowed) {
+          throw buildLimitReachedError(usage);
+        }
+
+          return usage;
+        },
+      });
+
+      updatedUsage = projectUsageAfterIncrement(
+        limitInfo as AnalyzeLimitResult,
+        persisted.usage.used
+      );
+      savedReport = persisted.report;
+    } else if (!unlimited && usageTarget.type === "guest") {
+      const consumed = await consumeAnalyzeUsageIfAllowed({
+        type: "guest",
+        guestId: usageTarget.guestId,
+        limit: limitInfo.limit,
+      });
+
+      if (!consumed.allowed) {
+        throw buildLimitReachedError(consumed);
+      }
+
+      updatedUsage = projectUsageAfterIncrement(
+        limitInfo as AnalyzeLimitResult,
+        consumed.used
+      );
+    } else if (usageTarget.type === "user" && reportCreateData) {
       savedReport = await createAnalyzeReport({
-        data: {
-          guestId: null,
-          user: {
-            connect: {
-              id: usageTarget.userId,
-            },
-          },
-          url,
-          platform,
-          category,
-          seoScore: shapedResult.seoScore,
-          dataCompletenessScore: shapedResult.dataCompletenessScore,
-          conversionScore: shapedResult.conversionScore,
-          overallScore: shapedResult.overallScore,
-          priceCompetitiveness: shapedResult.priceCompetitiveness,
-          summary: shapedResult.summary,
-          dataSource: shapedResult.dataSource,
-          extractedData: toDbJson(storedPayload.extractedData),
-          derivedMetrics:
-            storedPayload.derivedMetrics === null
-              ? null
-              : toDbJson(storedPayload.derivedMetrics),
-          coverage:
-            shapedResult.coverage === null ? null : toDbJson(shapedResult.coverage),
-          accessState: toDbJson(
-            attachReportVersionMeta({
-              accessState: access as unknown as Record<string, unknown>,
-              previousReportId: null,
-              rootReportId: null,
-              generation: 0,
-              trigger: "analyze",
-            })
-          ),
-          suggestions: toDbJson(shapedResult.suggestions),
-          priorityActions: toDbJson(shapedResult.priorityActions),
-          analysisTrace:
-            shapedResult.analysisTrace === null
-              ? null
-              : toDbJson(shapedResult.analysisTrace),
-        } as never,
+        data: reportCreateData as never,
       });
     }
 
@@ -454,14 +506,6 @@ export async function executeAnalyzeUrl(
       console.error("Learning memory update failed:", learningError);
     }
 
-    let updatedUsage = limitInfo;
-    if (!unlimited) {
-      const incremented = await incrementAnalyzeUsage(usageTarget);
-      updatedUsage = projectUsageAfterIncrement(
-        limitInfo as AnalyzeLimitResult,
-        incremented.used
-      );
-    }
     const reportPreview = savedReport
       ? {
           id: savedReport.id,

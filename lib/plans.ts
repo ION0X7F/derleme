@@ -399,14 +399,14 @@ function formatPlanCta(params: {
 
   if (params.currentPlanId === "FREE" && params.planId === "PRO_MONTHLY") {
     return {
-      href: "/account",
+      href: buildCheckoutPlanHref("PRO_MONTHLY"),
       label: "Pro'ya Gec",
     };
   }
 
   if (params.currentPlanId === "PRO_MONTHLY" && params.planId === "PRO_YEARLY") {
     return {
-      href: "/account",
+      href: buildCheckoutPlanHref("PRO_YEARLY"),
       label: "Yillik Avantaja Gec",
     };
   }
@@ -420,13 +420,17 @@ function formatPlanCta(params: {
 
   if (params.isAuthenticated) {
     return {
-      href: plan.cta.signedInHref,
+      href: isPaidPlanId(params.planId)
+        ? buildCheckoutPlanHref(params.planId)
+        : plan.cta.signedInHref,
       label: plan.cta.signedInLabel,
     };
   }
 
   return {
-    href: plan.cta.guestHref,
+    href: isPaidPlanId(params.planId)
+      ? buildRegisterPlanHref(params.planId)
+      : plan.cta.guestHref,
     label: plan.cta.guestLabel,
   };
 }
@@ -447,6 +451,20 @@ export const campaignContent: CampaignContent = {
 
 export function isAppPlanId(value?: string | null): value is AppPlanId {
   return APP_PLAN_IDS.includes(value as AppPlanId);
+}
+
+export function isPaidPlanId(planId?: AppPlanId | null) {
+  return !!planId && PLAN_DEFINITIONS[planId].isPaid;
+}
+
+export function buildRegisterPlanHref(planId: AppPlanId) {
+  if (planId === "FREE") return "/register";
+  return `/register?plan=${encodeURIComponent(planId)}`;
+}
+
+export function buildCheckoutPlanHref(planId: AppPlanId) {
+  if (planId === "FREE") return "/register";
+  return `/checkout?plan=${encodeURIComponent(planId)}`;
 }
 
 export function getPlanDefinition(planId: AppPlanId) {

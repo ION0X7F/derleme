@@ -15,6 +15,26 @@ function buildReferer(targetUrl: string) {
   return `${parsed.protocol}//${parsed.host}/`;
 }
 
+const PAGE_FETCH_TIMEOUT_MS = 15_000;
+
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs = PAGE_FETCH_TIMEOUT_MS
+) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function buildHeaders(targetUrl: string) {
   const hostname = new URL(targetUrl).hostname.toLowerCase();
   const isN11 = hostname.includes("n11.com");
@@ -55,7 +75,7 @@ function buildHeaders(targetUrl: string) {
 }
 
 async function fetchOnce(targetUrl: string) {
-  return fetch(targetUrl, {
+  return fetchWithTimeout(targetUrl, {
     method: "GET",
     headers: buildHeaders(targetUrl),
     redirect: "follow",
@@ -72,7 +92,7 @@ async function fetchWithFallbacks(targetUrl: string) {
 
   if (isN11 && (response.status === 403 || response.status === 429)) {
     // 1. deneme: Google referer ile
-    response = await fetch(targetUrl, {
+    response = await fetchWithTimeout(targetUrl, {
       method: "GET",
       headers: {
         ...buildHeaders(targetUrl),

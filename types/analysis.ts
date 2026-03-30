@@ -260,8 +260,12 @@ export type OtherSellerOffer = {
   price: number | null;
   original_price: number | null;
   discount_rate: number | null;
+  shipping_days?: number | null;
+  delivery_type?: string | null;
+  delivery_text: string | null;
   promotion_labels: string[] | null;
   listing_url: string | null;
+  confidence?: string | null;
 };
 
 export type OtherSellersSummary = {
@@ -742,7 +746,7 @@ export type DecisionSupportPacket = {
     discount_rate: number | null;
     currency: string | null;
     image_count: number;
-    has_video: boolean;
+    has_video: boolean | null;
     rating_value: number | null;
     rating_breakdown: ReviewRatingBreakdown | null;
     review_count: number | null;
@@ -760,7 +764,7 @@ export type DecisionSupportPacket = {
     bullet_point_count: number | null;
     has_add_to_cart: boolean;
     has_shipping_info: boolean;
-    has_free_shipping: boolean;
+    has_free_shipping: boolean | null;
     shipping_days: number | null;
     has_return_info: boolean;
     has_specs: boolean;
@@ -775,16 +779,17 @@ export type DecisionSupportPacket = {
     seller_score: number | null;
     follower_count: number | null;
     favorite_count: number | null;
+    view_count_24h: number | null;
     other_sellers_count: number | null;
     other_seller_offers: OtherSellerOffer[] | null;
     other_sellers_summary: OtherSellersSummary | null;
-    has_brand_page: boolean;
-    official_seller: boolean;
-    has_campaign: boolean;
+    has_brand_page: boolean | null;
+    official_seller: boolean | null;
+    has_campaign: boolean | null;
     campaign_label: string | null;
     promotion_labels: string[] | null;
     delivery_type: string | null;
-    is_best_seller: boolean;
+    is_best_seller: boolean | null;
     best_seller_rank: number | null;
     best_seller_badge: string | null;
   };
@@ -822,7 +827,7 @@ export type ExtractedProductFields = {
   currency: string | null;
 
   image_count: number;
-  has_video: boolean;
+  has_video: boolean | null;
 
   rating_value: number | null;
   rating_breakdown: ReviewRatingBreakdown | null;
@@ -843,7 +848,7 @@ export type ExtractedProductFields = {
 
   has_add_to_cart: boolean;
   has_shipping_info: boolean;
-  has_free_shipping: boolean;
+  has_free_shipping: boolean | null;
   shipping_days: number | null;
   has_return_info: boolean;
   has_specs: boolean;
@@ -860,17 +865,18 @@ export type ExtractedProductFields = {
   seller_score: number | null;
   follower_count: number | null;
   favorite_count: number | null;
+  view_count_24h: number | null;
   other_sellers_count: number | null;
   other_seller_offers: OtherSellerOffer[] | null;
   other_sellers_summary: OtherSellersSummary | null;
   similar_product_candidates?: SimilarProductCandidate[] | null;
-  has_brand_page: boolean;
-  official_seller: boolean;
-  has_campaign: boolean;
+  has_brand_page: boolean | null;
+  official_seller: boolean | null;
+  has_campaign: boolean | null;
   campaign_label: string | null;
   promotion_labels: string[] | null;
   delivery_type: string | null;
-  is_best_seller: boolean;
+  is_best_seller: boolean | null;
   best_seller_rank: number | null;
   best_seller_badge: string | null;
 

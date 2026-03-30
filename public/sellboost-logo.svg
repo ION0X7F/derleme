@@ -1,0 +1,16 @@
+<svg width="640" height="180" viewBox="0 0 640 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="640" height="180" fill="none"/>
+  <g transform="translate(12 24)">
+    <path d="M42 0C28 14 24 29 24 42V68L13 78C8 82 5 89 5 96V114L24 98V104C24 107 25 111 28 113L36 116H48L56 113C59 111 60 107 60 104V98L79 114V96C79 89 76 82 71 78L60 68V42C60 29 56 14 42 0Z" fill="#FF7A00"/>
+    <path d="M42 34C48.6274 34 54 28.6274 54 22C54 15.3726 48.6274 10 42 10C35.3726 10 30 15.3726 30 22C30 28.6274 35.3726 34 42 34Z" fill="white"/>
+    <path d="M42 29C45.866 29 49 25.866 49 22C49 18.134 45.866 15 42 15C38.134 15 35 18.134 35 22C35 25.866 38.134 29 42 29Z" fill="#FFB366"/>
+    <path d="M33 117L36 128H48L51 117H33Z" fill="#FF7A00"/>
+    <path d="M27 129C23.6863 129 21 131.686 21 135V142C21 145.314 23.6863 148 27 148C30.3137 148 33 145.314 33 142V135C33 131.686 30.3137 129 27 129Z" fill="#FFA24D"/>
+    <path d="M57 129C53.6863 129 51 131.686 51 135V142C51 145.314 53.6863 148 57 148C60.3137 148 63 145.314 63 142V135C63 131.686 60.3137 129 57 129Z" fill="#FFA24D"/>
+    <path d="M39 122C35.6863 122 33 124.686 33 128V150C33 153.314 35.6863 156 39 156C42.3137 156 45 153.314 45 150V128C45 124.686 42.3137 122 39 122Z" fill="#FF9A3D"/>
+  </g>
+  <text x="112" y="105" font-family="Arial, Helvetica, sans-serif" font-size="92" font-weight="400" fill="#B9BAC8">sell</text>
+  <text x="330" y="105" font-family="Arial, Helvetica, sans-serif" font-size="92" font-weight="400" fill="#7ED321">boo</text>
+  <text x="506" y="105" font-family="Arial, Helvetica, sans-serif" font-size="92" font-weight="400" fill="#B9BAC8">st</text>
+  <text x="214" y="146" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="400" letter-spacing="2" fill="#B9BAC8">sell smarter - grow faster</text>
+</svg>

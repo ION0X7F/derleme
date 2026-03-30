@@ -43,7 +43,7 @@ export function getEffectivePlanCodeFromRecord(record: MembershipRecord): Runtim
     return record.subscription.plan.code;
   }
 
-  return record.plan ?? "FREE";
+  return "FREE";
 }
 
 export function getEffectivePlanNameFromRecord(record: MembershipRecord) {

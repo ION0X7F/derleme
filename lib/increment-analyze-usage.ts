@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getMonthlyPeriodKey } from "@/lib/usage";
 
@@ -10,6 +11,11 @@ type IncrementAnalyzeUsageParams =
       type: "user";
       userId: string;
     };
+
+type UsageDbClient = Pick<
+  typeof prisma,
+  "guestUsageRecord" | "userUsageRecord"
+>;
 
 export async function incrementAnalyzeUsage(
   params: IncrementAnalyzeUsageParams
@@ -70,4 +76,168 @@ export async function incrementAnalyzeUsage(
     used: record.count,
     periodKey,
   } as const;
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
+
+export async function consumeAnalyzeUsageIfAllowed(
+  params:
+    | {
+        type: "guest";
+        guestId: string;
+        limit: number;
+        client?: UsageDbClient;
+      }
+    | {
+        type: "user";
+        userId: string;
+        limit: number;
+        client?: UsageDbClient;
+      }
+) {
+  const action = "analyze";
+  const periodKey = getMonthlyPeriodKey();
+  const client = params.client ?? prisma;
+
+  const buildSnapshot = (used: number, allowed: boolean) => ({
+    allowed,
+    used,
+    limit: params.limit,
+    remaining: Math.max(params.limit - used, 0),
+    periodKey,
+    periodType: "monthly" as const,
+  });
+
+  if (!Number.isFinite(params.limit) || params.limit <= 0) {
+    return buildSnapshot(0, false);
+  }
+
+  if (params.type === "guest") {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const updated = await client.guestUsageRecord.updateMany({
+        where: {
+          guestId: params.guestId,
+          action,
+          periodKey,
+          count: {
+            lt: params.limit,
+          },
+        },
+        data: {
+          count: {
+            increment: 1,
+          },
+        },
+      });
+
+      if (updated.count > 0) {
+        const record = await client.guestUsageRecord.findUnique({
+          where: {
+            guestId_action_periodKey: {
+              guestId: params.guestId,
+              action,
+              periodKey,
+            },
+          },
+        });
+
+        return buildSnapshot(record?.count ?? 1, true);
+      }
+
+      try {
+        const record = await client.guestUsageRecord.create({
+          data: {
+            guestId: params.guestId,
+            action,
+            periodKey,
+            count: 1,
+          },
+        });
+
+        return buildSnapshot(record.count, true);
+      } catch (error) {
+        if (!isUniqueConstraintError(error)) {
+          throw error;
+        }
+      }
+    }
+
+    const record = await client.guestUsageRecord.findUnique({
+      where: {
+        guestId_action_periodKey: {
+          guestId: params.guestId,
+          action,
+          periodKey,
+        },
+      },
+    });
+
+    return buildSnapshot(record?.count ?? 0, false);
+  }
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const updated = await client.userUsageRecord.updateMany({
+      where: {
+        userId: params.userId,
+        action,
+        periodKey,
+        count: {
+          lt: params.limit,
+        },
+      },
+      data: {
+        count: {
+          increment: 1,
+        },
+      },
+    });
+
+    if (updated.count > 0) {
+      const record = await client.userUsageRecord.findUnique({
+        where: {
+          userId_action_periodKey: {
+            userId: params.userId,
+            action,
+            periodKey,
+          },
+        },
+      });
+
+      return buildSnapshot(record?.count ?? 1, true);
+    }
+
+    try {
+      const record = await client.userUsageRecord.create({
+        data: {
+          userId: params.userId,
+          action,
+          periodKey,
+          count: 1,
+        },
+      });
+
+      return buildSnapshot(record.count, true);
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  const record = await client.userUsageRecord.findUnique({
+    where: {
+      userId_action_periodKey: {
+        userId: params.userId,
+        action,
+        periodKey,
+      },
+    },
+  });
+
+  return buildSnapshot(record?.count ?? 0, false);
 }
