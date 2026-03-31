@@ -281,6 +281,11 @@ canvas{display:block;width:100%!important;}
 .url-wrap:focus-within{border-color:rgba(79,127,255,.5);box-shadow:0 0 0 3px rgba(79,127,255,.1);}
 .url-in{flex:1;background:transparent;border:none;color:var(--text);font-size:14px;padding:8px 0;}
 .url-in::placeholder{color:var(--dim);}
+.keyword-row{display:flex;align-items:flex-start;gap:12px;margin-top:12px;flex-wrap:wrap;}
+.keyword-wrap{display:flex;align-items:center;gap:10px;flex:1;min-width:280px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+.keyword-in{flex:1;background:transparent;border:none;color:var(--text);font-size:13px;}
+.info-badge{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;border:1px solid rgba(79,127,255,.28);background:rgba(79,127,255,.1);color:var(--brand);font-family:'Bricolage Grotesque',sans-serif;font-size:11px;font-weight:800;cursor:help;flex-shrink:0;}
+.keyword-note{flex:1 1 100%;font-size:12px;color:var(--muted);}
 .ru-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;background:var(--surface);border:1px solid var(--border);margin-bottom:6px;cursor:pointer;transition:border-color .2s,background .2s;}
 .ru-item:hover{background:var(--surface2);border-color:var(--border2);}
 .ru-url{font-size:12px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -669,11 +674,7 @@ canvas{display:block;width:100%!important;}
         <div class="sig-lbl">Birincil Anahtar Kelimeler</div>
         <div class="sig-val c-b" id="contentPrimaryKeywordsValue" style="font-size:14px;line-height:1.35;">bromelain şurubu · detox şurubu · ananas şurubu</div>
         <div class="sig-note dn" id="contentPrimaryKeywordsNote">Anahtar kelime girilmedi</div>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;">
-          <input id="contentPrimaryKeywordsInput" type="text" placeholder="Anahtar kelime gir, virgulle ayir" style="flex:1;min-width:0;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px 12px;font-size:12px;outline:none;">
-          <button id="contentPrimaryKeywordsApplyBtn" type="button" class="btn btn-o btn-sm" onclick="applyCustomPrimaryKeywords()">Uygula</button>
-        </div>
-        <div class="sig-note ne" id="contentPrimaryKeywordsHelp" style="margin-top:8px;">En fazla 3 ifade gir. Bu alan anahtar kelime sıralaması ve açıklama puanında kullanılır.</div>
+        <div class="sig-note ne" id="contentPrimaryKeywordsHelp" style="margin-top:8px;">Analiz baslamadan once girilen anahtar kelime burada gosterilir ve keyword siralamasi ile icerik yorumunda kullanilir.</div>
       </div>
       <div class="sig"><div class="sig-lbl">Anahtar Kelime Sıralaması</div><div class="sig-val c-b" id="contentKeywordRankValue" style="font-size:13px;line-height:1.45;">Kontrol ediliyor…</div><div class="sig-note ne" id="contentKeywordRankNote">Trendyol arama sırası</div></div>
       <div class="sig"><div class="sig-lbl">Ürün / Kategori Uyumu</div><div class="sig-val c-g" id="contentCategoryFitValue">Yüksek</div><div class="sig-note up" id="contentCategoryFitNote">Kategori ile güçlü eşleşme görülüyor</div></div>
@@ -819,6 +820,13 @@ canvas{display:block;width:100%!important;}
         <input class="url-in" type="url" id="analyzeInput" placeholder="trendyol.com/... ürün linkini buraya yapıştır">
         <button class="btn btn-p" id="analyzeStartBtn" onclick="startAnalysis()">Analiz Et →</button>
       </div>
+      <div class="keyword-row">
+        <div class="keyword-wrap">
+          <input class="keyword-in" type="text" id="analyzeKeywordInput" placeholder="Opsiyonel: anahtar kelime gir">
+          <span class="info-badge" title="Anahtar kelime girersen içerik, başlık ve arama niyeti uyumunu daha net yorumlarız. Girmezsen analiz normal şekilde devam eder.">i</span>
+        </div>
+        <div class="keyword-note">Anahtar kelime opsiyoneldir. Girersen içerik ve arama niyeti tarafını daha net okuruz; boş bırakırsan analiz normal devam eder.</div>
+      </div>
       <div style="margin-top:20px;">
         <div style="font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:10px;">Son Analiz Edilen</div>
         <div id="recentAnalysisList"></div>
@@ -957,10 +965,10 @@ const CONTENT_PRIMARY_KEYWORDS_STORAGE_KEY='sellboost:content-primary-keywords:v
 let currentReportData=null;
 let currentCampaignState={discountRate:null,campaignDays:null};
 let keywordRankRequestToken=0;
-let primaryKeywordInputDebounceTimer=null;
 let currentActionFeedbackType='veri_yorumlama';
 let liveReportsCache=[];
 let reportsFetchPromise=null;
+let activeAnalyzeSession=null;
 let authSessionCheckPromise=null;
 let hasAuthenticatedSessionCache=null;
 let authSessionPayloadCache=undefined;
@@ -3413,19 +3421,15 @@ function updateContentSeoCards(){
         : 'dn';
   const imageBand=getLegacyContentBand(content.imageScore);
   const bulletBand=getLegacyContentBand(content.bulletScore);
-  const primaryKeywordsInput=document.getElementById('contentPrimaryKeywordsInput');
-  if(primaryKeywordsInput && document.activeElement!==primaryKeywordsInput){
-    primaryKeywordsInput.value=content.keywordSource==='custom'?content.primaryKeywords.join(', '):'';
-  }
   setText('contentPrimaryKeywordsValue',content.primaryKeywords.length?content.primaryKeywords.join(' · '):'—');
-  setText('contentPrimaryKeywordsNote',content.primaryKeywords.length?'Kullanıcı girişi aktif':'Anahtar kelime girilmedi');
+  setText('contentPrimaryKeywordsNote',content.primaryKeywords.length?'Analiz girisi aktif':'Analiz sirasinda anahtar kelime girilmedi');
   setClass(document.getElementById('contentPrimaryKeywordsValue'),'sig-val',content.primaryKeywords.length?'c-b':'c-r');
   setClass(document.getElementById('contentPrimaryKeywordsNote'),'sig-note',content.primaryKeywords.length?'up':'dn');
   setText(
     'contentPrimaryKeywordsHelp',
     content.keywordSource==='custom'
-      ? 'Kullanici girdigi ifade aktif. Temizlemek icin alani bos birakip uygula.'
-      : 'Sistem artik anahtar kelime turetmiyor. Bu alana kullanici olarak sen girmelisin.'
+      ? 'Analiz baslamadan once girilen ifade aktif. Keyword siralamasi ve icerik yorumu bu ifadeyi kullanir.'
+      : 'Analiz baslamadan once anahtar kelime girilmedigi icin bu alan bos kaldı.'
   );
   setText('contentCategoryFitValue',content.categoryFitLabel);
   setText('contentCategoryFitNote',content.categoryFitNote);
@@ -3493,39 +3497,6 @@ function refreshKeywordDrivenViews(){
   if(activeSection==='rdt-summary'){
     initRdSummary();
   }
-}
-function applyCustomPrimaryKeywords(){
-  if(!currentReportData) return;
-  const input=document.getElementById('contentPrimaryKeywordsInput');
-  const nextKeywords=saveCustomPrimaryKeywords(
-    currentReportData.reportId,
-    currentReportData.url,
-    input && 'value' in input ? input.value : ''
-  );
-  currentReportData.customPrimaryKeywords=nextKeywords;
-  refreshKeywordDrivenViews();
-}
-function initContentPrimaryKeywordInput(){
-  const input=document.getElementById('contentPrimaryKeywordsInput');
-  if(!input || input.dataset.bound==='1') return;
-  input.dataset.bound='1';
-  input.addEventListener('keydown',(event)=>{
-    if(event.key==='Enter'){
-      event.preventDefault();
-      applyCustomPrimaryKeywords();
-    }
-  });
-  input.addEventListener('input',()=>{
-    if(primaryKeywordInputDebounceTimer){
-      clearTimeout(primaryKeywordInputDebounceTimer);
-    }
-    primaryKeywordInputDebounceTimer=setTimeout(()=>{
-      if(document.activeElement===input){
-        applyCustomPrimaryKeywords();
-      }
-    },500);
-  });
-  input.addEventListener('blur',()=>applyCustomPrimaryKeywords());
 }
 function updateSummaryDiagnosis(){
   const r=currentReportData||{};
@@ -4725,14 +4696,73 @@ function renderRecentAnalyses(){
   }).join('');
 }
 
+function buildInProgressReportData(options={}){
+  const normalizedUrl=String(options.url || '').trim();
+  const preview=options.preview && typeof options.preview==='object' ? options.preview : {};
+  const keyword=String(options.keyword || '').trim();
+  const progressLabel=String(options.progressLabel || 'Analiz devam ediyor').trim();
+  const progressDetail=String(options.progressDetail || 'Urun verileri toplanıyor. Rapor ekranı canlı olarak dolacak.').trim();
+  const payload={
+    id:null,
+    url:normalizedUrl || null,
+    category:preview.category || 'Kategori analizi suruyor',
+    overallScore:preview.overallScore ?? null,
+    seoScore:preview.seoScore ?? null,
+    conversionScore:preview.conversionScore ?? null,
+    dataSource:'Canlı Analiz',
+    extractedData:{
+      title:'Analiz devam ediyor',
+      product_name:'Analiz devam ediyor',
+      seller_name:'Veri toplanıyor',
+      category:preview.category || null,
+      question_count:null,
+      description_text:'',
+      description_length:null,
+      image_count:null,
+      bullet_point_count:null,
+      meta_description:'',
+    },
+    suggestions:[],
+    priorityActions:[],
+  };
+  const report=adaptApiResultToReportData(payload);
+  report.reportId=null;
+  report.title='Analiz devam ediyor';
+  report.meta=progressLabel;
+  report.src=`Canlı Analiz · ${progressLabel}`;
+  report.summary=progressDetail;
+  report.customPrimaryKeywords=keyword ? [keyword] : [];
+  return report;
+}
+
+function maybeOpenInProgressAnalysisReport(params={}){
+  const stage=String(params.stage || '').trim();
+  if(!stage || stage==='completed' || stage==='queued') return;
+  const report=buildInProgressReportData({
+    url:params.url,
+    keyword:params.keyword,
+    preview:params.preview,
+    progressLabel:params.label,
+    progressDetail:params.detail,
+  });
+  activeAnalyzeSession={
+    ...(activeAnalyzeSession||{}),
+    openedPreview:true,
+    tempUrl:report.url || params.url || '',
+  };
+  openReportData(report);
+}
+
 function openReportData(r){
+  const persistedKeywords=loadCustomPrimaryKeywords(r?.reportId,r?.url);
   currentReportData={
     ...r,
-    customPrimaryKeywords:loadCustomPrimaryKeywords(r?.reportId,r?.url),
+    customPrimaryKeywords:Array.isArray(r?.customPrimaryKeywords) && r.customPrimaryKeywords.length
+      ? r.customPrimaryKeywords
+      : persistedKeywords,
   };
   currentCampaignState.discountRate=safeNumber(r.discountRate) ?? 15;
   currentCampaignState.campaignDays=Math.round(clamp(safeNumber(r.campaignDays) ?? 7,1,30));
-  initContentPrimaryKeywordInput();
   updateReportDetailImage(r);
   document.getElementById('rdTitle').textContent=r.title;
   document.getElementById('rdMeta').textContent=r.meta;
@@ -4740,6 +4770,9 @@ function openReportData(r){
   document.getElementById('rdCat').textContent=r.cat;
   document.getElementById('rdReportId').textContent=formatReadableReportId(r.reportId,r.createdAt);
   document.getElementById('rdDataSource').textContent=r.src;
+  if(typeof r.summary==='string' && r.summary.trim()){
+    setText('summaryDiagnosisText',r.summary);
+  }
   const productLinkEl=document.getElementById('rdProductLink');
   if(productLinkEl){
     const reportUrl=typeof r.url==='string'?r.url.trim():'';
@@ -4799,11 +4832,16 @@ function rTab(btn,secId){
   syncReportTabHash(secId,false);
 }
 
-async function startAnalysisJob(normalizedUrl){
+function getAnalyzeKeywordInputValue(){
+  const input=document.getElementById('analyzeKeywordInput');
+  return input && 'value' in input ? String(input.value || '').trim() : '';
+}
+
+async function startAnalysisJob(normalizedUrl,keyword=''){
   const res=await fetch('/api/analyze/jobs',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({url:normalizedUrl})
+    body:JSON.stringify({url:normalizedUrl,keyword})
   });
   const data=await res.json();
   if(!res.ok || !data?.jobId){
@@ -4847,6 +4885,7 @@ async function startAnalysis(){
   const input=document.getElementById('analyzeInput');
   const btn=document.getElementById('analyzeStartBtn');
   const v=input&&'value' in input?String(input.value||'').trim():'';
+  const keyword=getAnalyzeKeywordInputValue();
   if(!v) return;
 
   const originalBtnText=btn?btn.textContent:'';
@@ -4857,17 +4896,45 @@ async function startAnalysis(){
 
   try{
     const normalized=/^https?:\/\//i.test(v)?v:`https://${v}`;
-    const job=await startAnalysisJob(normalized);
+    activeAnalyzeSession={
+      url:normalized,
+      keyword,
+      openedPreview:false,
+    };
+    maybeOpenInProgressAnalysisReport({
+      stage:'fetch',
+      label:'Analiz baslatildi',
+      detail:'Urun sayfasi, fiyat, seller ve yorum kaynaklari toplanıyor. Rapor ekranı beklemeden açıldı; kartlar geldikçe dolacak.',
+      preview:null,
+      url:normalized,
+      keyword,
+    });
+    const job=await startAnalysisJob(normalized,keyword);
     const data=await waitForAnalysisJob(job.jobId,(payload)=>{
+      if(activeAnalyzeSession){
+        activeAnalyzeSession.jobId=job.jobId;
+      }
       if(btn && payload?.progress?.label){
         btn.textContent=String(payload.progress.label);
       }
+      maybeOpenInProgressAnalysisReport({
+        stage:payload?.progress?.stage,
+        label:payload?.progress?.label,
+        detail:payload?.progress?.detail,
+        preview:payload?.progress?.preview,
+        url:normalized,
+        keyword,
+      });
     });
     const report=adaptApiResultToReportData(data.result);
+    const savedKeywords=saveCustomPrimaryKeywords(report?.reportId, report?.url, keyword);
+    report.customPrimaryKeywords=savedKeywords;
     saveRecentAnalysis(report);
     renderRecentAnalyses();
     openReportData(report);
+    activeAnalyzeSession=null;
   }catch(err){
+    activeAnalyzeSession=null;
     alert(err instanceof Error ? err.message : 'Analiz sırasında bir hata oluştu.');
   }finally{
     if(btn){
@@ -4891,10 +4958,15 @@ function initAnalyzeInputHandlers(){
 function applyAnalyzeQueryPrefill(options={}){
   const params=options.params instanceof URLSearchParams ? options.params : new URLSearchParams(window.location.search);
   const input=document.getElementById('analyzeInput');
+  const keywordInput=document.getElementById('analyzeKeywordInput');
   if(!input) return;
   const prefillUrl=String(params.get('prefillUrl') || '').trim();
+  const prefillKeyword=String(params.get('keyword') || '').trim();
   if(prefillUrl){
     input.value=prefillUrl;
+  }
+  if(keywordInput && prefillKeyword){
+    keywordInput.value=prefillKeyword;
   }
   const shouldAutorun=params.get('autorun')==='1';
   if(

@@ -67,8 +67,14 @@ nav.solid{background:rgba(9,9,14,.9);backdrop-filter:blur(20px);border-color:var
 .hero h1{font-size:clamp(46px,7.4vw,92px);font-weight:800;margin:0 auto 22px;max-width:1120px;}
 .hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--brand) 0%,var(--brand2) 60%,var(--accent) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
 .hero-desc{font-size:18px;color:var(--muted);max-width:860px;margin:0 auto 44px;line-height:1.75;}
-.hero-input-wrap{display:flex;align-items:center;gap:10px;max-width:560px;margin:0 auto 36px;background:var(--surface);border:1px solid var(--border2);border-radius:999px;padding:7px 7px 7px 24px;}
+.hero-form{max-width:720px;margin:0 auto 36px;}
+.hero-input-wrap{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border2);border-radius:999px;padding:7px 7px 7px 24px;}
 .url-input{flex:1;background:transparent;border:none;padding:8px 0;color:var(--text);font-size:14.5px;}
+.hero-keyword-row{display:flex;align-items:center;gap:12px;margin:12px auto 0;padding:0 6px;justify-content:center;flex-wrap:wrap;}
+.hero-keyword-wrap{display:flex;align-items:center;gap:10px;flex:1;min-width:280px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:18px;padding:11px 14px;}
+.keyword-input{flex:1;background:transparent;border:none;color:var(--text);font-size:14px;}
+.info-badge{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;border:1px solid rgba(79,127,255,.28);background:rgba(79,127,255,.1);color:var(--brand);font-family:'Bricolage Grotesque',sans-serif;font-size:11px;font-weight:800;cursor:help;flex-shrink:0;}
+.hero-keyword-note{font-size:12.5px;color:var(--muted);text-align:left;flex:1 1 100%;max-width:560px;}
 .hero-trust{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;}
 .trust-item{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);}
 .trust-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;}
@@ -194,7 +200,7 @@ nav.solid{background:rgba(9,9,14,.9);backdrop-filter:blur(20px);border-color:var
 .auth-footer{margin-top:22px;text-align:center;font-size:13.5px;color:var(--muted);}
 .social-btn{display:flex;align-items:center;justify-content:center;gap:10px;padding:11px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--text);font-size:13.5px;font-weight:500;cursor:pointer;transition:all .2s;width:100%;}
 @media(max-width:900px){.benefits-grid{grid-template-columns:1fr;}.features-grid{grid-template-columns:1fr 1fr;}.pricing-grid,.charts-grid,.charts-grid-3,.reveal-metrics{grid-template-columns:1fr;}.analyze-grid{grid-template-columns:1fr;}.analyze-side{position:relative;top:auto;}.analyze-head{flex-direction:column;}.analyze-status{min-width:0;width:100%;}.auth-right{display:none;}}
-@media(max-width:640px){.c{padding:0 18px;}.nav-tabs{display:none;}.hero-input-wrap{flex-direction:column;border-radius:16px;padding:14px 16px;align-items:stretch;}.analyze-shell{padding:22px 18px;}.analyze-feed{padding-left:22px;}.reveal-card::before{left:-23px;}.stats-inner{grid-template-columns:repeat(2,1fr);}.form-row{grid-template-columns:1fr;}.auth-left{padding:28px 18px;}.report-main{padding:18px 16px;}}
+@media(max-width:640px){.c{padding:0 18px;}.nav-tabs{display:none;}.hero-input-wrap{flex-direction:column;border-radius:16px;padding:14px 16px;align-items:stretch;}.hero-keyword-row{align-items:stretch;padding:0;}.hero-keyword-wrap{min-width:0;width:100%;}.hero-keyword-note{text-align:left;}.analyze-shell{padding:22px 18px;}.analyze-feed{padding-left:22px;}.reveal-card::before{left:-23px;}.stats-inner{grid-template-columns:repeat(2,1fr);}.form-row{grid-template-columns:1fr;}.auth-left{padding:28px 18px;}.report-main{padding:18px 16px;}}
 </style>
 </head>
 <body>
@@ -217,10 +223,19 @@ nav.solid{background:rgba(9,9,14,.9);backdrop-filter:blur(20px);border-color:var
   <section class="hero">
     <div class="hero-bg"><div class="hg1"></div><div class="hg2"></div><div class="hg3"></div><div class="hgrid"></div></div>
     <div class="hero-inner">
-      <div class="hero-badge"><div class="pulse"></div>Trendyol Satış Analizi · AI + Deterministik Motor</div>
-      <h1>Ürünün neden <em>satmadığını</em> artık biliyorsun</h1>
-      <p class="hero-desc">Trendyol ürün linkini yapıştır. Fiyat, teslimat, içerik, güven ve rekabet sinyallerini tek karar panelinde oku. Saniyeler içinde aksiyona dönük rapor.</p>
-      <div class="hero-input-wrap"><input id="heroAnalyzeInput" class="url-input" type="text" name="product-url" inputmode="url" enterkeyhint="go" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" readonly onfocus="this.removeAttribute('readonly')" onkeydown="if(event.key==='Enter'){event.preventDefault();startInlineAnalyze();}" data-lpignore="true" data-1p-ignore="true" placeholder="trendyol.com/... ürün linkini buraya yapıştır"><button id="heroAnalyzeButton" class="btn btn-primary" onclick="startInlineAnalyze()">Analiz Et →</button></div>
+      <div class="hero-badge"><div class="pulse"></div>Trendyol odaklı analiz · AI + kural motoru</div>
+      <h1>Ürünün neden <em>satmadığını</em> tek panelde gör</h1>
+      <p class="hero-desc">Trendyol ürün linkini yapıştır. Fiyat, teslimat, içerik, güven ve rekabet sinyallerini tek karar panelinde oku. Saniyeler içinde aksiyona dönük rapor al.</p>
+      <div class="hero-form">
+        <div class="hero-input-wrap"><input id="heroAnalyzeInput" class="url-input" type="text" name="product-url" inputmode="url" enterkeyhint="go" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" readonly onfocus="this.removeAttribute('readonly')" onkeydown="if(event.key==='Enter'){event.preventDefault();startInlineAnalyze();}" data-lpignore="true" data-1p-ignore="true" placeholder="trendyol.com/... ürün linkini buraya yapıştır"><button id="heroAnalyzeButton" class="btn btn-primary" onclick="startInlineAnalyze()">Analiz Et →</button></div>
+        <div class="hero-keyword-row">
+          <div class="hero-keyword-wrap">
+            <input id="heroAnalyzeKeywordInput" class="keyword-input" type="text" name="keyword" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Opsiyonel: anahtar kelime gir">
+            <span class="info-badge" title="Anahtar kelime girersen içerik ve arama niyeti tarafını daha net yorumlarız. Girmezsen analiz yine normal şekilde devam eder.">i</span>
+          </div>
+          <div class="hero-keyword-note">Anahtar kelime opsiyoneldir. Girersen başlık, içerik ve arama niyeti uyumunu daha net okuruz; boş bırakırsan analiz normal devam eder.</div>
+        </div>
+      </div>
       <div class="hero-trust"><div class="trust-item"><div class="trust-dot"></div>Trendyol odaklı</div><div class="trust-item"><div class="trust-dot"></div>Kategori benchmark</div><div class="trust-item"><div class="trust-dot"></div>Aksiyona dönük çıktı</div><div class="trust-item"><div class="trust-dot"></div>AI + kural motoru</div></div>
     </div>
   </section>
@@ -314,7 +329,7 @@ nav.solid{background:rgba(9,9,14,.9);backdrop-filter:blur(20px);border-color:var
   <div class="stats-bar"><div class="stats-inner c"><div class="stat-cell"><div class="sv">5+</div><div class="sl">Sinyal Katmanı</div></div><div class="stat-cell"><div class="sv">AI</div><div class="sl">Deterministik Omurga</div></div><div class="stat-cell"><div class="sv">%100</div><div class="sl">Veri Güvenilirliği Önce</div></div><div class="stat-cell"><div class="sv">3+</div><div class="sl">Plan Seçeneği</div></div></div></div>
   <section class="sec"><div class="c"><div class="sec-center"><div class="eyebrow" style="justify-content:center;">Fark Ne</div><h2 style="font-size:clamp(30px,3.5vw,46px);font-weight:800;margin-bottom:14px;">Skor değil, kritik teşhis önce gelir</h2><p style="font-size:16px;color:var(--muted);line-height:1.7;">Sadece sayı göstermek yerine satışı frenleyen ana darboğazı adlandırır ve aksiyona dönük çıktı üretir.</p></div><div class="benefits-grid"><div class="benefit-card"><div class="bc-num">01</div><div class="bc-icon">🎯</div><h3>Kritik teşhis önce gelir</h3><p>Skor yığınından önce ana darboğazı adlandırır ve hangi katmanın satışı frenlediğini gösterir.</p></div><div class="benefit-card"><div class="bc-num">02</div><div class="bc-icon">📊</div><h3>Rekabet sinyalleri birlikte okunur</h3><p>Fiyat, teslimat, güven ve diğer satıcı baskısını aynı karar ekseninde yorumlar.</p></div><div class="benefit-card"><div class="bc-num">03</div><div class="bc-icon">⚡</div><h3>AI yorumları aksiyona döner</h3><p>Başlık, içerik, güven ve teklif tarafında önce neyin değişmesi gerektiğini sıralar.</p></div></div></div></section>
   <section class="sec" style="background:var(--bg2);padding:80px 0;"><div class="c"><div class="sec-center"><div class="eyebrow" style="justify-content:center;">Nasıl Çalışır</div><h2 style="font-size:clamp(28px,3vw,44px);font-weight:800;margin-bottom:12px;">5 adımda karar ekranın hazır</h2><p style="font-size:16px;color:var(--muted);">URL'yi gir, sistem otomatik tarar, analiz panelin açılır.</p></div><div class="steps-wrap"><div class="step"><div class="step-num">01</div><div><h3>Linki gir</h3><p>Trendyol ürün bağlantısını yapıştır.</p></div></div><div class="step"><div class="step-num">02</div><div><h3>Veriyi zenginleştir</h3><p>Ham HTML ve satıcı verisi tamamlanır.</p></div></div><div class="step"><div class="step-num">03</div><div><h3>Sinyalleri çarpıştır</h3><p>Fiyat, teslimat ve içerik benchmark ile değerlendirilir.</p></div></div><div class="step"><div class="step-num">04</div><div><h3>AI yorumu oluştur</h3><p>Model, deterministik teşhisle hizalanır.</p></div></div><div class="step"><div class="step-num">05</div><div><h3>Aksiyonları gör</h3><p>Kritik teşhis ve öncelikler raporda açılır.</p></div></div></div></div></section>
-  <div class="cta-band"><div class="c"><h2>Satışlarını frenliyeni bul.</h2><p>Trendyol ürün linkini yapıştır, karar panelin birkaç saniyede hazır.</p><div class="cta-btns"><button class="btn btn-primary btn-lg" onclick="goPage('register')">Ücretsiz Analiz Et →</button><button class="btn btn-ghost btn-lg" onclick="goPage('pricing')">Planları Karşılaştır</button></div></div></div>
+  <div class="cta-band"><div class="c"><h2>Satışı durduran sinyali bul.</h2><p>Trendyol ürün linkini yapıştır, sistem fiyat, teslimat, içerik ve güven katmanlarını saniyeler içinde açsın.</p><div class="cta-btns"><button class="btn btn-primary btn-lg" onclick="goPage('register')">Ücretsiz Analiz Et →</button><button class="btn btn-ghost btn-lg" onclick="goPage('pricing')">Planları Karşılaştır</button></div></div></div>
 </div>
 
 <div id="features" class="page"><section style="padding:100px 0 60px;text-align:center;background:var(--bg);position:relative;overflow:hidden;"><div class="c" style="position:relative;"><div class="eyebrow" style="justify-content:center;">Özellikler</div><h1 style="font-size:clamp(36px,5vw,64px);font-weight:800;margin-bottom:16px;">Her sinyal, bir <em style="font-style:normal;background:linear-gradient(135deg,var(--brand),var(--brand2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">karar fırsatı</em></h1><p style="font-size:17px;color:var(--muted);max-width:560px;margin:0 auto;line-height:1.75;">Ürün sayfasının tüm katmanlarını tarar, fırsatları ve zayıf noktaları tek panelde açar.</p></div></section><section class="sec"><div class="c"><div class="features-grid"><div class="fg-item"><div class="fg-ey">Keşif</div><h3>Başlık, açıklama ve görsel yeterliliği</h3><p>İçerik derinliği, görsel çeşitlilik ve ürün anlatımı birlikte değerlendirilir.</p></div><div class="fg-item"><div class="fg-ey">Güven</div><h3>Yorum, satıcı ve iade sinyalleri</h3><p>Yıldız puanı, yorum özeti ve resmi satıcı etkisi aynı panelde görünür.</p></div><div class="fg-item"><div class="fg-ey">Teklif</div><h3>Fiyat ve teslimat baskısı aynı eksende</h3><p>Fiyat pozisyonu, kargo hızı ve kampanya sinyalleri karar seviyesinde yorumlanır.</p></div><div class="fg-item"><div class="fg-ey">Rekabet</div><h3>Diğer satıcıları ayrışmaya çevir</h3><p>Rakip sayısı, fiyat farkı ve güven seviyesi rakip baskısına çevrilir.</p></div><div class="fg-item"><div class="fg-ey">Yorumlama</div><h3>AI sinyalleri tekleştirir, aksiyon üretir</h3><p>Veri çarpıştırma, kritik teşhis ve öncelikli aksiyonlar tek çıktıya döner.</p></div><div class="fg-item"><div class="fg-ey">Yönetim</div><h3>Rapor kütüphanesi ve export akışı</h3><p>Kayıtlı rapor, premium export ve tekrar okunabilir karar ekranları aynı deneyimde.</p></div></div></div></section></div>
@@ -334,6 +349,7 @@ let inlineAnalyzeTimers=[];
 let lastAnalyzedReportId=null;
 let lastAnalyzedUrl='';
 let inlineAnalyzePollTimer=null;
+let inlineAnalyzeHighestRevealedStep=-1;
 function getMarketingRoute(id){
   const routeMap={home:'/',features:'/features',pricing:'/pricing',login:'/login',register:'/register',report:'/report-demo'};
   return routeMap[id] || '/';
@@ -375,16 +391,20 @@ function resetInlineAnalyzeVisuals(url){
   const progressCount=document.getElementById('analyzeProgressCount');
   const hint=document.getElementById('analyzeStageHint');
   const openReportButton=document.getElementById('analyzeOpenReportButton');
+  const keyword=getAnalyzeKeywordValue();
   if(stage) stage.classList.add('active');
   if(urlLabel) urlLabel.textContent=url;
   if(progressFill) progressFill.style.width='0%';
   if(progressText) progressText.textContent='Tarama baslatiliyor';
   if(progressCount) progressCount.textContent='0 / 5';
   if(hint){
-    hint.textContent='Gercek analiz baslatildi. Sinyaller geldikce asagiya tek tek dusuyor.';
+    hint.textContent=keyword
+      ? `"${keyword}" bilgisi alindi. Girilen ifade varsa icerik ve arama niyeti tarafini daha net yorumlayacagiz; kartlar sinyaller geldikce tek tek acilacak.`
+      : 'Gercek analiz baslatildi. Sinyaller geldikce kartlar tek tek acilacak.';
     hint.className='ghost-note';
   }
   if(openReportButton) openReportButton.textContent='Rapor hazirlaniyor';
+  inlineAnalyzeHighestRevealedStep=-1;
   document.querySelectorAll('[data-reveal-step]').forEach(card=>card.classList.remove('active'));
   document.querySelectorAll('[data-signal-step]').forEach(item=>item.classList.remove('active'));
 }
@@ -393,6 +413,11 @@ function getAnalyzeInputValue(){
   const raw=input && 'value' in input ? String(input.value || '').trim() : '';
   if(raw) return raw;
   return 'trendyol.com/magaza/ornek-urun-sayfasi';
+}
+function getAnalyzeKeywordValue(){
+  const input=document.getElementById('heroAnalyzeKeywordInput');
+  const raw=input && 'value' in input ? String(input.value || '').trim() : '';
+  return raw;
 }
 function scrollToAnalyzeStage(){
   const stage=document.getElementById('analyzeStage');
@@ -480,6 +505,106 @@ function revealAnalyzeStep(runId,index,stepData){
   if(card) card.classList.add('active');
   if(signal) signal.classList.add('active');
   setAnalyzeProgress(index+1,stepData.progressLabel || INLINE_ANALYZE_STEPS[index] || 'Analiz ilerliyor');
+}
+function getProgressiveRevealStep(stage,preview){
+  const safePreview=preview && typeof preview==='object' ? preview : {};
+  const platform=String(safePreview.platform || 'Trendyol');
+  const category=String(safePreview.category || 'Kategori okunuyor');
+  const sellerName=String(safePreview.sellerName || 'Seller bilgisi bekleniyor');
+  const priceValue=safePreview.price!=null ? String(safePreview.price) : 'Okunuyor';
+  const shippingValue=safePreview.shippingText || 'Cozuluyor';
+  const reviewValue=safePreview.reviewCount!=null ? String(safePreview.reviewCount) : 'Toplaniyor';
+  const overallScore=safePreview.overallScore!=null ? String(safePreview.overallScore) : 'Hesaplaniyor';
+  const conversionScore=safePreview.conversionScore!=null ? String(safePreview.conversionScore) : 'Hesaplaniyor';
+  const seoScore=safePreview.seoScore!=null ? String(safePreview.seoScore) : 'Hesaplaniyor';
+  const maps={
+    fetch:{
+      progressLabel:'Sayfa tarandi, ilk sinyaller geliyor',
+      signal:{name:'Sayfa tarandi',trace:'HTML ve platform verisi okunuyor',value:'Calisiyor'},
+      card:{
+        title:'Sayfa izi yakalandi, ilk katman acildi.',
+        body:'Sistem urun sayfasini taramaya basladi. Fiyat, teslimat ve seller izi ilk kartta toplaniyor.',
+        metrics:[
+          {label:'Platform',value:platform,note:'Kaynak sayfa dogrulandi'},
+          {label:'Kategori',value:category,note:'Kategori benchmark hazirlaniyor'},
+          {label:'Durum',value:'Taraniyor',note:'Ham veri okunuyor'},
+        ],
+      },
+    },
+    extract:{
+      progressLabel:'Temel veri cozuldu, teklif okunuyor',
+      signal:{name:'Temel veri cikti',trace:'Fiyat, teslimat ve seller sinyalleri bulundu',value:'Hazir'},
+      card:{
+        title:'Teklif katmani sekilleniyor.',
+        body:'Fiyat, teslimat ve seller bilgileri okunup benchmark icin hazirlaniyor.',
+        metrics:[
+          {label:'Fiyat',value:priceValue,note:'Liste fiyat sinyali'},
+          {label:'Teslimat',value:shippingValue,note:'Operasyon hizi okunuyor'},
+          {label:'Seller',value:sellerName,note:'Guven izi toplanıyor'},
+        ],
+      },
+    },
+    reviews:{
+      progressLabel:'Guven katmani aciliyor',
+      signal:{name:'Guven sinyali',trace:'Yorum ve satici verileri isleniyor',value:reviewValue},
+      card:{
+        title:'Yorum ve guven sinyalleri yerine oturuyor.',
+        body:'Yorum hacmi, seller izi ve sosyal kanit bir arada okunuyor.',
+        metrics:[
+          {label:'Seller',value:sellerName,note:'Magaza guven katmani'},
+          {label:'Yorum',value:reviewValue,note:'Sosyal kanit seviyesi'},
+          {label:'Durum',value:'Isleniyor',note:'Guven puani hesaplanıyor'},
+        ],
+      },
+    },
+    deterministic:{
+      progressLabel:'Skor katmani ve icerik cozuluyor',
+      signal:{name:'Skor hesabi',trace:'Deterministik skorlar hesaplandi',value:overallScore},
+      card:{
+        title:'Icerik ve skor katmani netlesiyor.',
+        body:'Baslik, aciklama, gorsel ve teklif sinyalleri birlikte puanlanmaya baslandi.',
+        highlightTitle:'Skor onizleme',
+        highlightText:`Genel skor ${overallScore}, donusum ${conversionScore}, SEO ${seoScore} olarak sekilleniyor.`,
+        highlightScore:overallScore,
+        footerLeft:'Skor motoru calisti',
+        footerRight:'Icerik ve teklif ayni eksende okunuyor',
+      },
+    },
+    ai:{
+      progressLabel:'Aksiyonlar yaziliyor',
+      signal:{name:'AI yorumu',trace:'Aksiyon dili olusturuluyor',value:'Hazirlaniyor'},
+      card:{
+        title:'AI aksiyonlari son kez paketliyor.',
+        body:'Son kartta hangi degisikliklerin once gelmesi gerektigi yaziliyor.',
+        metrics:[
+          {label:'Genel skor',value:overallScore,note:'Son puan onizlemesi'},
+          {label:'SEO',value:seoScore,note:'Listing netligi'},
+          {label:'Durum',value:'Yaziliyor',note:'Aksiyon matrisi olusuyor'},
+        ],
+      },
+    },
+  };
+  return maps[stage] || null;
+}
+function queueAnalyzeStepReveal(runId,index,stepData,delay=280){
+  if(index<=inlineAnalyzeHighestRevealedStep) return;
+  inlineAnalyzeHighestRevealedStep=index;
+  scheduleInlineAnalyze(()=>revealAnalyzeStep(runId,index,stepData),delay);
+}
+function revealAnalyzeProgressUpTo(runId,targetStage,preview){
+  const orderedStages=['fetch','extract','reviews','deterministic','ai'];
+  const revealIndexByStage={fetch:0,extract:1,reviews:2,deterministic:3,ai:4,finalize:4,completed:4};
+  const targetIndex=Object.prototype.hasOwnProperty.call(revealIndexByStage,targetStage)?revealIndexByStage[targetStage]:-1;
+  if(targetIndex<0) return;
+  const startIndex=inlineAnalyzeHighestRevealedStep+1;
+  for(let index=startIndex;index<=targetIndex;index+=1){
+    const stageKey=orderedStages[index] || targetStage;
+    const stepPreview=index===targetIndex ? preview : {};
+    const stepData=getProgressiveRevealStep(stageKey,stepPreview);
+    if(stepData){
+      queueAnalyzeStepReveal(runId,index,stepData,280+((index-startIndex)*340));
+    }
+  }
 }
 function buildLiveAnalyzeSteps(payload){
   const result=payload?.result || {};
@@ -649,6 +774,9 @@ function applyAnalyzeJobProgress(runId,payload){
   setSignalRow(signalIndex,signalDataByStage[stage] || signalDataByStage.fetch);
   const signal=document.querySelector(`[data-signal-step="${signalIndex}"]`);
   if(signal) signal.classList.add('active');
+  if(stage!=='finalize' && stage!=='completed'){
+    revealAnalyzeProgressUpTo(runId,stage,preview);
+  }
   const hint=document.getElementById('analyzeStageHint');
   if(hint && progress.detail){
     hint.textContent=String(progress.detail);
@@ -702,6 +830,7 @@ function openAnalyzedReport(){
 }
 function startInlineAnalyze(){
   const url=getAnalyzeInputValue();
+  const keyword=getAnalyzeKeywordValue();
   const button=document.getElementById('heroAnalyzeButton');
   if(button && button.disabled) return;
   inlineAnalyzeRun+=1;
@@ -713,23 +842,10 @@ function startInlineAnalyze(){
   clearInlineAnalyzePollTimer();
   setAnalyzeButtonLoading(true);
   window.setTimeout(scrollToAnalyzeStage,90);
-  revealAnalyzeStep(runId,0,{
-    progressLabel:'URL dogrulandi, analiz baslatiliyor',
-    signal:{name:'URL dogrulama',trace:'Platform ve link formati kontrol edildi',value:'Hazir'},
-    card:{
-      title:'Analiz istegi gonderildi, gercek veri bekleniyor.',
-      body:'URL alindi. Sistem bu urun icin sayfa, fiyat, satici ve rekabet sinyallerini topluyor.',
-      metrics:[
-        {label:'Platform',value:'Trendyol',note:'Link dogrulama tamamlandi'},
-        {label:'Analiz modu',value:'Gercek',note:'Mock yerine API cagrisi yapiliyor'},
-        {label:'Durum',value:'Basladi',note:'Sonuclar geldikce asagi acilacak'},
-      ],
-    },
-  });
   window.fetch('/api/analyze/jobs',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({url:lastAnalyzedUrl}),
+    body:JSON.stringify({url:lastAnalyzedUrl,keyword}),
   })
     .then(async(res)=>{
       const payload=await res.json().catch(()=>null);
