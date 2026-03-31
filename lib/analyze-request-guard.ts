@@ -36,6 +36,28 @@ function buildKey(params: { actor: string; url: string }) {
   return `${params.actor}::${canonicalUrl}`.toLocaleLowerCase("tr-TR");
 }
 
+export function checkAnalyzeRequestGuard(params: { actor: string; url: string }) {
+  const current = now();
+  cleanupExpiredEntries(current);
+
+  const existing = guardStore.get(buildKey(params));
+  if (!existing || existing.expiresAt <= current) {
+    return {
+      allowed: true as const,
+    };
+  }
+
+  return {
+    allowed: false as const,
+    reason:
+      "Ayni URL icin cok hizli tekrar analyze cagrisi algilandi. Kisa sure sonra tekrar deneyin.",
+    retryAfterSeconds: Math.max(
+      1,
+      Math.ceil((existing.expiresAt - current) / 1000)
+    ),
+  };
+}
+
 export function beginAnalyzeRequestGuard(params: {
   actor: string;
   url: string;

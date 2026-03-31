@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import {
   buildAnalysisAccessState,
@@ -419,11 +420,7 @@ export async function POST(req: NextRequest) {
 
     const report = await createSavedReport({
       data: {
-        user: {
-          connect: {
-            id: session.user.id,
-          },
-        },
+        userId: session.user.id,
         url,
         platform: validatedUrl.platform,
         category: parsedCategory.value,
@@ -436,36 +433,36 @@ export async function POST(req: NextRequest) {
         dataSource: parsedDataSource.value,
         extractedData:
           sanitizedReport.extractedData === null
-            ? null
+            ? Prisma.JsonNull
             : toDbJson(sanitizedReport.extractedData ?? {}),
         derivedMetrics:
           sanitizedReport.derivedMetrics === null
-            ? null
+            ? Prisma.JsonNull
             : sanitizedReport.derivedMetrics === undefined
               ? undefined
               : toDbJson(sanitizedReport.derivedMetrics),
         coverage:
           sanitizedReport.coverage === null
-            ? null
+            ? Prisma.JsonNull
             : sanitizedReport.coverage === undefined
               ? undefined
               : toDbJson(sanitizedReport.coverage),
         accessState: toDbJson(accessState),
         suggestions:
           parsedSuggestions.value === null
-            ? null
+            ? Prisma.JsonNull
             : toDbJson(sanitizedReport.suggestions ?? []),
         priorityActions:
           parsedPriorityActions.value === null
-            ? null
+            ? Prisma.JsonNull
             : toDbJson(sanitizedReport.priorityActions ?? []),
         analysisTrace:
           sanitizedReport.analysisTrace === null
-            ? null
+            ? Prisma.JsonNull
             : sanitizedReport.analysisTrace === undefined
               ? undefined
               : toDbJson(sanitizedReport.analysisTrace),
-      } as any,
+      },
     });
 
     return NextResponse.json(

@@ -35,7 +35,14 @@ function run() {
       label: "reanalyze route uses shared create helper",
       passed:
         reanalyzeRoute.includes("createReanalyzeReport") &&
-        reanalyzeRoute.includes("createReanalyzeReport({"),
+        (reanalyzeRoute.includes("createReanalyzeReport({") ||
+          reanalyzeRoute.includes("createReanalyzeReportWithUsageTransaction({")),
+    },
+    {
+      label: "reanalyze route uses transaction helper for metered users",
+      passed:
+        reanalyzeRoute.includes("createReanalyzeReportWithUsageTransaction") &&
+        reanalyzeRoute.includes("consumeAnalyzeUsageIfAllowed"),
     },
     {
       label: "reanalyze route no longer directly imports prisma",

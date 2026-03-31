@@ -12,9 +12,8 @@ type IncrementAnalyzeUsageParams =
       userId: string;
     };
 
-type UsageDbClient = Pick<
-  typeof prisma,
-  "guestUsageRecord" | "userUsageRecord"
+type UsageDbClient = Partial<
+  Pick<typeof prisma, "guestUsageRecord" | "userUsageRecord">
 >;
 
 export async function incrementAnalyzeUsage(
@@ -118,8 +117,10 @@ export async function consumeAnalyzeUsageIfAllowed(
   }
 
   if (params.type === "guest") {
+    const guestUsageRecord = client.guestUsageRecord ?? prisma.guestUsageRecord;
+
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const updated = await client.guestUsageRecord.updateMany({
+      const updated = await guestUsageRecord.updateMany({
         where: {
           guestId: params.guestId,
           action,
@@ -136,7 +137,7 @@ export async function consumeAnalyzeUsageIfAllowed(
       });
 
       if (updated.count > 0) {
-        const record = await client.guestUsageRecord.findUnique({
+        const record = await guestUsageRecord.findUnique({
           where: {
             guestId_action_periodKey: {
               guestId: params.guestId,
@@ -150,7 +151,7 @@ export async function consumeAnalyzeUsageIfAllowed(
       }
 
       try {
-        const record = await client.guestUsageRecord.create({
+        const record = await guestUsageRecord.create({
           data: {
             guestId: params.guestId,
             action,
@@ -167,7 +168,7 @@ export async function consumeAnalyzeUsageIfAllowed(
       }
     }
 
-    const record = await client.guestUsageRecord.findUnique({
+    const record = await guestUsageRecord.findUnique({
       where: {
         guestId_action_periodKey: {
           guestId: params.guestId,
@@ -180,8 +181,10 @@ export async function consumeAnalyzeUsageIfAllowed(
     return buildSnapshot(record?.count ?? 0, false);
   }
 
+  const userUsageRecord = client.userUsageRecord ?? prisma.userUsageRecord;
+
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const updated = await client.userUsageRecord.updateMany({
+    const updated = await userUsageRecord.updateMany({
       where: {
         userId: params.userId,
         action,
@@ -198,7 +201,7 @@ export async function consumeAnalyzeUsageIfAllowed(
     });
 
     if (updated.count > 0) {
-      const record = await client.userUsageRecord.findUnique({
+      const record = await userUsageRecord.findUnique({
         where: {
           userId_action_periodKey: {
             userId: params.userId,
@@ -212,7 +215,7 @@ export async function consumeAnalyzeUsageIfAllowed(
     }
 
     try {
-      const record = await client.userUsageRecord.create({
+      const record = await userUsageRecord.create({
         data: {
           userId: params.userId,
           action,
@@ -229,7 +232,7 @@ export async function consumeAnalyzeUsageIfAllowed(
     }
   }
 
-  const record = await client.userUsageRecord.findUnique({
+  const record = await userUsageRecord.findUnique({
     where: {
       userId_action_periodKey: {
         userId: params.userId,

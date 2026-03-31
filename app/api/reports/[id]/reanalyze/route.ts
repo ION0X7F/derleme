@@ -7,7 +7,7 @@ import {
   buildAnalyzeLimitReachedResponse,
   buildAnalyzeThrottledResponse,
 } from "@/lib/analyze-error-response";
-import { incrementAnalyzeUsage } from "@/lib/increment-analyze-usage";
+import { consumeAnalyzeUsageIfAllowed } from "@/lib/increment-analyze-usage";
 import { attachReportVersionMeta, readReportVersionMeta } from "@/lib/report-versioning";
 import { beginAnalyzeRequestGuard } from "@/lib/analyze-request-guard";
 import {
@@ -19,6 +19,7 @@ import { createRequestId } from "@/lib/request-id";
 import { buildAnalysisDecisionSummary } from "@/lib/analysis-decision-summary";
 import {
   createReanalyzeReport,
+  createReanalyzeReportWithUsageTransaction,
   fetchReportReanalyzeBaseForUser,
 } from "@/lib/report-detail-query";
 import type { AnalysisTrace } from "@/types/analysis";
@@ -164,40 +165,63 @@ export async function POST(
     const rootReportId = baseVersion.rootReportId || baseReport.id;
     const generation = baseVersion.generation + 1;
 
-    const saved = await createReanalyzeReport({
-      data: {
-        userId: session.user.id,
-        url: baseReport.url,
-        platform,
-        category,
-        seoScore: analysis.seoScore,
-        dataCompletenessScore: analysis.dataCompletenessScore,
-        conversionScore: analysis.conversionScore,
-        overallScore: analysis.overallScore,
-        priceCompetitiveness: analysis.priceCompetitiveness,
-        summary: analysis.summary,
-        dataSource: analysis.dataSource,
-        extractedData: toDbJson(analysis.extractedData),
-        derivedMetrics: toDbJson(analysis.derivedMetrics),
-        coverage: toDbJson(analysis.decisionSupportPacket.coverage),
-        accessState: toDbJson(
-          attachReportVersionMeta({
-            accessState: access as unknown as Record<string, unknown>,
-            previousReportId: baseReport.id,
-            rootReportId,
-            generation,
-            trigger: "reanalyze",
-          })
-        ),
-        suggestions: toDbJson(analysis.suggestions),
-        priorityActions: toDbJson(analysis.priorityActions),
-        analysisTrace: analysis.analysisTrace ? toDbJson(analysis.analysisTrace) : null,
-      } as any,
-    });
+    const reportData = {
+      userId: session.user.id,
+      url: baseReport.url,
+      platform,
+      category,
+      seoScore: analysis.seoScore,
+      dataCompletenessScore: analysis.dataCompletenessScore,
+      conversionScore: analysis.conversionScore,
+      overallScore: analysis.overallScore,
+      priceCompetitiveness: analysis.priceCompetitiveness,
+      summary: analysis.summary,
+      dataSource: analysis.dataSource,
+      extractedData: toDbJson(analysis.extractedData),
+      derivedMetrics: toDbJson(analysis.derivedMetrics),
+      coverage: toDbJson(analysis.decisionSupportPacket.coverage),
+      accessState: toDbJson(
+        attachReportVersionMeta({
+          accessState: access as unknown as Record<string, unknown>,
+          previousReportId: baseReport.id,
+          rootReportId,
+          generation,
+          trigger: "reanalyze",
+        })
+      ),
+      suggestions: toDbJson(analysis.suggestions),
+      priorityActions: toDbJson(analysis.priorityActions),
+      analysisTrace: analysis.analysisTrace
+        ? toDbJson(analysis.analysisTrace)
+        : undefined,
+    };
 
-    if (!unlimited) {
-      await incrementAnalyzeUsage({ type: "user", userId: session.user.id });
-    }
+    const saved = unlimited
+      ? await createReanalyzeReport({
+          data: reportData,
+        })
+      : (
+          await createReanalyzeReportWithUsageTransaction({
+            data: reportData,
+            consume: async (tx) => {
+              const usage = await consumeAnalyzeUsageIfAllowed({
+                type: "user",
+                userId: session.user.id,
+                limit: userMonthlyLimit,
+                client: tx,
+              });
+
+              if (!usage.allowed) {
+                const limitError = new Error("ANALYZE_LIMIT_REACHED");
+                limitError.name = "AnalyzeLimitReachedError";
+                (limitError as Error & { payload?: typeof usage }).payload = usage;
+                throw limitError;
+              }
+
+              return usage;
+            },
+          })
+        ).report;
 
     const previousOverall = typeof baseReport.overallScore === "number" ? baseReport.overallScore : null;
     const currentOverall = typeof saved.overallScore === "number" ? saved.overallScore : null;
@@ -268,6 +292,21 @@ export async function POST(
         },
         { status: 400 }
       );
+    }
+
+    if (error instanceof Error && error.name === "AnalyzeLimitReachedError") {
+      return buildAnalyzeLimitReachedResponse({
+        requestId,
+        usage: (error as Error & { payload?: unknown }).payload as {
+          allowed: boolean;
+          used: number;
+          limit: number;
+          remaining: number;
+          periodKey: string;
+          periodType: string;
+        },
+        actorType: "user",
+      });
     }
 
     logAnalyzeEvent({

@@ -60,7 +60,7 @@ export async function getAnalyzeUsageResponse() {
       }),
       ...result,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
         requestId,

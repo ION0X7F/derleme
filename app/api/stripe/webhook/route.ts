@@ -6,6 +6,8 @@ import { getStripe, getStripeWebhookSecret } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
+type MembershipStatus = "ACTIVE" | "CANCELED" | "EXPIRED" | "TRIALING";
+
 async function ensurePlanRecord(planId: AppPlanId) {
   const runtimePlanCode = getRuntimePlanCodeForPlanId(planId);
 
@@ -69,7 +71,7 @@ async function ensurePlanRecord(planId: AppPlanId) {
 async function syncMembershipFromPlan(params: {
   userId: string;
   planId: AppPlanId;
-  status: "ACTIVE" | "CANCELED" | "EXPIRED" | "TRIALING";
+  status: MembershipStatus;
   cancelAtPeriodEnd?: boolean;
   endDate?: Date | null;
 }) {
@@ -105,6 +107,62 @@ async function syncMembershipFromPlan(params: {
       },
     }),
   ]);
+}
+
+function toMembershipStatus(status: Stripe.Subscription.Status): MembershipStatus {
+  switch (status) {
+    case "trialing":
+      return "TRIALING";
+    case "active":
+      return "ACTIVE";
+    case "canceled":
+      return "CANCELED";
+    case "past_due":
+    case "unpaid":
+    case "incomplete":
+    case "incomplete_expired":
+    case "paused":
+      return "EXPIRED";
+    default:
+      return "EXPIRED";
+  }
+}
+
+function getPeriodEndDate(unixSeconds?: number | null) {
+  return typeof unixSeconds === "number" && Number.isFinite(unixSeconds)
+    ? new Date(unixSeconds * 1000)
+    : null;
+}
+
+async function syncMembershipFromSubscription(subscription: Stripe.Subscription) {
+  const userId = String(subscription.metadata?.userId || "").trim();
+  const rawPlanId = String(subscription.metadata?.planId || "").trim().toUpperCase();
+
+  if (!userId) {
+    return;
+  }
+
+  if (!isAppPlanId(rawPlanId)) {
+    if (subscription.status === "canceled") {
+      await downgradeToFree(userId);
+    }
+    return;
+  }
+
+  const membershipStatus = toMembershipStatus(subscription.status);
+
+  if (membershipStatus === "EXPIRED" && subscription.status !== "canceled") {
+    await downgradeToFree(userId);
+    return;
+  }
+
+  await syncMembershipFromPlan({
+    userId,
+    planId: rawPlanId,
+    status: membershipStatus,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    endDate: getPeriodEndDate(subscription.cancel_at ?? subscription.canceled_at),
+  });
 }
 
 async function downgradeToFree(userId: string) {
@@ -182,9 +240,53 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (event.type === "checkout.session.async_payment_failed") {
+      const session = event.data.object;
+      const userId = String(session.metadata?.userId || session.client_reference_id || "").trim();
+
+      if (userId) {
+        await downgradeToFree(userId);
+      }
+    }
+
+    if (event.type === "customer.subscription.created") {
+      await syncMembershipFromSubscription(event.data.object);
+    }
+
+    if (event.type === "customer.subscription.updated") {
+      await syncMembershipFromSubscription(event.data.object);
+    }
+
     if (event.type === "customer.subscription.deleted") {
       const subscription = event.data.object;
       const userId = String(subscription.metadata?.userId || "").trim();
+
+      if (userId) {
+        await downgradeToFree(userId);
+      }
+    }
+
+    if (event.type === "invoice.payment_failed") {
+      const invoice = event.data.object;
+      const invoiceMeta = invoice as Stripe.Invoice & {
+        subscription_details?: {
+          metadata?: {
+            userId?: string;
+          };
+        };
+        parent?: {
+          subscription_details?: {
+            metadata?: {
+              userId?: string;
+            };
+          };
+        };
+      };
+      const userId = String(
+        invoiceMeta.subscription_details?.metadata?.userId ||
+          invoiceMeta.parent?.subscription_details?.metadata?.userId ||
+          ""
+      ).trim();
 
       if (userId) {
         await downgradeToFree(userId);

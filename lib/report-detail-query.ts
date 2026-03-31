@@ -169,6 +169,16 @@ export async function createAnalyzeReportInTransaction(params: {
   });
 }
 
+export async function createReanalyzeReportInTransaction(params: {
+  tx: Pick<Prisma.TransactionClient, "report">;
+  data: Prisma.ReportUncheckedCreateInput;
+}) {
+  assertReportOwnershipBinding(params.data);
+  return params.tx.report.create({
+    data: params.data,
+  });
+}
+
 export async function createAnalyzeReportWithUsageTransaction<T>(params: {
   consume: (
     tx: Pick<
@@ -193,10 +203,30 @@ export async function createAnalyzeReportWithUsageTransaction<T>(params: {
 }
 
 export async function createSavedReport(params: {
-  data: Prisma.ReportCreateInput;
+  data: Prisma.ReportUncheckedCreateInput;
 }) {
   assertReportOwnershipBinding(params.data);
   return prisma.report.create({
     data: params.data,
+  });
+}
+
+export async function createReanalyzeReportWithUsageTransaction<T>(params: {
+  consume: (
+    tx: Pick<Prisma.TransactionClient, "report" | "userUsageRecord">
+  ) => Promise<T>;
+  data: Prisma.ReportUncheckedCreateInput;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const usage = await params.consume(tx);
+    const report = await createReanalyzeReportInTransaction({
+      tx,
+      data: params.data,
+    });
+
+    return {
+      usage,
+      report,
+    };
   });
 }

@@ -3,6 +3,10 @@ import { auth } from "@/auth";
 import {
   createAnalyzeJob,
 } from "@/lib/analyze-jobs";
+import { buildAnalyzeLimitReachedResponse, buildAnalyzeThrottledResponse } from "@/lib/analyze-error-response";
+import { checkAnalyzeRequestGuard } from "@/lib/analyze-request-guard";
+import { resolveGuestAnalyzeUsageContext, resolveUserAnalyzeUsageContext } from "@/lib/analyze-usage-context";
+import { resolveUserAnalysisContext } from "@/lib/analysis-user-context";
 import { getOrCreateGuestId } from "@/lib/guest";
 import { createRequestId } from "@/lib/request-id";
 import { validateProductUrl } from "@/lib/url-validation";
@@ -11,14 +15,16 @@ export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   const requestId = createRequestId("job");
+  let actorType: "guest" | "user" = "guest";
 
   try {
     const session = await auth();
+    actorType = session?.user?.id ? "user" : "guest";
     const guestId = session?.user?.id ? null : await getOrCreateGuestId();
-    let body: { url?: unknown };
+    let body: { url?: unknown; keyword?: unknown };
 
     try {
-      body = (await req.json()) as { url?: unknown };
+      body = (await req.json()) as { url?: unknown; keyword?: unknown };
     } catch {
       return NextResponse.json(
         {
@@ -42,6 +48,8 @@ export async function POST(req: Request) {
     }
 
     const rawUrl = typeof body.url === "string" ? body.url : "";
+    const keyword =
+      typeof body.keyword === "string" ? body.keyword.trim().slice(0, 120) : "";
     const validatedUrl = validateProductUrl(rawUrl, {
       allowedPlatforms: ["trendyol"],
       allowShortTrendyolLinks: false,
@@ -56,6 +64,42 @@ export async function POST(req: Request) {
         },
         { status: 400 }
       );
+    }
+
+    const usageContext = session?.user?.id
+      ? await (async () => {
+          const userAnalysisContext = await resolveUserAnalysisContext({
+            userId: session.user.id,
+            email: session.user.email,
+          });
+
+          return resolveUserAnalyzeUsageContext({
+            userId: session.user.id,
+            monthlyLimit: userAnalysisContext.monthlyLimit,
+            unlimited: userAnalysisContext.unlimited,
+          });
+        })()
+      : await resolveGuestAnalyzeUsageContext(guestId ?? undefined);
+
+    if (!usageContext.usageWindow.allowed) {
+      return buildAnalyzeLimitReachedResponse({
+        requestId,
+        usage: usageContext.usageWindow,
+        actorType,
+      });
+    }
+
+    const guard = checkAnalyzeRequestGuard({
+      actor: usageContext.actor,
+      url: validatedUrl.normalizedUrl,
+    });
+
+    if (!guard.allowed) {
+      return buildAnalyzeThrottledResponse({
+        requestId,
+        reason: guard.reason,
+        retryAfterSeconds: guard.retryAfterSeconds,
+      });
     }
 
     const job = await createAnalyzeJob({
@@ -75,11 +119,12 @@ export async function POST(req: Request) {
         requestId,
         jobId: job.id,
         status: job.status,
+        keyword: keyword || null,
         pollUrl: `/api/analyze/jobs/${job.id}`,
       },
       { status: 202 }
     );
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
         requestId,
