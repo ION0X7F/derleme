@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   WORKSPACE_ROUTES,
@@ -20,6 +20,7 @@ type Props = {
   initialView: View;
   reportId?: string;
   initialPrefillUrl?: string;
+  initialPrefillKeyword?: string;
   initialAutorun?: boolean;
 };
 
@@ -33,12 +34,13 @@ const DASHBOARD_SHELL_VERSION = "2026-03-29-13";
 function getQuery(
   view: View,
   reportId?: string,
-  passthrough?: { prefillUrl?: string; autorun?: boolean }
+  passthrough?: { prefillUrl?: string; prefillKeyword?: string; autorun?: boolean }
 ) {
   const params = new URLSearchParams();
   params.set("view", view);
   if (reportId) params.set("reportId", reportId);
   if (passthrough?.prefillUrl) params.set("prefillUrl", passthrough.prefillUrl);
+  if (passthrough?.prefillKeyword) params.set("keyword", passthrough.prefillKeyword);
   if (passthrough?.autorun) params.set("autorun", "1");
   return params.toString();
 }
@@ -72,18 +74,20 @@ export default function DashboardShellFrame({
   initialView,
   reportId,
   initialPrefillUrl,
+  initialPrefillKeyword,
   initialAutorun,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [isFrameReady, setIsFrameReady] = useState(false);
   const [frameHash, setFrameHash] = useState("");
   const passthrough =
     initialView === "new-analysis"
       ? {
           prefillUrl:
             initialPrefillUrl || searchParams.get("url") || undefined,
+          prefillKeyword:
+            initialPrefillKeyword || searchParams.get("keyword") || undefined,
           autorun:
             initialAutorun === true || searchParams.get("autorun") === "1",
         }
@@ -101,10 +105,6 @@ export default function DashboardShellFrame({
       window.location.origin
     );
   };
-
-  useEffect(() => {
-    setIsFrameReady(false);
-  }, [initialView, reportId]);
 
   useEffect(() => {
     const syncHash = () => setFrameHash(window.location.hash || "");
@@ -144,6 +144,22 @@ export default function DashboardShellFrame({
     };
   }, [router]);
 
+  const frameSrc = `/dashboard-shell.html?${getQuery(initialView, reportId, passthrough)}&shellv=${DASHBOARD_SHELL_VERSION}${frameHash}`;
+
+  return (
+    <DashboardShellViewport key={frameSrc} iframeRef={iframeRef} src={frameSrc} />
+  );
+}
+
+function DashboardShellViewport({
+  iframeRef,
+  src,
+}: {
+  iframeRef: RefObject<HTMLIFrameElement | null>;
+  src: string;
+}) {
+  const [isFrameReady, setIsFrameReady] = useState(false);
+
   useEffect(() => {
     const frame = iframeRef.current;
     if (!frame) return;
@@ -170,7 +186,7 @@ export default function DashboardShellFrame({
       window.clearInterval(intervalId);
       window.clearTimeout(timeoutId);
     };
-  }, [initialView, reportId]);
+  }, [iframeRef, src]);
 
   return (
     <div
@@ -222,7 +238,7 @@ export default function DashboardShellFrame({
       <iframe
         ref={iframeRef}
         title="SellBoost Dashboard"
-        src={`/dashboard-shell.html?${getQuery(initialView, reportId, passthrough)}&shellv=${DASHBOARD_SHELL_VERSION}${frameHash}`}
+        src={src}
         onLoad={() => setIsFrameReady(true)}
         style={{
           display: "block",

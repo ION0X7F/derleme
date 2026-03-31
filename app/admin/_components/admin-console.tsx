@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type AdminTab = "dashboard" | "users" | "notifications";
 
@@ -164,7 +164,7 @@ export default function AdminConsole() {
     setNotifications(payload.notifications);
   }
 
-  async function loadAll() {
+  const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -174,11 +174,11 @@ export default function AdminConsole() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [searchQuery]);
 
   useEffect(() => {
     loadAll().catch(() => undefined);
-  }, []);
+  }, [loadAll]);
 
   async function handleSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -30,8 +30,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 .next-dev-*.log
+.next-dev-*.err.log
+.next-dev-*.out.log
 .tmp-next-dev*.log
+.tmp-next-session*.log
 .tmp-public-tunnel.log
+dev-server.log
 tmp-*.html
 tmp-*.json
 tmp_*.html

@@ -6,6 +6,7 @@ type RoutePlaceholderProps = {
   children?: ReactNode;
 };
 
-export default function RoutePlaceholder(_: RoutePlaceholderProps) {
+export default function RoutePlaceholder(_props: RoutePlaceholderProps) {
+  void _props;
   return null;
 }
