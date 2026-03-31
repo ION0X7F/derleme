@@ -1,0 +1,16 @@
+.git
+.github
+.next
+node_modules
+npm-debug.log
+dev-server.log
+.env
+.env.local
+.env.production
+.env.development
+prisma/dev.db
+prisma/*.db
+prisma/*.db-journal
+coverage
+tmp
+*.log

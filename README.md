@@ -120,6 +120,7 @@ npm run lab:analysis-quality
 - Deploy checklist: [DEPLOY_CHECKLIST_2026-04-01.md](DEPLOY_CHECKLIST_2026-04-01.md)
 - Handoff ozeti: [HANDOFF_2026-04-01.md](HANDOFF_2026-04-01.md)
 - Durum ozeti: [STATUS_2026-04-01.md](STATUS_2026-04-01.md)
+- Google Cloud Run deploy: [GOOGLE_CLOUD_RUN_DEPLOYMENT.md](GOOGLE_CLOUD_RUN_DEPLOYMENT.md)
 
 ## Kritik Dosyalar
 
