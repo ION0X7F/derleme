@@ -8,6 +8,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NODE_ENV=production
+ENV DATABASE_URL=file:/tmp/build.db
+ENV AUTH_SECRET=build-only-secret
+ENV NEXTAUTH_URL=https://build.sellboost.local
+RUN npx prisma db push --skip-generate
 RUN npm run build
 
 FROM node:20-slim AS runner
