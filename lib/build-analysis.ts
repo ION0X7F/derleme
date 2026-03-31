@@ -650,6 +650,7 @@ function getCompletenessScore(input: ConsolidatedAnalysisInput) {
   return clampScore(score);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getSeoScore(input: ConsolidatedAnalysisInput) {
   let score = 0;
   const extracted = input._raw; // for fields not yet in ConsolidatedAnalysisInput
@@ -2153,6 +2154,7 @@ function getPriceCompetitiveness(
   return "Temel fiyat bilgisi mevcut";
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildSummary(params: {
   platform: string | null;
   consolidatedInput: ConsolidatedAnalysisInput;
@@ -2306,11 +2308,12 @@ function buildSummaryWithMarket(params: {
 }
 
 export function buildAnalysis({
-  platform,
+  platform: _platform,
   consolidatedInput,
   extracted,
   planContext = "free",
 }: BuildAnalysisParams): BuildAnalysisResult {
+  void _platform;
   const trendyolScorecard = buildTrendyolScorecard({
     extracted,
     consolidatedInput,

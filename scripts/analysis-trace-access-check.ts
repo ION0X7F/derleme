@@ -1,4 +1,5 @@
 import { sanitizeAnalysisTraceForAccess } from "../lib/analysis-trace";
+import type { AnalysisTrace } from "../types/analysis";
 
 function createTrace() {
   return {
@@ -54,7 +55,7 @@ function run() {
   const checks: Check[] = [];
   const trace = createTrace();
 
-  const guest = sanitizeAnalysisTraceForAccess(trace as any, "guest");
+  const guest = sanitizeAnalysisTraceForAccess(trace as unknown as AnalysisTrace, "guest");
   checks.push({
     label: "guest trace clips deeply",
     passed:
@@ -69,7 +70,7 @@ function run() {
     detail: guest,
   });
 
-  const free = sanitizeAnalysisTraceForAccess(trace as any, "free");
+  const free = sanitizeAnalysisTraceForAccess(trace as unknown as AnalysisTrace, "free");
   checks.push({
     label: "free trace clips moderately",
     passed:
@@ -84,7 +85,7 @@ function run() {
     detail: free,
   });
 
-  const pro = sanitizeAnalysisTraceForAccess(trace as any, "pro");
+  const pro = sanitizeAnalysisTraceForAccess(trace as unknown as AnalysisTrace, "pro");
   checks.push({
     label: "pro trace keeps full payload",
     passed:

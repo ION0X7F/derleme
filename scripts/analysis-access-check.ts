@@ -1,4 +1,5 @@
 import { buildAnalysisAccessState, resolveAccessPlan } from "../lib/analysis-access";
+import type { AnalysisSectionLock } from "../types/analysis";
 
 type Check = {
   label: string;
@@ -6,8 +7,11 @@ type Check = {
   detail?: unknown;
 };
 
-function hasLocked(state: ReturnType<typeof buildAnalysisAccessState>, key: string) {
-  return state.lockedSections.includes(key as any);
+function hasLocked(
+  state: ReturnType<typeof buildAnalysisAccessState>,
+  key: AnalysisSectionLock
+) {
+  return state.lockedSections.includes(key);
 }
 
 function run() {

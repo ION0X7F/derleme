@@ -203,7 +203,7 @@ export function mergeExtractedFieldsWithMetadata(params: {
   let missingCount = 0;
 
   // Determine source for each field
-  for (const [key, value] of Object.entries(merged)) {
+  for (const [key] of Object.entries(merged)) {
     if (key === "extractor_status" || key === "platform") {
       // Skip metadata fields
       continue;

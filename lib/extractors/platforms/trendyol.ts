@@ -1591,6 +1591,7 @@ function extractStockStatus(
   return null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function extractQuestionCount(
   $: CheerioAPI,
   decodedHtml: string,

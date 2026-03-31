@@ -10,6 +10,22 @@ type Check = {
   detail?: unknown;
 };
 
+type LogExtra = {
+  apiKey?: string;
+  nested?: {
+    token?: string;
+    keep?: string;
+  };
+  list?: string[];
+  huge?: string;
+};
+
+type WarnPayload = {
+  stage?: string;
+  message?: string;
+  extra?: Record<string, unknown>;
+};
+
 function run() {
   const checks: Check[] = [];
 
@@ -39,24 +55,26 @@ function run() {
   checks.push({
     label: "sensitive keys are redacted",
     passed:
-      (payload.extra as any)?.apiKey === "[redacted]" &&
-      (payload.extra as any)?.nested?.token === "[redacted]",
+      (payload.extra as LogExtra | undefined)?.apiKey === "[redacted]" &&
+      (payload.extra as LogExtra | undefined)?.nested?.token === "[redacted]",
     detail: payload.extra,
   });
 
   checks.push({
     label: "array payload is clipped",
-    passed: Array.isArray((payload.extra as any)?.list) && (payload.extra as any).list.length === 10,
-    detail: (payload.extra as any)?.list,
+    passed:
+      Array.isArray((payload.extra as LogExtra | undefined)?.list) &&
+      ((payload.extra as LogExtra | undefined)?.list?.length ?? 0) === 10,
+    detail: (payload.extra as LogExtra | undefined)?.list,
   });
 
   checks.push({
     label: "long strings are truncated",
     passed:
-      typeof (payload.extra as any)?.huge === "string" &&
-      (payload.extra as any).huge.length <= 243 &&
-      (payload.extra as any).huge.endsWith("..."),
-    detail: (payload.extra as any)?.huge,
+      typeof (payload.extra as LogExtra | undefined)?.huge === "string" &&
+      ((payload.extra as LogExtra | undefined)?.huge?.length ?? 0) <= 243 &&
+      ((payload.extra as LogExtra | undefined)?.huge?.endsWith("...") ?? false),
+    detail: (payload.extra as LogExtra | undefined)?.huge,
   });
 
   const warnCalls: unknown[] = [];
@@ -85,13 +103,15 @@ function run() {
     console.warn = originalWarn;
   }
 
-  const limitPayload = (warnCalls[0] as any[])?.[1];
-  const throttlePayload = (warnCalls[1] as any[])?.[1];
+  const limitCall = warnCalls[0] as [string, WarnPayload] | undefined;
+  const throttleCall = warnCalls[1] as [string, WarnPayload] | undefined;
+  const limitPayload = limitCall?.[1];
+  const throttlePayload = throttleCall?.[1];
 
   checks.push({
     label: "logAnalyzeLimitReached writes expected warn payload",
     passed:
-      (warnCalls[0] as any[])?.[0] === "[analyze]" &&
+      limitCall?.[0] === "[analyze]" &&
       limitPayload?.stage === "limit_check" &&
       limitPayload?.extra?.used === 10 &&
       limitPayload?.extra?.limit === 10 &&
@@ -102,7 +122,7 @@ function run() {
   checks.push({
     label: "logAnalyzeThrottled writes expected warn payload",
     passed:
-      (warnCalls[1] as any[])?.[0] === "[analyze]" &&
+      throttleCall?.[0] === "[analyze]" &&
       throttlePayload?.stage === "abuse_guard" &&
       throttlePayload?.message === "too fast" &&
       throttlePayload?.extra?.retryAfterSeconds === 12,

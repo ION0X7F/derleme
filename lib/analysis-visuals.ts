@@ -120,6 +120,7 @@ function demandLevelFromScore(score: number | null): "low" | "medium" | "high" |
   return "low";
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function demandLabel(level: "low" | "medium" | "high" | "unclear") {
   switch (level) {
     case "high":

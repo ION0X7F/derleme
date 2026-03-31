@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import type { Element } from "domhandler";
 import type { ExtractedProductFields } from "@/types/analysis";
 
 type ModelCodeSource =
@@ -533,8 +534,8 @@ function extractIdentityFromTable(
       cleanText($(`tr:contains("${label}") td, th:contains("${label}") + td`).first().text()),
       cleanText(
         $(`[class*="detail"], [class*="attribute"], [class*="spec"]`)
-          .filter((_: number, el: unknown) => {
-            const text = cleanText($(el as any).text()) || "";
+          .filter((_: number, el: Element) => {
+            const text = cleanText($(el).text()) || "";
             return text.toLocaleLowerCase("tr-TR").includes(label.toLocaleLowerCase("tr-TR"));
           })
           .first()
@@ -1043,6 +1044,7 @@ function detectBooleanSignal(
   return keywords.some((keyword) => bodyText.includes(keyword));
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function extractModelCode(
   title: string | null,
   h1: string | null,

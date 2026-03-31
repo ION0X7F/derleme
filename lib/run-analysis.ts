@@ -1,38 +1,26 @@
-import { analyzeWithAi } from "@/lib/ai-analysis";
-import { evaluateAnalysisContract } from "@/lib/analysis-contract";
-import { buildAnalysisTrace } from "@/lib/analysis-trace";
-import { buildAnalysis, buildPriorityActions } from "@/lib/build-analysis";
+import { buildAnalysis } from "@/lib/build-analysis";
 import { detectCategory } from "@/lib/detect-category";
 import {
   buildExtractorHealthReport,
-  calculateHealthScore,
-  getHealthStatusLabel,
 } from "@/lib/extractors/health";
-import { extractFieldsWithFallback } from "@/lib/extractors";
-import { mergeExtractedFieldsWithMetadata } from "@/lib/extractors/merge-extracted-fields";
 import { fetchPageHtml } from "@/lib/fetch-page-html";
-import {
-  fetchTrendyolApi,
-  fetchTrendyolFollowerCountByMerchantId,
-} from "@/lib/fetch-trendyol-api";
-import { runPythonJson } from "@/lib/python-runner";
-import { isAiAnalysisEligible } from "@/lib/ai-eligibility";
-import { createDebugTrace, emitDebugTrace, traceEvent } from "@/lib/debug-observability";
+import { fetchTrendyolApi } from "@/lib/fetch-trendyol-api";
+import { createDebugTrace, traceEvent } from "@/lib/debug-observability";
 import { getLearningContext } from "@/lib/learning-engine";
-import { fetchTrendyolReviewAnalysis } from "@/lib/trendyol-review-analysis";
-import { isTrendyolFreeShippingEligible } from "@/lib/trendyol-shipping";
-import trendyolRenderedProductContent from "@/lib/trendyol-rendered-product-content";
-import { enrichTrendyolScorecardWithAi } from "@/lib/trendyol-scorecard";
-import trendyolRenderedOtherMerchants from "@/lib/trendyol-rendered-other-merchants";
 import {
-  completeMissingFieldsWithMetadata,
-  getLearningStatus,
-} from "@/lib/missing-data";
+  enrichTrendyolReviewSignals,
+  executeExtractionPhase,
+} from "@/lib/run-analysis-extraction";
+import {
+  attachDeterministicMetadata,
+  enrichAnalysisForDelivery,
+  logExtractorHealth,
+} from "@/lib/run-analysis-finalize";
+import { getLearningStatus } from "@/lib/missing-data";
 import { prepareAnalysisInput } from "./prepare-analysis-input";
 import type {
   AccessPlan,
   BuildAnalysisResult,
-  CategoryAverages,
   LearningContext,
   LearningStatus,
   MissingDataReport,
@@ -74,41 +62,6 @@ type RunAnalysisPipelineParams = {
   }) => void;
 };
 
-const PYTHON_BACKFILL_FIELDS: Array<keyof import("@/types/analysis").ExtractedProductFields> = [
-  "original_price",
-  "discount_rate",
-  "question_count",
-  "qa_snippets",
-  "other_sellers_count",
-  "other_seller_offers",
-  "other_sellers_summary",
-  "review_snippets",
-  "review_summary",
-  "review_themes",
-  "follower_count",
-];
-
-const PYTHON_BACKFILL_SCRIPT = `
-import asyncio
-import json
-import sys
-from trendyol_pdp_extractor.fetch_page import fetch_html
-from trendyol_pdp_extractor.parse_html import extract_html_data
-from trendyol_pdp_extractor.parse_embedded_json import extract_embedded_json
-from trendyol_pdp_extractor.capture_network import capture_runtime_requests
-from trendyol_pdp_extractor.parse_runtime_json import extract_runtime_data
-from trendyol_pdp_extractor.normalize import merge_product_data
-
-url = sys.argv[1]
-html = fetch_html(url)
-html_data = extract_html_data(html, url)
-embedded_data = extract_embedded_json(html)
-logs = asyncio.run(capture_runtime_requests(url))
-runtime_data = extract_runtime_data(logs)
-merged = merge_product_data(html_data, embedded_data, runtime_data)
-print(json.dumps(merged, ensure_ascii=False))
-`;
-
 export type AnalysisPipelineResult = {
   platform: string | null;
   category: string;
@@ -126,142 +79,6 @@ export type AnalysisPipelineResult = {
     aiMs: number;
   };
 };
-
-function hasText(value: string | null | undefined) {
-  return !!value && value.trim().length > 0;
-}
-
-function isMissingValue(value: unknown) {
-  if (value == null) return true;
-  if (typeof value === "string") return value.trim().length === 0;
-  if (typeof value === "number") return !Number.isFinite(value);
-  if (Array.isArray(value)) return value.length === 0;
-  return false;
-}
-
-function shouldRunPythonBackfill(
-  extracted: import("@/types/analysis").ExtractedProductFields
-) {
-  return PYTHON_BACKFILL_FIELDS.some((field) => isMissingValue(extracted[field]));
-}
-
-async function fetchPythonBackfill(
-  url: string
-): Promise<Partial<import("@/types/analysis").ExtractedProductFields> | null> {
-  try {
-    const payload = (await runPythonJson({
-      script: PYTHON_BACKFILL_SCRIPT,
-      args: [url],
-      cwd: process.cwd(),
-    })) as Record<string, unknown>;
-
-    if (!payload || typeof payload !== "object") return null;
-    return payload as Partial<import("@/types/analysis").ExtractedProductFields>;
-  } catch {
-    return null;
-  }
-}
-
-function applyPythonBackfill(params: {
-  extracted: import("@/types/analysis").ExtractedProductFields;
-  pythonData: Partial<import("@/types/analysis").ExtractedProductFields>;
-  fieldMetadata: Record<string, import("@/types/analysis").ExtractedFieldMetadata>;
-  trace: ReturnType<typeof createDebugTrace>;
-}) {
-  const { extracted, pythonData, fieldMetadata, trace } = params;
-
-  for (const field of PYTHON_BACKFILL_FIELDS) {
-    const currentValue = extracted[field];
-    const incomingValue = pythonData[field];
-
-    if (!isMissingValue(currentValue) || isMissingValue(incomingValue)) {
-      continue;
-    }
-
-    extracted[field] = incomingValue as never;
-    fieldMetadata[String(field)] = {
-      source: "runtime_xhr",
-      confidence: "medium",
-      timestamp: Date.now(),
-      reason: "python layered fallback",
-    };
-
-    traceEvent(trace, {
-      stage: "merge",
-      code: "python_backfill_field",
-      message: `${String(field)} python fallback ile dolduruldu.`,
-      field: String(field),
-    });
-  }
-}
-
-function shouldUseAiScore(aiScore: number, fallbackScore: number) {
-  if (!Number.isFinite(aiScore)) return false;
-  if (aiScore <= 0 && fallbackScore > 0) return false;
-  return true;
-}
-
-function buildAiPriorityActionsFromSuggestions(
-  suggestions: Array<{ title: string; detail: string }> | null | undefined
-) {
-  if (!Array.isArray(suggestions)) return [];
-
-  return suggestions
-    .filter(
-      (item): item is { title: string; detail: string } =>
-        !!item &&
-        typeof item.title === "string" &&
-        item.title.trim().length > 0 &&
-        typeof item.detail === "string" &&
-        item.detail.trim().length > 0
-    )
-    .slice(0, 10)
-    .map((item, index) => ({
-      priority: index + 1,
-      title: item.title.trim(),
-      detail: item.detail.trim(),
-    }));
-}
-
-function buildCategoryAverages(
-  learningContext: LearningContext | null | undefined
-): CategoryAverages | null {
-  const benchmark = learningContext?.benchmark;
-  if (!benchmark || benchmark.sampleSize <= 0) return null;
-
-  return {
-    source: "learning_benchmark",
-    sampleSize: benchmark.sampleSize,
-    imageCount: benchmark.avgImageCount,
-    descriptionLength: benchmark.avgDescriptionLength,
-    ratingValue: benchmark.avgRatingValue,
-    sellerScore: benchmark.avgSellerScore,
-    price: benchmark.avgPrice,
-    reviewCount: benchmark.avgReviewCount,
-    favoriteCount: benchmark.avgFavoriteCount,
-    shippingDays: benchmark.avgShippingDays,
-    otherSellersCount: benchmark.avgOtherSellersCount,
-    freeShippingRate: benchmark.freeShippingRate,
-    fastDeliveryRate: benchmark.fastDeliveryRate,
-    hasVideoRate: benchmark.hasVideoRate,
-    officialSellerRate: benchmark.officialSellerRate,
-  };
-}
-
-const CRITICAL_FIELDS = [
-  "title",
-  "h1",
-  "brand",
-  "product_name",
-  "normalized_price",
-  "image_count",
-  "description_length",
-  "seller_name",
-  "rating_value",
-  "review_count",
-  "shipping_days",
-  "stock_status",
-];
 
 export async function runAnalysisPipeline(
   params: RunAnalysisPipelineParams
@@ -376,193 +193,13 @@ export async function runAnalysisPipeline(
     extracted,
     fieldMetadata,
     report: missingDataReport,
-  } = await (async () => {
-    // Önce sadece HTML'den veri çıkarılır (platforma özel ve genel olarak).
-    const htmlExtraction = extractFieldsWithFallback({
-      url: params.url,
-      html,
-    });
-
-    // Sonra, HTML'den çıkan ham veri birleştirilir.
-    const {
-      merged: mergedWithHtml,
-      fieldMetadata: initialMetadata,
-    } = mergeExtractedFieldsWithMetadata({
-      genericFields: htmlExtraction.genericFields,
-      platformFields: htmlExtraction.platformFields,
-      platform: htmlExtraction.platform,
-      trace: debugTrace,
-    });
-
-    const finalExtractionResult = (() => {
-      // API verisinden gelen güvenilir alanları, HTML'den gelenlerin üzerine yazarak önceliklendir.
-      // Bu, `completeMissingFieldsWithMetadata` fonksiyonunun belirsiz davranışını azaltır.
-      if (trendyolApiData) {
-        const apiSeller = trendyolApiData.seller;
-        if (apiSeller) {
-          const applyApiField = <K extends keyof typeof mergedWithHtml>(
-            key: K,
-            apiValue: (typeof mergedWithHtml)[K]
-          ) => {
-            if (apiValue == null) return;
-            mergedWithHtml[key] = apiValue;
-            initialMetadata[String(key)] = {
-              source: "api",
-              confidence: "high",
-              timestamp: Date.now(),
-              reason: "trendyol api seller payload",
-            };
-          };
-
-          applyApiField("seller_score", apiSeller.seller_score);
-          applyApiField("seller_name", apiSeller.seller_name);
-          applyApiField("official_seller", apiSeller.is_official);
-          applyApiField("has_free_shipping", apiSeller.has_free_shipping);
-          applyApiField("listing_id", apiSeller.listing_id);
-          applyApiField("merchant_id", apiSeller.merchant_id);
-        }
-      }
-
-      // Son olarak, birleştirilmiş veri API'den gelen bilgilerle zenginleştirilir ve eksik alanlar tamamlanır.
-      if (
-        isTrendyol &&
-        mergedWithHtml.has_free_shipping == null &&
-        isTrendyolFreeShippingEligible(mergedWithHtml.normalized_price)
-      ) {
-        mergedWithHtml.has_free_shipping = true;
-        initialMetadata.has_free_shipping = {
-          source: "derived",
-          confidence: "high",
-          timestamp: Date.now(),
-          reason: "trendyol free shipping threshold",
-        };
-      }
-
-      return completeMissingFieldsWithMetadata(
-        {
-          platform: htmlExtraction.platform,
-          extracted: mergedWithHtml,
-          genericFields: htmlExtraction.genericFields,
-          platformFields: htmlExtraction.platformFields,
-          trendyolApiData,
-        },
-        initialMetadata,
-        debugTrace
-      );
-    })();
-
-    if (isTrendyol && shouldRunPythonBackfill(finalExtractionResult.extracted)) {
-      const pythonData = await fetchPythonBackfill(params.url);
-      if (pythonData) {
-        applyPythonBackfill({
-          extracted: finalExtractionResult.extracted,
-          pythonData,
-          fieldMetadata: finalExtractionResult.fieldMetadata,
-          trace: debugTrace,
-        });
-      } else {
-        traceEvent(debugTrace, {
-          stage: "merge",
-          level: "warn",
-          code: "python_backfill_unavailable",
-          message: "Python fallback denendi fakat veri alinamadi.",
-        });
-      }
-    }
-
-    if (
-      trendyolRenderedProductContent.shouldFetchRenderedProductContent({
-        platform: finalExtractionResult.extracted.platform,
-        description_text: finalExtractionResult.extracted.description_text ?? null,
-        description_length: finalExtractionResult.extracted.description_length,
-        view_count_24h: finalExtractionResult.extracted.view_count_24h ?? null,
-      })
-    ) {
-      const renderedProductContent =
-        await trendyolRenderedProductContent.fetchRenderedProductContent(params.url);
-      if (renderedProductContent) {
-        if (renderedProductContent.description_text) {
-          finalExtractionResult.extracted.description_text =
-            renderedProductContent.description_text;
-          finalExtractionResult.extracted.description_length =
-            renderedProductContent.description_length;
-          finalExtractionResult.fieldMetadata.description_text = {
-            source: "html",
-            confidence: "high",
-            timestamp: Date.now(),
-            reason: "trendyol rendered urun aciklamasi block",
-          };
-          finalExtractionResult.fieldMetadata.description_length = {
-            source: "html",
-            confidence: "high",
-            timestamp: Date.now(),
-            reason: "trendyol rendered urun aciklamasi block",
-          };
-        }
-        if (typeof renderedProductContent.view_count_24h === "number") {
-          finalExtractionResult.extracted.view_count_24h =
-            renderedProductContent.view_count_24h;
-          finalExtractionResult.fieldMetadata.view_count_24h = {
-            source: "html",
-            confidence: "high",
-            timestamp: Date.now(),
-            reason: "trendyol rendered son 24 saatte goruntulenme block",
-          };
-        }
-
-        traceEvent(debugTrace, {
-          stage: "merge",
-          code: "rendered_product_description_enriched",
-          message: "Render edilmis Trendyol urun bloklari ile aciklama ve goruntulenme sinyali zenginlestirildi.",
-          meta: {
-            descriptionLength: renderedProductContent.description_length,
-            viewCount24h: renderedProductContent.view_count_24h,
-          },
-        });
-      }
-    }
-
-    if (
-      isTrendyol &&
-      trendyolRenderedOtherMerchants.shouldFetchRenderedOtherMerchantData(
-        finalExtractionResult.extracted.other_seller_offers
-      )
-    ) {
-      const renderedOffers =
-        await trendyolRenderedOtherMerchants.fetchRenderedOtherMerchantData(params.url);
-      if (renderedOffers && renderedOffers.length > 0) {
-        finalExtractionResult.extracted.other_seller_offers =
-          trendyolRenderedOtherMerchants.mergeRenderedOtherMerchantData(
-            finalExtractionResult.extracted.other_seller_offers,
-            renderedOffers
-          );
-
-        traceEvent(debugTrace, {
-          stage: "merge",
-          code: "rendered_other_merchants_enriched",
-          message: "Render edilmis rakip kart verileri ile teslimat/promo alanlari zenginlestirildi.",
-          meta: {
-            renderedOfferCount: renderedOffers.length,
-            extractedOfferCount:
-              finalExtractionResult.extracted.other_seller_offers?.length ?? 0,
-          },
-        });
-      } else {
-        traceEvent(debugTrace, {
-          stage: "merge",
-          level: "warn",
-          code: "rendered_other_merchants_unavailable",
-          message: "Render edilmis rakip kart verisi alinamadi.",
-        });
-      }
-    }
-
-    return {
-      extracted: finalExtractionResult.extracted,
-      fieldMetadata: finalExtractionResult.fieldMetadata,
-      report: finalExtractionResult.report,
-    };
-  })();
+  } = await executeExtractionPhase({
+    url: params.url,
+    html,
+    isTrendyol,
+    trendyolApiData,
+    debugTrace,
+  });
   extractionMs = Date.now() - extractionStartedAt;
   emitProgress({
     stage: "extract",
@@ -638,82 +275,12 @@ export async function runAnalysisPipeline(
     });
     const reviewStartedAt = Date.now();
     try {
-      const shouldFetchFollowerCount =
-        extracted.follower_count == null &&
-        typeof extracted.merchant_id === "number";
-      const [reviewAnalysis, followerCount] = await Promise.all([
-        fetchTrendyolReviewAnalysis({
-          url: params.url,
-          merchantId: extracted.merchant_id ?? null,
-          sellerName: extracted.seller_name ?? null,
-          otherSellersCount: extracted.other_sellers_count ?? null,
-        }),
-        shouldFetchFollowerCount
-          ? fetchTrendyolFollowerCountByMerchantId(extracted.merchant_id!)
-          : Promise.resolve(null),
-      ]);
-
-      if (typeof followerCount === "number") {
-        extracted.follower_count = followerCount;
-        fieldMetadata.follower_count = {
-          source: "api",
-          confidence: "high",
-          timestamp: Date.now(),
-          reason: "trendyol sellerstore-follow api",
-        };
-        traceEvent(debugTrace, {
-          stage: "merge",
-          code: "follower_count_runtime_fallback_success",
-          message: "follower_count runtime fallback ile dolduruldu.",
-          field: "follower_count",
-          meta: {
-            merchantId: extracted.merchant_id,
-            followerCount,
-          },
-        });
-      } else if (shouldFetchFollowerCount) {
-        traceEvent(debugTrace, {
-          stage: "merge",
-          level: "warn",
-          code: "follower_count_runtime_fallback_missed",
-          message: "follower_count runtime fallback denendi ama sonuc alinmadi.",
-          field: "follower_count",
-          meta: {
-            merchantId: extracted.merchant_id,
-          },
-        });
-      }
-
-      if (reviewAnalysis) {
-        extracted.review_analysis = reviewAnalysis;
-        extracted.review_records = reviewAnalysis.general?.recent_reviews ?? null;
-        extracted.rating_value =
-          extracted.rating_value ?? reviewAnalysis.general?.average_rating ?? null;
-        extracted.review_count =
-          extracted.review_count ?? reviewAnalysis.general?.total_comment_count ?? null;
-        extracted.rating_breakdown =
-          extracted.rating_breakdown ?? reviewAnalysis.general?.rating_breakdown ?? null;
-        extracted.review_summary =
-          extracted.review_summary ?? reviewAnalysis.general?.review_summary ?? null;
-        extracted.review_themes =
-          extracted.review_themes ?? reviewAnalysis.general?.review_themes ?? null;
-        extracted.top_positive_review_hits =
-          extracted.top_positive_review_hits ??
-          reviewAnalysis.general?.top_positive_review_hits ??
-          null;
-        extracted.top_negative_review_hits =
-          extracted.top_negative_review_hits ??
-          reviewAnalysis.general?.top_negative_review_hits ??
-          null;
-        if (!extracted.review_snippets && reviewAnalysis.general?.recent_reviews?.length) {
-          extracted.review_snippets = reviewAnalysis.general.recent_reviews
-            .slice(0, 8)
-            .map((review) => ({
-              rating: review.rating,
-              text: review.text,
-            }));
-        }
-      }
+      await enrichTrendyolReviewSignals({
+        url: params.url,
+        extracted,
+        fieldMetadata,
+        debugTrace,
+      });
     } catch (error) {
       traceEvent(debugTrace, {
         stage: "parse",
@@ -766,20 +333,15 @@ export async function runAnalysisPipeline(
     },
   });
 
-  // Phase 1: Attach metadata to analysis result
-  analysis._fieldMetadata = fieldMetadata;
-  analysis._normalizedFieldMetadata = consolidatedInput._fieldMetadata;
-  analysis.extractorHealth = extractorHealth;
-  analysis.debugTrace = null;
-
-  // Log health score (for debugging)
-  if (process.env.NODE_ENV === "development") {
-    const healthScore = calculateHealthScore(extractorHealth);
-    const healthStatus = getHealthStatusLabel(healthScore);
-    console.log(
-      `[Extraction Health] Platform: ${extractorHealth.platformDetected}, Score: ${healthScore}/100 (${healthStatus}), Critical: ${extractorHealth.criticalFieldsFound}/${CRITICAL_FIELDS.length}`
-    );
-  }
+  attachDeterministicMetadata({
+    analysis,
+    fieldMetadata,
+    normalizedFieldMetadata: consolidatedInput._fieldMetadata,
+    extractorHealth,
+  });
+  logExtractorHealth({
+    extractorHealth,
+  });
 
   const learningContext = await getLearningContext({
     platform,
@@ -789,187 +351,16 @@ export async function runAnalysisPipeline(
     includeSynthetic: params.includeSyntheticLearning,
   });
 
-  analysis.categoryAverages = buildCategoryAverages(learningContext);
-
-  if (analysis.trendyolScorecard) {
-    analysis.trendyolScorecard = await enrichTrendyolScorecardWithAi({
-      extracted: analysis.extractedData,
-      scorecard: analysis.trendyolScorecard,
-    });
-    analysis.seoScore = analysis.trendyolScorecard.searchVisibility.score;
-    analysis.conversionScore = analysis.trendyolScorecard.conversionPotential.score;
-    analysis.overallScore = Math.max(
-      0,
-      Math.min(
-        100,
-        Math.round(
-          analysis.trendyolScorecard.overall.score * 0.65 +
-            analysis.dataCompletenessScore * 0.2 +
-            analysis.trendyolScorecard.conversionPotential.score * 0.15
-        )
-      )
-    );
-  }
-
-  let aiResult: Awaited<ReturnType<typeof analyzeWithAi>> = null;
-  const aiEligibility = isAiAnalysisEligible(consolidatedInput);
-  const contract = evaluateAnalysisContract({
-    input: consolidatedInput,
-    aiEligibility,
-  });
-
-  if (process.env.NODE_ENV === "development") {
-    console.log(
-      `[AI Eligibility] ${aiEligibility.reason} | contract: ${contract.aiDecision.reason}`
-    );
-  }
-
-  // AI, veri kalitesine göre çalıştırılır.
-  // Bu, AI'ın eksik veya zayıf veriyle hatalı yorumlar üretmesini engeller.
-  const shouldRunAi = contract.aiDecision.executed;
-
-  if (shouldRunAi) {
-    emitProgress({
-      stage: "ai",
-      step: 5,
-      totalSteps: 6,
-      label: "AI yorumu uretiliyor",
-      detail: "Deterministik bulgular aciklamaya ve aksiyon diline donusuyor.",
-      preview: {
-        mode: contract.aiDecision.mode,
-        confidence: contract.confidence,
-      },
-    });
-    const aiStartedAt = Date.now();
-    aiResult = await analyzeWithAi({
-      consolidatedInput,
-      packet: {
-        ...analysis.decisionSupportPacket,
-        coverage: {
-          ...analysis.decisionSupportPacket.coverage,
-          confidence: contract.confidence,
-        }
-      },
-      extracted: analysis.extractedData,
-      url: params.url,
-      learningContext,
-      missingDataReport: missingDataReport,
-      baseline: {
-        summary: analysis.summary,
-        strengths: analysis.strengths,
-        weaknesses: analysis.weaknesses,
-        suggestions: analysis.suggestions,
-        seo_score: analysis.seoScore,
-        conversion_score: analysis.conversionScore,
-        overall_score: analysis.overallScore,
-      },
-      eligibility: aiEligibility,
-    });
-    aiMs = Date.now() - aiStartedAt;
-    traceEvent(debugTrace, {
-      stage: "analysis",
-      code: "ai_analysis_completed",
-      message: "AI enrichment calisti.",
-      meta: {
-        aiMs,
-        eligible: aiEligibility.eligible,
-        contractMode: contract.aiDecision.mode,
-      },
-    });
-  }
-
-  if (aiResult) {
-    if (aiEligibility.guidance.allowNarrativeExpansion && hasText(aiResult.summary)) {
-      analysis.summary = aiResult.summary;
-    }
-
-    if (
-      aiEligibility.guidance.allowStrengthWeaknessRewrite &&
-      aiResult.strengths.length > 0
-    ) {
-      analysis.strengths = aiResult.strengths;
-    }
-
-    if (
-      aiEligibility.guidance.allowStrengthWeaknessRewrite &&
-      aiResult.weaknesses.length > 0
-    ) {
-      analysis.weaknesses = aiResult.weaknesses;
-    }
-
-    if (aiResult.suggestions.length > 0) {
-      analysis.suggestions = aiResult.suggestions.slice(
-        0,
-        aiEligibility.guidance.maxSuggestions
-      );
-    }
-
-    const aiPriorityActions = buildAiPriorityActionsFromSuggestions(
-      analysis.suggestions
-    );
-
-    analysis.priorityActions =
-      aiPriorityActions.length > 0
-        ? aiPriorityActions
-        : buildPriorityActions(
-            analysis.extractedData,
-            analysis.derivedMetrics,
-            analysis.suggestions,
-            consolidatedInput.marketComparison
-          );
-
-    if (
-      aiEligibility.guidance.allowScoreOverrides &&
-      shouldUseAiScore(aiResult.seo_score, analysis.seoScore)
-    ) {
-      analysis.seoScore = aiResult.seo_score;
-    }
-
-    if (
-      aiEligibility.guidance.allowScoreOverrides &&
-      shouldUseAiScore(aiResult.conversion_score, analysis.conversionScore)
-    ) {
-      analysis.conversionScore = aiResult.conversion_score;
-    }
-
-    if (
-      aiEligibility.guidance.allowScoreOverrides &&
-      shouldUseAiScore(aiResult.overall_score, analysis.overallScore)
-    ) {
-      analysis.overallScore = aiResult.overall_score;
-    }
-
-    analysis.aiCommentary = {
-      mode: "ai_enriched",
-      summary: analysis.summary,
-    };
-  }
-
-  analysis.analysisTrace = buildAnalysisTrace({
-    mode: aiResult ? "ai_enriched" : "deterministic",
-    aiDecision: {
-      eligible: aiEligibility.eligible,
-      executed: aiResult !== null,
-      mode: contract.aiDecision.mode,
-      reason: contract.aiDecision.reason,
-      blockingFields:
-        contract.blockingFields.length > 0
-          ? contract.blockingFields
-          : aiEligibility.blockingFields,
-      coverageTier: contract.coverageTier,
-    },
-    summary: analysis.summary,
-    suggestions: analysis.suggestions,
-    packet: analysis.decisionSupportPacket,
-    extracted: analysis.extractedData,
-    derivedMetrics: analysis.derivedMetrics,
-    seoScore: analysis.seoScore,
-    conversionScore: analysis.conversionScore,
-    overallScore: analysis.overallScore,
+  const finalizeResult = await enrichAnalysisForDelivery({
+    analysis,
+    consolidatedInput,
+    url: params.url,
     learningContext,
-    missingDataReport: missingDataReport,
+    missingDataReport,
+    debugTrace,
+    emitProgress,
   });
-  analysis.debugTrace = emitDebugTrace(debugTrace, "SellBoostInternalTrace");
+  aiMs = finalizeResult.aiMs;
 
   return {
     platform,

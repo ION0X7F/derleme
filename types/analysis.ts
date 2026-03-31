@@ -9,6 +9,15 @@ export type PriorityAction = {
   priority: number;
   title: string;
   detail: string;
+  key?: string;
+  source?: "rule" | "ai" | "ai_raw";
+  severity?: "high" | "medium" | "low";
+  weight?: number;
+  kind?: string;
+  change?: string;
+  evidence?: string;
+  outcome?: string;
+  ruleIds?: string[];
 };
 
 export type AccessPlan = "guest" | "free" | "pro" | "enterprise";

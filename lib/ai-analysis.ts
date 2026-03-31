@@ -1,7 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
   parseAnalysisSummary,
-  syncStructuredSummaryWithSuggestions,
 } from "@/lib/analysis-summary";
 import {
   buildAiLearningPromptSection,
@@ -607,6 +606,7 @@ function buildBenchmarkDeltaSummary(
   return deltas.slice(0, 4);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildSignalDigest(params: {
   packet: DecisionSupportPacket;
   extracted: ExtractedProductFields;
@@ -668,6 +668,7 @@ function buildSignalDigest(params: {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildDataQualitySummary(
   input: ConsolidatedAnalysisInput
 ): string {
@@ -732,6 +733,7 @@ function buildDataQualitySummary(
   return parts.join(" ");
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildAiMarketContext(input: ConsolidatedAnalysisInput) {
   const market = input.marketComparison;
   const safeList = (items: unknown[]) =>
@@ -983,16 +985,6 @@ async function buildPrompt(params: {
   missingDataReport?: MissingDataReport | null,
   eligibility: AiEligibilityResult,
 }) {
-  const {
-    consolidatedInput,
-    packet,
-    extracted,
-    url,
-    learningContext,
-    missingDataReport,
-    eligibility,
-  } = params;
-  
   return `
 Bu urun linkini incele ve sadece musteri gibi dusun.
 Sadece bu iki soruya cevap ver:
@@ -1000,7 +992,7 @@ Sadece bu iki soruya cevap ver:
 2) Bu urunu satin almazsan neden almazdin?
 
 Kurallar:
-- Sadece bu linki kullan: ${url}
+- Sadece bu linki kullan: ${params.url}
 - Sadece bu urune odaklan.
 - Acik, net, durust yaz.
 - Bizim verimizi, signal ozetlerini veya ek baglamlari kullanma.
@@ -1355,9 +1347,8 @@ function postProcessAiResult(
   result: RawAiAnalysisResult,
   extracted: ExtractedProductFields,
   fallback: AiAnalysisResult,
-  consolidatedInput: ConsolidatedAnalysisInput,
-  eligibility: AiEligibilityResult,
-  learningContext?: LearningContext | null
+  _consolidatedInput: ConsolidatedAnalysisInput,
+  eligibility: AiEligibilityResult
 ): AiAnalysisResult {
   const suggestionLimit = eligibility.guidance.maxSuggestions;
   const validatedAiSuggestions = collectEvidenceFilteredSuggestions({
@@ -1969,8 +1960,7 @@ export async function analyzeWithAi(params: {
       params.extracted,
       fallback,
       params.consolidatedInput,
-      params.eligibility,
-      params.learningContext
+      params.eligibility
     );
   } catch (err) {
     console.error("AI analysis error:", err);
