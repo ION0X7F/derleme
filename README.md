@@ -76,6 +76,7 @@ server tarafinda eslesen client id/secret ciftinin birlikte tanimli olmasi gerek
 
 ```bash
 npm run build
+npm run release:status
 npm run test:readiness-suite
 npm run test:pre-release
 npm run test:auth-callback
@@ -110,6 +111,15 @@ npm run test:release-readiness
 npm run test:ai-decision
 npm run lab:analysis-quality
 ```
+
+## Release Operasyonlari
+
+- Hizli durum ozeti: `npm run release:status`
+- Release index: [RELEASE_INDEX_2026-04-01.md](RELEASE_INDEX_2026-04-01.md)
+- Release notlari: [RELEASE_NOTES_2026-04-01.md](RELEASE_NOTES_2026-04-01.md)
+- Deploy checklist: [DEPLOY_CHECKLIST_2026-04-01.md](DEPLOY_CHECKLIST_2026-04-01.md)
+- Handoff ozeti: [HANDOFF_2026-04-01.md](HANDOFF_2026-04-01.md)
+- Durum ozeti: [STATUS_2026-04-01.md](STATUS_2026-04-01.md)
 
 ## Kritik Dosyalar
 
